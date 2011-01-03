@@ -1,0 +1,29 @@
+<?xml version="1.0"?>
+<museumPlusExport xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns="http://www.mpx.org/mpx"
+	xsi:schemaLocation="http://www.mpx.org/mpx file:/c:/cygwin/home/Mengel/usr/levelup/lib/mpx-lvl2.v2.xsd">
+	<sammlungsobjekt objId="524" exportdatum="2010-04-20T11:21:49">
+		<bearbDatum>23.09.2008</bearbDatum>
+		<credits>
+			Staatliche Museen zu Berlin, Preu&#xDF;ischer Kulturbesitz,
+			Ethnologisches Museum
+		</credits>
+		<identNr art="Ident. Nr.">IV Ca Nls 527</identNr>
+		<maßangabe typ="L&#xE4;nge">8,5 cm</maßangabe>
+		<materialTechnik art="Material">Ton</materialTechnik>
+		<objekttyp>Musikinstrument</objekttyp>
+		<objStatus>vorhanden</objStatus>
+		<personKörperschaftRef id="1">
+			kein Eintrag
+		</personKörperschaftRef>
+		<sachbegriff art="Sachbegriff">Tonpfeife</sachbegriff>
+		<ständigerStandort>
+			Depot/Studiensammlung (Amerikanische Arch&#xE4;ologie) / S:
+			22, F: 1, Kasten: A
+		</ständigerStandort>
+		<verantwortlichkeit>EM-Am Arch&#xE4;ologie</verantwortlichkeit>
+		<verwaltendeInstitution>
+			Ethnologisches Museum, Staatliche Museen zu Berlin
+		</verwaltendeInstitution>
+	</sammlungsobjekt>
+</museumPlusExport>
