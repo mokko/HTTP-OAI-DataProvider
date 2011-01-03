@@ -1,0 +1,7 @@
+.#*
+*~
+blib
+Makefile
+Makefile.old
+devel-test
+pm_to_blib
