@@ -7,6 +7,7 @@ use HTTP::OAI::DataProvider::SQLite;
 use XML::LibXML;
 use XML::LibXML::XPathContext;
 use Data::Dumper qw/Dumper/;
+use utf8;    #for verknupftesObjekt
 sub debug;
 
 =head1 NAME
@@ -76,12 +77,12 @@ todo
 # user input
 #
 
-if (!$ARGV[0]) {
+if ( !$ARGV[0] ) {
 	print "Error: Need to specify digest file\n";
 	exit 1;
 }
 
-if (! -f $ARGV[0]) {
+if ( !-f $ARGV[0] ) {
 	print "Error: Specified digest files does not exist\n";
 	print "Try /home/Mengel/projects/Salsa_OAI2/data/fix-test.lvl2.mpx\n";
 	exit 1;
@@ -156,7 +157,7 @@ sub extractRecords {
 		my $objId  = $objIds[0]->value;
 
 		#because xpath issues make md before header
-		my $md = _mk_md( $doc, $objId );
+		my $md = $self->main::_mk_md( $doc, $objId );
 
 		#header stuff except sets
 		my $header = _extractHeader($node);
@@ -219,40 +220,76 @@ sub _extractHeader {
 #metadata for one object including related data (todo) as HTTP::OAI::Metadata
 #object
 sub _mk_md {
-	my $doc       = shift; #original doc, a potentially big mpx/xml document
+	my $self      = shift;
+	my $doc       = shift;    #original doc, a potentially big mpx/xml document
 	my $currentId = shift;
 
 	#get root element from original doc
-	#speed is not mission critical,so I don't have to cache this operation
+	#speed is not mission critical since this is part of the digester
+	#so I don't have to cache this operation
 	my @list = $doc->findnodes('/mpx:museumPlusExport');
 	if ( !$list[0] ) {
 		die "Cannot find root element";
 	}
 
+	#make new doc
 	my $new_doc = XML::LibXML::Document->createDocument( "1.0", "UTF-8" );
+
+	#add root
 	my $root = $list[0]->cloneNode(0);    #0 not deep. It works!
 	$new_doc->setDocumentElement($root);
 
-	my @nodes = $doc->findnodes(qq(/mpx:museumPlusExport/mpx:sammlungsobjekt[\@objId = '$currentId']));
-	$root->appendChild($nodes[0]);
+	#get current node
+	my @nodes =
+	  $doc->findnodes(
+		qq(/mpx:museumPlusExport/mpx:sammlungsobjekt[\@objId = '$currentId']));
+	my $node = $nodes[0];
 
-	#todo: append related personK;rperschaft and multimedia records
-	
-	#foreach (personKörperschaftRef\@id) {
-	#   $kueId=personKörperschaftRef\@id
-	#   if (exists personKörperschaft[@kueId = $kueId]) {
-	#      appendChild
-	#   }
-	#}
+	#related info: verknüpftesObjekt
+	{
+		my $xpath =
+		  qw (/mpx:museumPlusExport/mpx:multimediaobjekt)
+		  . qq([mpx:verknüpftesObjekt = '$currentId']);
 
-	#
-	#foreach (verknüpftesObjekt) {
-	#  $mulId=verknüpftesObjekt	
-	#  appendChild (multimediaobjekt, $mulId)
-	#}
-	
+		#debug "DEBUG XPATH $xpath\n";
+
+		my @mume = $doc->findnodes($xpath);
+		foreach my $mume (@mume) {
+
+			#debug 'MUME' . $mume->toString . "\n";
+			$root->appendChild($mume);
+		}
+	}
+
+	#related info: personKörperschaft
+	{
+		my $node   = $self->_registerNS($node);
+		my @kueIds = $node->findnodes('mpx:personKörperschaftRef/@id');
+
+		foreach my $kueId (@kueIds) {
+
+			my $id=$kueId->value;
+
+			my $xpath =
+			  qw (/mpx:museumPlusExport/mpx:personKörperschaft)
+			  . qq([\@kueId = '$id']);
+			#debug "DEBUG XPATH $xpath\n";
+
+			my @perKors = $doc->findnodes($xpath);
+			foreach my $perKor (@perKors) {
+
+				#debug 'perKor' . $perKor->toString . "\n";
+				$root->appendChild($perKor);
+			}
+		}
+	}
+
+	#attach the complete sammlungsdatensatz, there can be only one
+	$root->appendChild($node);
 
 	#should I also validate the stuff?
+
+	#MAIN DEBUG
 	debug "debug output\n" . $new_doc->toString;
 
 	#wrap into dom into HTTP::OAI::Metadata
@@ -278,8 +315,8 @@ sub setRules {
 	if ($objekttyp) {
 
 		#debug "   objekttyp: $objekttyp\n";
-		if ( $objekttyp eq 'Musikinstrument' ) {
-			$header->setSpec('MIMO');
+		if ( $objekttyp eq ' Musikinstrument ' ) {
+			$header->setSpec(' MIMO ');
 			debug "    set setSpect MIMO";
 		}
 	}
