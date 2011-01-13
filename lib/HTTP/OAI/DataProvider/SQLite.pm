@@ -72,7 +72,7 @@ sub digest_single {
 	my $doc = $self->_loadXML( $args{source} );
 
 	if ( !$doc ) {
-		croak "No document for whatever reason";
+		croak "No document";
 	}
 
 	if ( !$args{mapping} ) {
@@ -289,6 +289,8 @@ sub _storeRecord {
 	my $md=$record->metadata;
 	my $identifier = $header->identifier;
 	my $datestamp  = $header->datestamp;
+
+	#todo: overwrite only those items where datestamp is equal or newer
 
 	debug "Enter _storeRecord";
 

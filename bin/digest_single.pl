@@ -181,9 +181,9 @@ sub extractRecords {
 		push @records, $record;
 
 		#debug;
-		if ( ++$counter == 5 ) {
-			return @records;
-		}
+		#if ( ++$counter == 5 ) {
+		#	return @records;
+		#}
 
 	}
 	return @records;
