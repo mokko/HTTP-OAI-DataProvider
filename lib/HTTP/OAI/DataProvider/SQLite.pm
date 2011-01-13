@@ -19,34 +19,37 @@ use Data::Dumper;
 
 =head1 NAME
 
-HTTP::OAI::DataProvider::SQLite - Create/query OAI header information and store
-it in sqlite.
+HTTP::OAI::DataProvider::SQLite - A sqlite engine for HTTP::OAI::DataProvider
 
 =head1 SYNOPSIS
 
-	#PHASE 1: Creating new cache
-	use HTTP::OAI::DataProvider::SQLite qw/import_single import_dir/;
-	my $cache=new HTTP::OAI::DataProvider::SQLite (ns_prefix=>$prefix,
+1) Creat a new cache
+	use HTTP::OAI::DataProvider::SQLite;
+	my $engine=new HTTP::OAI::DataProvider::SQLite (ns_prefix=>$prefix,
 		ns_uri=$uri);
 
+	my $err=$engine->digest_single (source=>$xml_fn, mapping=>&mapping);
 
-	my $err=$cache->digest_single (source=>$xml_fn, mapping=>&mapping);
-	#my $err=$cache->digest_dir (source=>$xml_fn, mapping=>&mapping);
-
-	#PHASE2: Using the cache
-	use HTTP::OAI::DataProvider::SQLite::HeaderCache
-	my $cache=new HTTP::OAI::DataProvider::SQLite::HeaderCache(
+2) Use the cache
+	use HTTP::OAI::DataProvider::SQLite::HeaderCache;
+	my $engine=new HTTP::OAI::DataProvider::SQLite(
 		ns_prefix=>$prefix, ns_uri=$uri);
 
-	$result=$cache->query(from=>$from, until=>$until, set=>$set);
+	$result=$engine->query(from=>$from, until=>$until, set=>$set);
+	TODO
+
 
 =head1 DESCRIPTION
 
-Provide a db for HTTP::OAI::DataProvider and abstract all the database action.
+Provide a sqlite for HTTP::OAI::DataProvider and abstract all the database
+action to store, modify and access header and metadata information.
 
 =cut
 
 =head2 debug "blabla bla";
+
+TODO: Should go to HTTP::OAI::DataProvider or similar.
+
 =cut
 
 sub debug {
@@ -57,7 +60,7 @@ sub debug {
 	}
 }
 
-=head2 	my $err=$cache->digest_single (source=>$xml_fn, mapping=>&mapping);
+=head2 	my $err=$engine->digest_single (source=>$xml_fn, mapping=>&mapping);
 =cut
 
 sub digest_single {
@@ -81,31 +84,20 @@ sub digest_single {
 
 	#debug "test: " . $args{mapping};
 
+	my $mapping = $args{mapping};
 	no strict "refs";
-
-	#I don't know how to do this with arrow notation
-	my @records = &{ $args{mapping} }( $self, $doc );
+	while ( my $record = $self->$mapping($doc) ) {
+		$self->_storeRecord($record);
+	}
 	use strict "refs";
 
-	foreach my $record (@records) {
-
-		#$self->_practice_select($header);
-
-		$self->_storeRecord($record);
-		#debug 'record:' . $record->metadata->toString;
-
-		#$self->_showRecord($record);
-
-		#insert into sqlite ONLY if not already there
-
-	}
 }
 
 =head2 $self->showRecord($record);
 =cut
 
 sub _showRecord {
-	my $self=shift;
+	my $self   = shift;
 	my $record = shift;
 	debug "Enter showRecord";
 
@@ -122,9 +114,10 @@ sub _showRecord {
 		debug "--ABOUT--";
 		debug $record->metadata->toString;
 	}
-#	my $list= new HTTP::OAI::ListRecord;
-#	$list->record($record);
-#	debug $list->toDOM->toString;
+
+	#	my $list= new HTTP::OAI::ListRecord;
+	#	$list->record($record);
+	#	debug $list->toDOM->toString;
 	#my $gr = new HTTP::OAI::GetRecord();
 	#$gr->record($record);
 
@@ -137,6 +130,7 @@ sub _showRecord {
 	#debug "wewe" . $writer;
 }
 
+#outdated db scheme
 sub _practice_select {
 	my $header = shift;
 	my ( $records_id, $identifier, $datestamp, $setSpec );
@@ -224,18 +218,25 @@ sub _init_db {
 	if ( !$dbh ) {
 		carp "Error: database handle missing";
 	}
+
+	$dbh->do("PRAGMA foreign_keys");
+	$dbh->do("PRAGMA cache_size = 8000"); #doesn't make a big difference
+	#default is 2000
+
+	#I could make identifier the primary key. What are advantages and
+	#disadvantages? I guess primary key cannot be text
+
 	my $sql = q /CREATE TABLE if not exists sets (
-  		'setSpec' string not null,
-  		'recordID' integer not null)/;
+  		'setSpec' STRING NOT NULL,
+  		'identifier' TEXT NOT NULL REFERENCES records(identifier))/;
 
 	#debug $sql. "\n";
 	$dbh->do($sql) or die $dbh->errstr;
 
 	$sql = q/CREATE TABLE if not exists records (
-  		'id' integer primary key autoincrement,
-  		'identifier' text not null,
-  		'datestamp'  text not null,
-  		'native_md' blob)/;
+  		'identifier' TEXT PRIMARY KEY NOT NULL ,
+  		'datestamp'  TEXT NOT NULL ,
+  		'native_md' BLOB)/;
 
 	#debug $sql. "\n";
 	$dbh->do($sql) or die $dbh->errstr;
@@ -285,8 +286,8 @@ sub _storeRecord {
 	my $self   = shift;
 	my $record = shift;
 
-	my $header= $record->header;
-	my $md=$record->metadata;
+	my $header     = $record->header;
+	my $md         = $record->metadata;
 	my $identifier = $header->identifier;
 	my $datestamp  = $header->datestamp;
 
@@ -317,54 +318,70 @@ sub _storeRecord {
 		croak "No database handle!";
 	}
 
+	#currently:
+	#try to update and if update fails insert
 
-	my $up = qq(UPDATE records SET datestamp=?, native_md=? WHERE
-		identifier=?);
-	my $in = qq/INSERT INTO records(identifier, datestamp, native_md) VALUES
-		(?,?,?)/;
+	#now I want to add: update only when datestamp equal or newer
+	#i.e. correct behavior might be
+	#a) insert because rec does not yet exist at all
+	#b) update because rec exists and is older
+	#c) do nothing because rec exists already and is newer
+	#my first idea is to check with a SELECT
+	#get datestamp and determine which of the two actions or none
+	#have to be taken
 
-	my $id = qq/SELECT id FROM records WHERE identifier=?/;
+	my $check = qq(SELECT datestamp FROM records WHERE identifier = ?);
+	my $sth = $dbh->prepare($check) or croak $dbh->errstr();
+	$sth->execute($identifier) or croak $dbh->errstr();
+	my $datestamp_db = $sth->fetchrow_array;
 
-	#attempt update
-	my $sth = $dbh->prepare($up) or croak $dbh->errstr();
-	$sth->execute( $datestamp, $md->toString, $identifier ) or croak $dbh->errstr();
+	#croak $dbh->errstr();
 
-	#attempt insert
-	if ( $sth->rows == 0 ) {
-		my $sth = $dbh->prepare($in) or croak $dbh->errstr();
-		$sth->execute( $identifier, $datestamp,$md->toString ) or croak $dbh->errstr();
-		$id = $dbh->last_insert_id( undef, undef, 'records', undef );
-		debug "  insert-id: $id";
+	if ($datestamp_db) {
+
+		#if datestamp, then compare db and source datestamp
+		#debug "datestamp source: $datestamp // datestamp $datestamp_db";
+		if ( $datestamp_db le $datestamp ) {
+			debug "$identifier exists and date equal or newer -> update";
+			my $up =
+			    q/UPDATE records SET datestamp=?, native_md =? /
+			  . q/WHERE identifier=?/;
+
+			#debug "UPDATE:$up";
+			my $sth = $dbh->prepare($up) or croak $dbh->errstr();
+			$sth->execute( $datestamp, $md->toString, $identifier )
+			  or croak $dbh->errstr();
+		}
+
+		#else: db date is older than current one -> NO update
 	} else {
+		debug "$identifier new -> insert";
 
-		#all this trouble for last_update_id?
-		my $sth = $dbh->prepare($id) or croak $dbh->errstr();
-		$sth->execute($identifier) or croak $dbh->errstr();
-		$id = $sth->fetch->[0];
-		debug "  update-id: $id";
+		#if no datestamp, then no record -> insert one
+		#this implies every record MUST have a datestamp!
+		my $in =
+		    q/INSERT INTO records(identifier, datestamp, native_md)/
+		  . q/VALUES (?,?,?)/;
+		#debug "INSERT:$in";
+		my $sth = $dbh->prepare($in) or croak $dbh->errstr();
+		$sth->execute( $identifier, $datestamp, $md->toString )
+		  or croak $dbh->errstr();
 	}
 
-	debug "rows affected:";
-
-	#delete all sets with that recordID
-	#debug "delete Sets for record $id";
-	my $deleteSets = qq/DELETE FROM sets WHERE recordID=?/;
+	debug "delete Sets for record $identifier";
+	my $deleteSets = qq/DELETE FROM sets WHERE identifier=?/;
 	$sth = $dbh->prepare($deleteSets) or croak $dbh->errstr();
-	$sth->execute($id) or croak $dbh->errstr();
+	$sth->execute($identifier) or croak $dbh->errstr();
 
 	if ( $header->setSpec ) {
 		foreach my $set ( $header->setSpec ) {
-
-			#debug "write new set:" . $set;
-			my $addSet = qq/INSERT INTO sets (setSpec, recordID) VALUES
-				(?, ?)/;
+			debug "write new set:" . $set;
+			my $addSet =
+			  q/INSERT INTO sets (setSpec, identifier) VALUES (?, ?)/;
 			$sth = $dbh->prepare($addSet) or croak $dbh->errstr();
-			$sth->execute( $set, $id ) or croak $dbh->errstr();
-
+			$sth->execute( $set, $identifier ) or croak $dbh->errstr();
 		}
-
 	}
-
 }
 
 #outdated. Looking for better way to outsource something

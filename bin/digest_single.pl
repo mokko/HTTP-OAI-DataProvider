@@ -8,6 +8,7 @@ use XML::LibXML;
 use XML::LibXML::XPathContext;
 use Data::Dumper qw/Dumper/;
 use utf8;    #for verknupftesObjekt
+our $debug = 0;    #not sure if this works as intended
 sub debug;
 
 =head1 NAME
@@ -90,14 +91,14 @@ if ( !-f $ARGV[0] ) {
 
 #todo: outsource configuration to a Dancer config file
 
-my $cache = new HTTP::OAI::DataProvider::SQLite(
+my $engine = new HTTP::OAI::DataProvider::SQLite(
 	dbfile    => '/home/Mengel/projects/HTTP-OAI-DataProvider/db',
 	ns_prefix => 'mpx',
 	ns_uri    => 'http://www.mpx.org/mpx',
 );
 
 #todo: outsource configuration, see above
-my $err = $cache->digest_single(
+my $err = $engine->digest_single(
 	source  => $ARGV[0],
 	mapping => 'main::extractRecords',
 );
@@ -111,7 +112,9 @@ if ($err) {
 #
 
 sub debug {
-	HTTP::OAI::DataProvider::SQLite::debug @_;
+	if ( $debug > 0 ) {
+		HTTP::OAI::DataProvider::SQLite::debug @_;
+	}
 }
 
 =head2 my @records=extractRecords ($doc);
@@ -139,7 +142,6 @@ import_dir.
 sub extractRecords {
 	my $self = shift;
 	my $doc  = shift;    #old document
-	my @records;
 
 	debug "Enter extractRecords ($doc)";
 
@@ -174,20 +176,8 @@ sub extractRecords {
 			metadata => $md,
 		);
 
-		#i could put records in ListRecords or in an array
-
-		#debug 'sdsds'.Dumper $record;
-
-		push @records, $record;
-
-		#debug;
-		#if ( ++$counter == 5 ) {
-		#	return @records;
-		#}
-
+		return $record;
 	}
-	return @records;
-
 }
 
 #includes the logic of how to extract OAI header information from the node
@@ -268,11 +258,12 @@ sub _mk_md {
 
 		foreach my $kueId (@kueIds) {
 
-			my $id=$kueId->value;
+			my $id = $kueId->value;
 
 			my $xpath =
 			  qw (/mpx:museumPlusExport/mpx:personKörperschaft)
 			  . qq([\@kueId = '$id']);
+
 			#debug "DEBUG XPATH $xpath\n";
 
 			my @perKors = $doc->findnodes($xpath);
@@ -290,7 +281,7 @@ sub _mk_md {
 	#should I also validate the stuff?
 
 	#MAIN DEBUG
-	debug "debug output\n" . $new_doc->toString;
+	#debug "debug output\n" . $new_doc->toString;
 
 	#wrap into dom into HTTP::OAI::Metadata
 	my $md = new HTTP::OAI::Metadata( dom => $new_doc );
@@ -310,14 +301,17 @@ sub setRules {
 	my $node   = shift;
 	my $header = shift;
 
+	$debug = 0;
+	debug "Enter setRules";
+
 	#setSpec: MIMO
 	my $objekttyp = $node->findvalue('mpx:objekttyp');
 	if ($objekttyp) {
 
 		#debug "   objekttyp: $objekttyp\n";
-		if ( $objekttyp eq ' Musikinstrument ' ) {
+		if ( $objekttyp eq 'Musikinstrument' ) {
 			$header->setSpec(' MIMO ');
-			debug "    set setSpect MIMO";
+			debug "    set setSpec MIMO";
 		}
 	}
 
