@@ -5,23 +5,26 @@ use strict;
 use XML::SAX::Writer;
 use Carp qw/croak carp/;
 
+#should be only temporary, for warning and debug
+use Dancer ':syntax';
+
 #for easier development, will go away later
 use lib '/home/Mengel/projects/HTTP-OAI-DataProvider/lib';
 
 #verbs - this time without exporter. Yay!
 use HTTP::OAI::DataProvider::GetRecord;
+#use HTTP::OAI::DataProvider::Identify;
 use HTTP::OAI::DataProvider::ListIdentifiers;
 use HTTP::OAI::DataProvider::ListSets;
 use HTTP::OAI::DataProvider::ListRecords;
-use HTTP::OAI::DataProvider::MetadataFormats;
-use HTTP::OAI::GlobalFormats;
-#Identify is here because so small, might still go
+use HTTP::OAI::DataProvider::ListMetadataFormats;
+use HTTP::OAI::DataProvider::GlobalFormats;
 
-sub warning; #todo
-sub debug; #todo
+#sub warning;    #todo
+#sub debug;      #todo
 
-our $warning=0;;
-our $debug=0;
+our $warning = 0;
+our $debug   = 0;
 
 =head1 NAME
 
@@ -264,22 +267,17 @@ xslt=>'path/to/style.xslt',
 sub new {
 	my $class = shift;
 	my %args  = @_;
-	my $self  = {};
-
-	bless( $self, $class );
 
 	if ( $args{warning} ) {
 		$warning = $args{warning};
+		delete $args{warning};
 	}
 
 	if ( $args{debug} ) {
 		$debug = $args{debug};
+		delete $args{debug};
 	}
-
-	if ( !$args{engine} ) {
-		croak "Engine not defined!";
-	}
-
+	my $self = \%args;    #probably not a secure thing to do
 	bless( $self, $class );
 	return $self;
 }
@@ -290,6 +288,7 @@ sub new {
 #
 #
 #
+
 =head1 METHODS - VERBS
 
 =head2 my $result=$provider->GetRecord(%params);
@@ -299,10 +298,10 @@ Todo: Might become AUTOLOAD? Better than this senseless code duplication!
 =cut
 
 sub GetRecord {
-	my $self=shift;
-	my %params=shift;
+	my $self   = shift;
+	my %params = shift;
 
-	return (HTTP::OAI::DataProvider::GetRecord->new ($self, %params));
+	return ( HTTP::OAI::DataProvider::GetRecord->do( $self, %params ) );
 }
 
 =head2 my $response=$provider->Identify();
@@ -324,76 +323,73 @@ prompty return a xml string.
 =cut
 
 sub Identify {
+
 	my $self = shift;
-	warning "Enter Identify";    #.' ['. $self->head_count.']';
+	debug "Enter Identify (HTTP::OAI::DataProvider)";
 	no strict "refs";
 
 	#might change and loose args
-	if ( !$self->{args}->{Identify} ) {
+	if ( !$self->{Identify} ) {
 		return
 		  "Error: Identify callback seems not to exist. Check initialization "
 		  . "of HTTP::OAI::DataProvider::Simple";
 	}
+
 	#call the callback for actual data
-	my $response = $self->{args}->{Identify}();
+	my $response = $self->{Identify}();
 	use strict "refs";
 
-	#todo: could check if HTTP::OAI::Identidy object
-	if ( ref $response =~ /HTTP::OAI::Identify/ ) {
-		return $response;
+	debug "I am back from callback";
+
+	if ( ref $response eq 'HTTP::OAI::Identify' ) {
+		if ( $self->{xslt} ) {
+			$response->xslt( $self->{xslt} );
+		}
+
+		# todo: will probably need to go somewhere else
+		my $xml;
+		$response->set_handler( XML::SAX::Writer->new( Output => \$xml ) );
+		$response->generate;
+		return $xml;
+
 	}
-	croak "Return value from $self->{args}->{Identify}() is not of type "
-	  . 'HTTP::OAI::Identify';
-
-
-	# output is untested!
-	# prepare for output as xml string
-	# todo: will probably need to go somewhere else
-	# return $obj->Salsa_OAI::toString;
-
-	if ( $self->{args}->{xslt} ) {
-		$response->xslt( $self->{args}->{xslt} );
-	}
-
-	my $xml;
-	$self->set_handler( XML::SAX::Writer->new( Output => \$xml ) );
-	$self->generate;
-	return $xml;
-
+	croak 'Return value is not of type HTTP::OAI::Identify';
 }
 
 sub ListMetadataFormats {
-	my $self=shift;
-	my %params=shift;
+	my $self   = shift;
+	my %params = shift;
 
-	return (HTTP::OAI::DataProvider::ListMetadataFormats->new ($self, %params));
+	return (
+		HTTP::OAI::DataProvider::ListMetadataFormats->do( $self, %params ) );
 }
 
 sub ListIdentifiers {
-	my $self=shift;
-	my %params=shift;
+	my $self   = shift;
+	my %params = shift;
 
-	return (HTTP::OAI::DataProvider::ListIdentifiers->new ($self, %params));
+	return ( HTTP::OAI::DataProvider::ListIdentifiers->do( $self, %params ) );
 }
 
 sub ListRecords {
-	my $self=shift;
-	my %params=shift;
+	my $self   = shift;
+	my %params = shift;
 
-	return (HTTP::OAI::DataProvider::ListRecords->new ($self, %params));
+	return ( HTTP::OAI::DataProvider::ListRecords->do( $self, %params ) );
 
 }
 
 sub ListSets {
-	my $self=shift;
-	my %params=shift;
+	my $self   = shift;
+	my %params = shift;
 
-	return (HTTP::OAI::DataProvider::ListSets->new ($self, %params));
+	return ( HTTP::OAI::DataProvider::ListSets->do( $self, %params ) );
 }
 
 #
 #
 #
+
 =head1 METHODS - VARIOUS PUBLIC UTILITY FUNCTIONS
 
 check error, display error, warning, debug etc.
@@ -413,7 +409,7 @@ available, but when not just blunt output via print! See warning.
 
 =cut
 
-sub debug {
+sub debug1 {
 	my $msg = shift;
 
 	if ( $msg && $debug gt 0 ) {
@@ -433,7 +429,7 @@ available, but when not just blunt output via print! See debug.
 
 =cut
 
-sub warning {
+sub warning1 {
 	my $msg = shift;
 
 	if ( $msg && $warning gt 0 ) {
@@ -451,6 +447,10 @@ sub warning {
 #
 
 =head1 PRIVATE METHODS
+
+Since HTTP::OAI::DataProvider is to be used by frontend developers, so whatever
+they don't need is private.
+
 
 =head2 $obj= $self->_init_xslt($obj)
 
@@ -476,8 +476,6 @@ sub _init_xslt {
 	}
 	return $obj;
 }
-
-
 
 =head1 AUTHOR
 

@@ -11,9 +11,9 @@ HTTP::OAI::DataProvider::GlobalFormats - Handle global metadata formats!
 
 =head1 SYNOPSIS
 
-    use HTTP::OAI::DataProvider::Simple::GlobalFormats;
+    use HTTP::OAI::DataProvider::GlobalFormats;
 
-    my $globalFormats = HTTP::OAI::DataProvider::Simple::GlobalFormats->new();
+    my $globalFormats = HTTP::OAI::DataProvider::GlobalFormats->new();
 
 	my $err=$globalFormats->register ( ns_prefix => $prefix,
 		ns_uri => $uri, ns_schema => $location
@@ -251,4 +251,4 @@ See http://dev.perl.org/licenses/ for more information.
 
 =cut
 
-1;    # End of HTTP::OAI::Repository::Simple::GlobalMetadataFormats
+1;    # End of HTTP::OAI::Repository::GlobalMetadataFormats

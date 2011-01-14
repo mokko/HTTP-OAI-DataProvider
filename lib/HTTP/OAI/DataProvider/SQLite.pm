@@ -318,9 +318,6 @@ sub _storeRecord {
 		croak "No database handle!";
 	}
 
-	#currently:
-	#try to update and if update fails insert
-
 	#now I want to add: update only when datestamp equal or newer
 	#i.e. correct behavior might be
 	#a) insert because rec does not yet exist at all
@@ -368,6 +365,7 @@ sub _storeRecord {
 		  or croak $dbh->errstr();
 	}
 
+
 	debug "delete Sets for record $identifier";
 	my $deleteSets = qq/DELETE FROM sets WHERE identifier=?/;
 	$sth = $dbh->prepare($deleteSets) or croak $dbh->errstr();
@@ -384,33 +382,6 @@ sub _storeRecord {
 	}
 }
 
-#outdated. Looking for better way to outsource something
-sub _updateOrInsert {
-	my $update = shift;
-	my $insert = shift;
-	my $id     = shift;
-	debug "Enter _updateOrInsert";    # ($update,$insert)";
-
-	#attempt update
-	my $sth = $dbh->prepare($update) or croak $dbh->errstr();
-	$sth->execute() or croak $dbh->errstr();
-
-	#attempt insert
-	if ( $sth->rows == 0 ) {
-		my $sth = $dbh->prepare($insert) or croak $dbh->errstr();
-		$sth->execute() or croak $dbh->errstr();
-		$id = $dbh->last_insert_id( undef, undef, 'records', undef );
-	} else {
-
-		#all this trouble for last_update_id
-		my $sth = $dbh->prepare($id) or croak $dbh->errstr();
-		$sth->execute() or croak $dbh->errstr();
-		$id = $sth->fetch->[0];
-	}
-
-	debug "affected:" . $sth->rows . '(' . $id . ')';
-	return $id;
-}
 
 1;
 
