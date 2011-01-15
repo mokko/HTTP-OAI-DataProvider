@@ -7,24 +7,16 @@ use Carp qw/croak carp/;
 
 #should be only temporary, for warning and debug
 use Dancer ':syntax';
+use Dancer::CommandLine qw/Debug Warning/;
 
 #for easier development, will go away later
 use lib '/home/Mengel/projects/HTTP-OAI-DataProvider/lib';
 
 #verbs - this time without exporter. Yay!
-use HTTP::OAI::DataProvider::GetRecord;
-#use HTTP::OAI::DataProvider::Identify;
-use HTTP::OAI::DataProvider::ListIdentifiers;
-use HTTP::OAI::DataProvider::ListSets;
-use HTTP::OAI::DataProvider::ListRecords;
-use HTTP::OAI::DataProvider::ListMetadataFormats;
+
+#I hope not that I don't need GlobalFormats
 use HTTP::OAI::DataProvider::GlobalFormats;
 
-#sub warning;    #todo
-#sub debug;      #todo
-
-our $warning = 0;
-our $debug   = 0;
 
 =head1 NAME
 
@@ -88,12 +80,10 @@ Error checking/TODO
 	}
 
 Debugging
-	This time we have our own debugging function which PRINTS info. Enable or
-	disable during initialization. You most likely want to DISABLE it for
-	production purposes because it would break anything!
+	I use Dancer::CommandLine
 
-	debug "message";
-	warning "message";
+	Debug "message";
+	Warning "message";
 
 =head1 OAI DATA PROVIDER FEATURES
 
@@ -239,18 +229,12 @@ development and not during runtime it may also croak.
 
 only options not otherwise explained?
 
-debug=>'1',
-	see debug function
-
 isMetadaFormatSupported=>Callback,
 
 	The callback expects a single prefix and returns 1 if true and nothing
 	when not supported. Currently only global metadataFormats, i.e. for all
 	items in repository. This one seems to be obligatory, so croak when
 	missing.
-
-warning=>'1',
-	see warning function
 
 xslt=>'path/to/style.xslt',
 
@@ -268,21 +252,15 @@ sub new {
 	my $class = shift;
 	my %args  = @_;
 
-	if ( $args{warning} ) {
-		$warning = $args{warning};
-		delete $args{warning};
-	}
+	#TODO:
+	#probably not a secure thing to do:
+	my $self = \%args;
 
-	if ( $args{debug} ) {
-		$debug = $args{debug};
-		delete $args{debug};
-	}
-	my $self = \%args;    #probably not a secure thing to do
 	bless( $self, $class );
 	return $self;
 }
 
-#should be digest_single be part of this module or of the engine?
+#should digest_single be part of this module or of the engine?
 #it would be less fragile if engine operates on its own
 
 #
@@ -325,21 +303,22 @@ prompty return a xml string.
 sub Identify {
 
 	my $self = shift;
-	debug "Enter Identify (HTTP::OAI::DataProvider)";
+	Debug "Enter Identify (HTTP::OAI::DataProvider)";
 	no strict "refs";
 
 	#might change and loose args
 	if ( !$self->{Identify} ) {
 		return
 		  "Error: Identify callback seems not to exist. Check initialization "
-		  . "of HTTP::OAI::DataProvider::Simple";
+		  . "of HTTP::OAI::DataProvider";
 	}
 
 	#call the callback for actual data
-	my $response = $self->{Identify}();
+	my $identify_cb=$self->{Identify};
+	my $response = $self->$identify_cb;
 	use strict "refs";
 
-	debug "I am back from callback";
+	#Debug "I am back from callback";
 
 	if ( ref $response eq 'HTTP::OAI::Identify' ) {
 		if ( $self->{xslt} ) {
@@ -394,53 +373,6 @@ sub ListSets {
 
 check error, display error, warning, debug etc.
 
-=head2 debug "this is a message";
-
-Prints out a debug message via print and STDOUT if debug is specified during
-initialization, e.g.
-
-	my $provider = HTTP::OAI::DataProvider->new(
-		#other options ...
-		debug     => 1, #1 is on, 0 is off
-	);
-
-Todo: what I really want is to use Dancer's functions with the same name when
-available, but when not just blunt output via print! See warning.
-
-=cut
-
-sub debug1 {
-	my $msg = shift;
-
-	if ( $msg && $debug gt 0 ) {
-		print $msg. "\n";
-	}
-}
-
-=head2 warning "this is a message";
-
-	my $provider = HTTP::OAI::DataProvider->new(
-		#other options ...
-		warning     => 1, #1 is on, 0 is off
-	);
-
-Todo: what I really want is to use Dancer's functions with the same name when
-available, but when not just blunt output via print! See debug.
-
-=cut
-
-sub warning1 {
-	my $msg = shift;
-
-	if ( $msg && $warning gt 0 ) {
-		print $msg. "\n";
-	}
-
-	#if (Dancer available)
-	#how can i test if a perl function exists?
-	#how can I call dancer debug from here?
-	#dancer::debug $msg;
-}
 
 #
 # PRIVATE STUFF
@@ -448,9 +380,8 @@ sub warning1 {
 
 =head1 PRIVATE METHODS
 
-Since HTTP::OAI::DataProvider is to be used by frontend developers, so whatever
-they don't need is private.
-
+HTTP::OAI::DataProvider is to be used by frontend developers. What is not meant
+for them, is private.
 
 =head2 $obj= $self->_init_xslt($obj)
 
