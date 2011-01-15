@@ -6,7 +6,7 @@ use XML::SAX::Writer;
 use Carp qw/croak carp/;
 
 #should be only temporary, for warning and debug
-use Dancer ':syntax';
+#use Dancer ':syntax'; #this module should abstract from Dancer
 use Dancer::CommandLine qw/Debug Warning/;
 
 #for easier development, will go away later
@@ -335,13 +335,75 @@ sub Identify {
 	croak 'Return value is not of type HTTP::OAI::Identify';
 }
 
-sub ListMetadataFormats {
-	my $self   = shift;
-	my %params = shift;
+=head2 ListMetadataFormats (identifier);
 
-	return (
-		HTTP::OAI::DataProvider::ListMetadataFormats->do( $self, %params ) );
+"This verb is used to retrieve the metadata formats available from a
+repository. An optional argument restricts the request to the formats available
+for a specific item." (the spec)
+
+HTTP::OAI::DataProvider only knows global metadata formats, i.e. it assumes
+that every record is available in every format supported by the repository.
+
+ARGUMENTS
+-identifier (optional)
+
+ERRORS
+-badArgument - in validate_request()
+-idDoesNotExist - here
+-noMetadataFormats - here
+
+=cut
+
+sub ListMetadataFormats {
+	my $self = shift;
+
+	#todo, but seems to work for the moment
+	my %params=@_;
+	my $params=\%params;
+
+	#Debug "SDSDS". $params;
+
+	Warning 'Enter ListMetadataFormats';
+	if ($params->{identifier}) {
+		Debug 'with id'.$params->{identifier}
+	}
+
+	my $engine  = $self->{engine};         #TODO test
+	my $globalFormats = $self->{globalFormats};
+
+	#
+	# Error handling
+	#
+
+	#only if there is actually an identifier
+	if ( my $identifier = $params->{identifier} ) {
+
+		my $header = $engine->findByIdentifier($identifier);
+		if ( !$header ) {
+			return $self->err2XML(
+				new HTTP::OAI::Error( code => 'idDoesNotExist' ) );
+		}
+	}
+
+	#Metadata Handling
+	my $lmfs = $globalFormats->get_list();
+	my @mdfs = $lmfs->metadataFormat();
+
+	#check if noMetadataFormats
+	if ( @mdfs == 0 ) {
+		return $self->err2XML(
+			new HTTP::OAI::Error( code => 'noMetadataFormats' ) );
+	}
+
+	#
+	# Return
+	#
+
+	$lmfs=$self->_init_xslt ($lmfs);
+	return $lmfs->toDOM->toString;
 }
+
+
 
 sub ListIdentifiers {
 	my $self   = shift;
@@ -397,13 +459,13 @@ sub _init_xslt {
 	my $self = shift;
 	my $obj  = shift;    #e.g. HTTP::OAI::ListRecord
 	if ( !$obj ) {
-		warning "init_xslt called without a object!";
+		Warning "init_xslt called without a object!";
 		return ();
 	}
 
 	#todo: could loose the args
-	if ( $self->{args}->{xslt} ) {
-		$obj->xslt( $self->{args}->{xslt} );
+	if ( $self->{xslt} ) {
+		$obj->xslt( $self->{xslt} );
 	}
 	return $obj;
 }
