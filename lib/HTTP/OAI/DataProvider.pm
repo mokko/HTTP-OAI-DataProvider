@@ -17,7 +17,6 @@ use lib '/home/Mengel/projects/HTTP-OAI-DataProvider/lib';
 #I hope not that I don't need GlobalFormats
 use HTTP::OAI::DataProvider::GlobalFormats;
 
-
 =head1 NAME
 
 HTTP::OAI::DataProvider - A flexible OAI data provider
@@ -314,8 +313,8 @@ sub Identify {
 	}
 
 	#call the callback for actual data
-	my $identify_cb=$self->{Identify};
-	my $response = $self->$identify_cb;
+	my $identify_cb = $self->{Identify};
+	my $response    = $self->$identify_cb;
 	use strict "refs";
 
 	#Debug "I am back from callback";
@@ -355,20 +354,15 @@ ERRORS
 =cut
 
 sub ListMetadataFormats {
-	my $self = shift;
-
-	#todo, but seems to work for the moment
-	my %params=@_;
-	my $params=\%params;
-
-	#Debug "SDSDS". $params;
+	my $self   = shift;
+	my $params = _hashref(@_);
 
 	Warning 'Enter ListMetadataFormats';
-	if ($params->{identifier}) {
-		Debug 'with id'.$params->{identifier}
+	if ( $params->{identifier} ) {
+		Debug 'with id' . $params->{identifier};
 	}
 
-	my $engine  = $self->{engine};         #TODO test
+	my $engine        = $self->{engine};          #TODO test
 	my $globalFormats = $self->{globalFormats};
 
 	#
@@ -376,6 +370,7 @@ sub ListMetadataFormats {
 	#
 
 	#only if there is actually an identifier
+	#TODO
 	if ( my $identifier = $params->{identifier} ) {
 
 		my $header = $engine->findByIdentifier($identifier);
@@ -399,11 +394,9 @@ sub ListMetadataFormats {
 	# Return
 	#
 
-	$lmfs=$self->_init_xslt ($lmfs);
+	$lmfs = $self->_init_xslt($lmfs);
 	return $lmfs->toDOM->toString;
 }
-
-
 
 sub ListIdentifiers {
 	my $self   = shift;
@@ -436,6 +429,7 @@ sub ListSets {
 check error, display error, warning, debug etc.
 
 
+
 #
 # PRIVATE STUFF
 #
@@ -444,6 +438,17 @@ check error, display error, warning, debug etc.
 
 HTTP::OAI::DataProvider is to be used by frontend developers. What is not meant
 for them, is private.
+
+=head2 my $params=_hashref (@_);
+
+Little thingy that transforms array of parameters to hashref and returns it.
+
+=cut
+
+sub _hashref {
+	my %params = @_;
+	return \%params;
+}
 
 =head2 $obj= $self->_init_xslt($obj)
 
