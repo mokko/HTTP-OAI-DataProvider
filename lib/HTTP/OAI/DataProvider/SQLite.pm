@@ -6,7 +6,6 @@ use YAML::Syck qw/Dump LoadFile/;
 
 #use XML::LibXML;
 use HTTP::OAI;
-use HTTP::OAI::Repository qw/:validate/;
 use XML::LibXML;
 use XML::LibXML::XPathContext;
 use XML::SAX::Writer;
@@ -16,27 +15,30 @@ use DBI;
 our $dbh;
 use Data::Dumper;
 
+#TODO: See if I want to use base or parent?
+
 =head1 NAME
 
 HTTP::OAI::DataProvider::SQLite - A sqlite engine for HTTP::OAI::DataProvider
 
 =head1 SYNOPSIS
 
-1) Creat a new cache
+1) Create new cache
 	use HTTP::OAI::DataProvider::SQLite;
 	my $engine=new HTTP::OAI::DataProvider::SQLite (ns_prefix=>$prefix,
 		ns_uri=$uri);
 
 	my $err=$engine->digest_single (source=>$xml_fn, mapping=>&mapping);
 
-2) Use the cache
-	use HTTP::OAI::DataProvider::SQLite::HeaderCache;
+2) Use cache
+	use HTTP::OAI::DataProvider::SQLite;
 	my $engine=new HTTP::OAI::DataProvider::SQLite(
-		ns_prefix=>$prefix, ns_uri=$uri);
+		ns_prefix=>$prefix, ns_uri=$uri
+
+		);
 
 	$result=$engine->query(from=>$from, until=>$until, set=>$set);
 	TODO
-
 
 =head1 DESCRIPTION
 
@@ -159,29 +161,136 @@ the Identify verb.
 =cut
 
 sub earliestDate {
-	my $self=shift;
+	my $self = shift;
 
-	my $sql=qq/SELECT MIN (datestamp) FROM records/;
+	my $sql = qq/SELECT MIN (datestamp) FROM records/;
 	my $sth = $dbh->prepare($sql) or croak $dbh->errstr();
 	$sth->execute() or croak $dbh->errstr();
 
 	my $aref = $sth->fetch;
 
-	if (! $aref->[0]) {
+	if ( !$aref->[0] ) {
 		Warning "No date";
 	}
 
-	$aref->[0]=~/(^\d{4}-\d{2}-\d{2})/;
+	$aref->[0] =~ /(^\d{4}-\d{2}-\d{2})/;
 
-	if (!$1)  {
+	if ( !$1 ) {
 		Warning "No date pattern found!";
-		return();
+		return ();
 	}
 
 	return $1;
 
 }
 
+=head2 $engine->granularity();
+
+Returns either "YYYY-MM-DDThh:mm:ssZ" or "YYYY-MM-DD" depending of granularity
+of datestamps in the store.
+
+Question is how much trouble I go to check weather all values comply with this
+definition?
+
+TODO: Check weather all datestamps comply with format
+
+=cut
+
+sub granularity {
+
+	#for the time being
+	return "YYYY-MM-DDThh:mm:ssZ";
+
+	#for the future
+	my $sql=q/SELECT datestamp FROM records/;
+
+	my $sth = $dbh->prepare($sql) or croak $dbh->errstr();
+	$sth->execute() or croak $dbh->errstr();
+
+	while (my $aref=$sth->fetch) {
+		#test
+	}
+
+	return "YYYY-MM-DD";
+
+	#return Error message if values are not all the same?
+
+}
+
+=head2	$header=$engine->findByIdentifier($identifier)
+	Finds and return a specific header (HTTP::OAI::Header) by identifier.
+
+	If no header with this identifier found, this method returns nothing. Who
+	had expected otherwise? If called with identifier, should I croak? I guess
+	so since it indicates a mistake of the frontend developer. And we want her
+	alert!
+
+=cut
+
+sub findByIdentifier {
+	my $self       = shift;
+	my $identifier = shift;
+
+	#I am not sure if I should croak or keep silent.
+	if ( !$identifier ) {
+		croak "No identifier specified";
+	}
+
+	#If I cannot compose a header from the db I have the wrong db scheme
+	#TODO: status is missing in db
+	#I could do a join and get the setSpecs
+
+	my $sql = q/SELECT datestamp, setSpec FROM records JOIN sets ON
+	records.identifier = sets.identifier WHERE records.identifier=?/;
+
+	my $sth = $dbh->prepare($sql) or croak $dbh->errstr();
+	$sth->execute($identifier) or croak $dbh->errstr();
+	my $aref = $sth->fetch;
+
+	#there should be exactly one record with that id or none and I will trust
+	#my db on that
+	#However, I do want to test if I really get a result at all
+	if ( $aref->[0] ) {
+
+		my $h = new HTTP::OAI::Header;
+		$h->identifier = $identifier;
+		$h->datestamp  = $aref->[0];
+
+		#TODO $h->status=$aref->[1];
+
+		while ( $aref = $sth->fetch ) {
+			if ( $aref->[1] ) {
+				$h->setSpec( $aref->[1] );
+			}
+		}
+		return $h;
+	}
+}
+
+=head2 listSets TODO
+
+Return those setSpecs which are actually used in the store. Expects nothing,
+returns an array of setSpecs as string. Called from DataProvider::ListSets.
+
+=cut
+
+sub listSets {
+	my $self = shift;
+
+	Debug "Enter ListSets";
+
+	my $sql = q/SELECT DISTINCT setSpec FROM sets ORDER BY setSpec ASC/;
+	my $sth = $dbh->prepare($sql) or croak $dbh->errstr();
+	$sth->execute() or croak $dbh->errstr();
+
+	#can this be done easier without another setSpec?
+	my @setSpecs;
+	while ( my $aref = $sth->fetch ) {
+		Debug "listSets:setSpec='$aref->[0]'";
+		push( @setSpecs, $aref->[0] );
+	}
+	return @setSpecs;
+}
 
 #
 #
@@ -214,22 +323,25 @@ sub _init_db {
 	}
 
 	$dbh->do("PRAGMA foreign_keys");
-	$dbh->do("PRAGMA cache_size = 8000"); #doesn't make a big difference
-	#default is 2000
+	$dbh->do("PRAGMA cache_size = 8000");    #doesn't make a big difference
+	                                         #default is 2000
 
 	#I could make identifier the primary key. What are advantages and
 	#disadvantages? I guess primary key cannot be text
 
-	my $sql = q /CREATE TABLE if not exists sets (
-  		'setSpec' STRING NOT NULL,
-  		'identifier' TEXT NOT NULL REFERENCES records(identifier))/;
+	my $sql = q / CREATE TABLE IF NOT EXISTS sets(
+		'setSpec' STRING NOT NULL,
+		'identifier' TEXT NOT NULL REFERENCES records(identifier)
+	)/;
 
 	#Debug $sql. "\n";
 	$dbh->do($sql) or die $dbh->errstr;
 
-	$sql = q/CREATE TABLE if not exists records (
+	#TODO: Status not yet implemented
+	$sql = q/CREATE TABLE IF NOT EXISTS records (
   		'identifier' TEXT PRIMARY KEY NOT NULL ,
   		'datestamp'  TEXT NOT NULL ,
+  		'status' TEXT,
   		'native_md' BLOB)/;
 
 	#Debug $sql. "\n";
@@ -353,12 +465,12 @@ sub _storeRecord {
 		my $in =
 		    q/INSERT INTO records(identifier, datestamp, native_md)/
 		  . q/VALUES (?,?,?)/;
+
 		#Debug "INSERT:$in";
 		my $sth = $dbh->prepare($in) or croak $dbh->errstr();
 		$sth->execute( $identifier, $datestamp, $md->toString )
 		  or croak $dbh->errstr();
 	}
-
 
 	Debug "delete Sets for record $identifier";
 	my $deleteSets = qq/DELETE FROM sets WHERE identifier=?/;
@@ -375,7 +487,6 @@ sub _storeRecord {
 		}
 	}
 }
-
 
 1;
 

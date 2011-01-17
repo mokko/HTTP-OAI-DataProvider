@@ -4,18 +4,15 @@ use warnings;
 use strict;
 use XML::SAX::Writer;
 use Carp qw/croak carp/;
+use HTTP::OAI;
+use HTTP::OAI::Repository qw/validate_request/;
 
-#should be only temporary, for warning and debug
 #use Dancer ':syntax'; #this module should abstract from Dancer
 use Dancer::CommandLine qw/Debug Warning/;
 
-#for easier development, will go away later
-use lib '/home/Mengel/projects/HTTP-OAI-DataProvider/lib';
-
-#verbs - this time without exporter. Yay!
-
-#I hope not that I don't need GlobalFormats
+use lib '/home/Mengel/projects/HTTP-OAI-DataProvider/lib';    #for development
 use HTTP::OAI::DataProvider::GlobalFormats;
+use HTTP::OAI::DataProvider::SetLibrary;
 
 =head1 NAME
 
@@ -276,9 +273,13 @@ Todo: Might become AUTOLOAD? Better than this senseless code duplication!
 
 sub GetRecord {
 	my $self   = shift;
-	my %params = shift;
+	my $params = _hashref(@_);
 
-	return ( HTTP::OAI::DataProvider::GetRecord->do( $self, %params ) );
+	if ( my $error = validate_request( %{$params} ) ) {
+		return $self->err2XML($error);
+	}
+
+	#eturn ( HTTP::OAI::DataProvider::GetRecord->do( $self, %params ) );
 }
 
 =head2 my $response=$provider->Identify();
@@ -300,12 +301,25 @@ prompty return a xml string.
 =cut
 
 sub Identify {
+	my $self   = shift;
+	my $params = _hashref(@_);
 
-	my $self = shift;
 	Debug "Enter Identify (HTTP::OAI::DataProvider)";
-	no strict "refs";
 
-	#might change and loose args
+	#
+	# Check
+	#
+
+	#syntax already checked, I don't NEED to check if again
+	if ( my $error = validate_request( %{$params} ) ) {
+		return $self->err2XML($error);
+	}
+
+	#
+	# Get data from frontend
+	#
+
+	no strict "refs";
 	if ( !$self->{Identify} ) {
 		return
 		  "Error: Identify callback seems not to exist. Check initialization "
@@ -314,24 +328,29 @@ sub Identify {
 
 	#call the callback for actual data
 	my $identify_cb = $self->{Identify};
-	my $response    = $self->$identify_cb;
+	my $id_data     = $self->$identify_cb;
 	use strict "refs";
 
-	#Debug "I am back from callback";
+	#
+	# Metadata munging
+	#
 
-	if ( ref $response eq 'HTTP::OAI::Identify' ) {
-		if ( $self->{xslt} ) {
-			$response->xslt( $self->{xslt} );
-		}
+	my $obj = new HTTP::OAI::Identify(
+		adminEmail        => $id_data->{adminEmail},
+		baseURL           => $id_data->{baseURL},
+		deletedRecord     => $id_data->{deletedRecord},
+		earliestDatestamp => $self->{engine}->earliestDate(),
+		granularity       => $self->{engine}->granularity(),
+		repositoryName    => $id_data->{repositoryName},
+	  )
+	  or return "Cannot create new HTTP::OAI::Identify";
 
-		# todo: will probably need to go somewhere else
-		my $xml;
-		$response->set_handler( XML::SAX::Writer->new( Output => \$xml ) );
-		$response->generate;
-		return $xml;
+	#
+	# Output
+	#
 
-	}
-	croak 'Return value is not of type HTTP::OAI::Identify';
+	return $self->_output($obj);
+
 }
 
 =head2 ListMetadataFormats (identifier);
@@ -358,6 +377,12 @@ sub ListMetadataFormats {
 	my $params = _hashref(@_);
 
 	Warning 'Enter ListMetadataFormats';
+
+	#check param syntax
+	if ( my $error = validate_request( %{$params} ) ) {
+		return $self->err2XML($error);
+	}
+
 	if ( $params->{identifier} ) {
 		Debug 'with id' . $params->{identifier};
 	}
@@ -394,30 +419,131 @@ sub ListMetadataFormats {
 	# Return
 	#
 
-	$lmfs = $self->_init_xslt($lmfs);
-	return $lmfs->toDOM->toString;
+	return $self->_output($lmfs);
 }
 
 sub ListIdentifiers {
 	my $self   = shift;
-	my %params = shift;
+	my $params = _hashref(@_);
 
-	return ( HTTP::OAI::DataProvider::ListIdentifiers->do( $self, %params ) );
+	#check param syntax
+	if ( my $error = validate_request( %{$params} ) ) {
+		return $self->err2XML($error);
+	}
+
 }
 
 sub ListRecords {
 	my $self   = shift;
-	my %params = shift;
+	my $params = _hashref(@_);
 
-	return ( HTTP::OAI::DataProvider::ListRecords->do( $self, %params ) );
+	#check param syntax
+	if ( my $error = validate_request( %{$params} ) ) {
+		return $self->err2XML($error);
+	}
 
 }
 
+=head2 ListSets
+
+	##ARGUMENTS##
+	#resumptionToken (optional)
+	##ERRORS##
+	#badArgument -> HTTP::OAI::Repository
+	#badResumptionToken  -> here
+	#noSetHierarchy --> here
+
+TODO
+=cut
+
 sub ListSets {
 	my $self   = shift;
-	my %params = shift;
+	my $params = _hashref(@_);
+	my $engine = $self->{engine};
 
-	return ( HTTP::OAI::DataProvider::ListSets->do( $self, %params ) );
+	Warning 'Enter ListSets';
+
+	#
+	# Check for errors
+	#
+
+	if ( !$engine ) {
+		croak "Engine missing!";
+	}
+
+	if ( !$self ) {
+		croak "Provider missing!";
+	}
+
+	#check general param syntax
+	if ( my $error = validate_request( %{$params} ) ) {
+		return $self->err2XML($error);
+	}
+
+	#resumptionTokens not supported
+	if ( $params->{resumptionToken} ) {
+
+		Debug "resumptionToken";
+		return $self->err2XML(
+			new HTTP::OAI::Error( code => 'badResumptionToken' ) );
+	}
+
+	#
+	# Get the setSpecs from engine/store
+	#
+
+	#TODO:test for noSetHierarchy has to be in SetLibrary
+	my @used_sets = $engine->listSets;
+
+	#
+	# Check results
+	#
+
+	#if none then noSetHierarchy (untested)
+	if ( !@used_sets ) {
+
+		#		debug "no sets";
+		return $self->err2XML(
+			new HTTP::OAI::Error( code => 'noSetHierarchy' ) );
+	}
+
+	# just for debug
+	foreach (@used_sets) {
+		Debug "used_sets: $_\n";
+	}
+
+	#
+	# Complete naked setSpecs with info from setLibrary
+	#
+
+	#the brackets () are important
+	#listSets from Dancer config
+	no strict "refs";
+	my $listSets = $self->{setLibrary}();
+	use strict "refs";
+
+	my $library = new HTTP::OAI::DataProvider::SetLibrary();
+	$library->addListSets($listSets)
+	  or die "Error: some error occured in library->addListSet";
+
+	if ( !$library ) {
+
+		Warning "setLibrary cannot be loaded, proceed without setNames and "
+		  . "setDescriptions";
+
+		foreach (@used_sets) {
+			my $s = new HTTP::OAI::Set;
+			$s->setSpec($_);
+			$listSets->set($s);
+		}
+	} else {
+		$listSets = $library->expand(@used_sets);
+	}
+
+	#
+	#output fun!
+	#
+	return $self->_output($listSets);
 }
 
 #
@@ -428,7 +554,58 @@ sub ListSets {
 
 check error, display error, warning, debug etc.
 
+=head2 my $xml=$provider->err2XML(@obj);
 
+Parameter is an array of HTTP::OAI::Error objects. Of course, also a single
+value.
+
+Includes the nicer output stylesheet setting from init.
+
+=cut
+
+sub err2XML {
+	my $self = shift;
+	if (@_) {
+		my $response = new HTTP::OAI::Response;
+		my @errors;
+		foreach (@_) {
+			$response->errors($_);
+			push @errors, $response;
+		}
+
+		if ( $self->{xslt} ) {
+			$response->xslt( $self->{xslt} );
+		}
+
+		return $response->toDOM->toString;
+	}
+}
+
+=head2 return $self->_output($response);
+
+Expects a HTTP::OAI::Response object and returns it as xml string. It applies
+$self->{xslt} if set.
+
+=cut
+
+sub _output {
+	my $self     = shift;
+	my $response = shift;
+
+	Debug "self" . $self;
+	Debug "response" . $response;
+
+	$response = $self->_init_xslt($response);
+	return $response->toDOM->toString;
+
+	# todo: will probably need to go somewhere else
+	#my $xml;
+	#$response->set_handler( XML::SAX::Writer->new( Output => \$xml ) );
+	#$response->generate;
+	#return $xml;
+	#return $lmfs->toDOM->toString;
+
+}
 
 #
 # PRIVATE STUFF
