@@ -592,19 +592,13 @@ sub _output {
 	my $self     = shift;
 	my $response = shift;
 
-	Debug "self" . $self;
-	Debug "response" . $response;
-
 	$response = $self->_init_xslt($response);
 	return $response->toDOM->toString;
 
-	# todo: will probably need to go somewhere else
 	#my $xml;
 	#$response->set_handler( XML::SAX::Writer->new( Output => \$xml ) );
 	#$response->generate;
 	#return $xml;
-	#return $lmfs->toDOM->toString;
-
 }
 
 #

@@ -198,23 +198,37 @@ TODO: Check weather all datestamps comply with format
 
 sub granularity {
 
-	#for the time being
-	return "YYYY-MM-DDThh:mm:ssZ";
+	#Debug "Enter granularity";
 
-	#for the future
+	my $long='YYYY-MM-DDThh:mm:ssZ';
+	my $short='YYYY-MM-DD';
+	my $default=$long;
+
 	my $sql=q/SELECT datestamp FROM records/;
-
 	my $sth = $dbh->prepare($sql) or croak $dbh->errstr();
 	$sth->execute() or croak $dbh->errstr();
 
-	while (my $aref=$sth->fetch) {
-		#test
+	# alternative is to test each and every record
+	# not such a bad idea to do this during Identify
+	#	while (my $aref=$sth->fetch) {
+	#	}
+
+	my $aref=$sth->fetch;
+
+	if (!$aref->[0]) {
+		Debug "granuarity cannot find a datestamp and hence assumes $default";
+		return $default;
 	}
 
-	return "YYYY-MM-DD";
+	if ($aref->[0] =~ /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z/){
+		return $long;
+	}
 
-	#return Error message if values are not all the same?
+	if ($aref->[0] =~ /^\d{4}-\d{2}-\d{2}/){
+		return $short;
+	}
 
+	Warning "datestamp doesn't match requirements. I assume $short";
 }
 
 =head2	$header=$engine->findByIdentifier($identifier)
