@@ -510,13 +510,12 @@ sub ListIdentifiers {
 
 		#query contains sets, but data has no set defined
 		if ( !@used_sets ) {
-			push @errors,
-			  new HTTP::OAI::Error( code => 'noRecordsMatch' );
+			push @errors, new HTTP::OAI::Error( code => 'noRecordsMatch' );
 		}
 	}
 
 	if (@errors) {
-		return $self->err2xml (@errors);
+		return $self->err2xml(@errors);
 	}
 
 	#
@@ -530,10 +529,10 @@ sub ListIdentifiers {
 	# Check result
 	#
 
-	Debug "check results";
+	#Debug "check results";
 	#checkRecordsMatch is now done inside queryHeaders
 	if ( $result->isError ) {
-		return $self->err2XML($result->isError);
+		return $self->err2XML( $result->isError );
 	}
 
 	#
@@ -675,14 +674,17 @@ Includes the nicer output stylesheet setting from init.
 
 sub err2XML {
 	my $self = shift;
-	Debug 'dddddd' . Dumper @_;
+
+	#Debug 'dddddd' . Dumper @_;
 	if (@_) {
-		if (ref $_ ne 'HTTP::OAI::Error') {
-			croak "Internal Error: Error has wrong format!";
-		}
 		my $response = new HTTP::OAI::Response;
 		my @errors;
 		foreach (@_) {
+			#Debug 'Kennedy' . ref $_;
+
+			if (ref $_ ne 'HTTP::OAI::Error') {
+				die "Internal Error: Error has wrong format!";
+			}
 			$response->errors($_);
 			push @errors, $response;
 		}
