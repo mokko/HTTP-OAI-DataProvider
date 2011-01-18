@@ -13,6 +13,8 @@ use Dancer::CommandLine qw/Debug Warning/;
 use Carp qw/carp croak/;
 use DBI;
 our $dbh;
+
+#only for debug during development
 use Data::Dumper;
 
 #TODO: See if I want to use base or parent?
@@ -200,11 +202,11 @@ sub granularity {
 
 	#Debug "Enter granularity";
 
-	my $long='YYYY-MM-DDThh:mm:ssZ';
-	my $short='YYYY-MM-DD';
-	my $default=$long;
+	my $long    = 'YYYY-MM-DDThh:mm:ssZ';
+	my $short   = 'YYYY-MM-DD';
+	my $default = $long;
 
-	my $sql=q/SELECT datestamp FROM records/;
+	my $sql = q/SELECT datestamp FROM records/;
 	my $sth = $dbh->prepare($sql) or croak $dbh->errstr();
 	$sth->execute() or croak $dbh->errstr();
 
@@ -213,18 +215,18 @@ sub granularity {
 	#	while (my $aref=$sth->fetch) {
 	#	}
 
-	my $aref=$sth->fetch;
+	my $aref = $sth->fetch;
 
-	if (!$aref->[0]) {
+	if ( !$aref->[0] ) {
 		Debug "granuarity cannot find a datestamp and hence assumes $default";
 		return $default;
 	}
 
-	if ($aref->[0] =~ /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z/){
+	if ( $aref->[0] =~ /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z/ ) {
 		return $long;
 	}
 
-	if ($aref->[0] =~ /^\d{4}-\d{2}-\d{2}/){
+	if ( $aref->[0] =~ /^\d{4}-\d{2}-\d{2}/ ) {
 		return $short;
 	}
 
@@ -306,6 +308,129 @@ sub listSets {
 	return @setSpecs;
 }
 
+=head2 $result=$provider->queryHeaders (metadataPrefix=>'x');
+
+Possible paramters are metadataPrefix, from, until and Set. Queries the data
+store and returns a HTTP::OAI::DataProvider::SQLite object which contains
+errors (in key {errors}) or a HTTP::OAI::ListIdentifiers (in key
+{ListIdentifiers}).
+
+TODO: Of course, it returns only those headers which comply with paramaters.
+
+Test for failure:
+if ($result->isError) {
+	#do this
+}
+
+=cut
+
+sub queryHeaders {
+	my $self   = shift;
+	my $params = shift;
+	my $result = {};
+	bless $result, 'HTTP::OAI::DataProvider::SQLite';
+	my @errors;
+
+	#should already be tested, so only croak
+	if ( !$params->{metadataPrefix} ) {
+		Debug Dumper $params;
+		croak "metadataPrefix missing!";
+	}
+
+	#NOT sure if this has been tested already
+	#It's a bit unexpected that if validation succeeds when it fails, but who
+	#cares really?
+	foreach (qw/until from/) {
+		if ( $params->{$_} ) {
+			if ( validate_date $params->{$_} ) {
+				push(
+					@errors,
+					new HTTP::OAI::Error(
+						code    => 'badArgument',
+						message => "Argument $_ is not a valid date"
+					)
+				);
+			}
+		}
+	}
+
+	if (@errors) {
+		$result->{errors} = @errors;
+		return $result;
+	}
+
+	my $sql = q/SELECT records.identifier, datestamp, status, setSpec
+	FROM records JOIN sets ON records.identifier = sets.identifier/;
+
+	#About order: I could add "ORDER BY records.identifier ASC" which gives us
+	#strict alphabetical order. Not want is expected. That wdn't really be a
+	#problem, but not nice. Now we have the order we put'em in. Less reliable,
+	#but more intuitive. Until it goes wrong.
+	my $sth = $dbh->prepare($sql) or croak $dbh->errstr();
+	$sth->execute() or croak $dbh->errstr();
+
+	my $header;
+	my $i       = 0;     #count the results so you can test if none
+	my $last_id = '';    #needs to be an empty string
+	my $LI = new HTTP::OAI::ListIdentifiers;
+	while ( my $aref = $sth->fetch ) {
+		$i++;
+
+		#Debug Dumper $aref;
+
+		if ( $last_id ne $aref->[0] ) {
+
+			#a new item
+			$header = new HTTP::OAI::Header;
+			$header->identifier( $aref->[0] );
+			$header->datestamp( $aref->[1] );
+			if ( $aref->[2] ) {
+				$header->status('deleted');
+			}
+		}
+		if ( $aref->[3] ) {
+			my $set = new HTTP::OAI::Set;
+
+			#TODO: Do I need to expand info from setLibrary?
+			#It seems that ListIdentifiers wants to know about setSpecs only
+			$set->setSpec( $aref->[3] );
+			$header->setSpec($set);
+		}
+		$last_id = $aref->[0];
+
+		#add header to LI
+		$LI->identifier($header);
+	}
+
+	if ( $i == 0 ) {
+		push( @errors, new HTTP::OAI::Error( code => 'noRecordsMatch', ) );
+	}
+
+	if (@errors) {
+		$result->{errors} = @errors;
+		return $result;
+	}
+	$result->{ListIdentifiers} = $LI;
+	return $result;
+}
+
+=head2 isError
+	if ($cache->isError){
+		#do in case of error
+	}
+	#return usually contains HTTP::OAI::Error, but not always
+	my @return=$cache->isError
+
+=cut
+
+sub isError {
+	my $self = shift;
+	if ( exists $self->{errors} ) {
+		return @{ $self->{errors} };
+	}
+	return ();
+}
+
 #
 #
 #
@@ -355,8 +480,8 @@ sub _init_db {
 	$sql = q/CREATE TABLE IF NOT EXISTS records (
   		'identifier' TEXT PRIMARY KEY NOT NULL ,
   		'datestamp'  TEXT NOT NULL ,
-  		'status' TEXT,
-  		'native_md' BLOB)/;
+  		'status'     INTEGER -- null or 1,
+  		'native_md'  BLOB)/;
 
 	#Debug $sql. "\n";
 	$dbh->do($sql) or die $dbh->errstr;

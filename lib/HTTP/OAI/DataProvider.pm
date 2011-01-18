@@ -422,15 +422,116 @@ sub ListMetadataFormats {
 	return $self->_output($lmfs);
 }
 
+=head2 ListIdentifiers (params());
+
+The Spec in my words: This verb is an abbreviated form of ListRecords,
+retrieving only headers rather than headers and records. Optional arguments
+permit selective harvesting of headers based on set membership and/or
+datestamp.
+
+Depending on the repository's support for deletions, a returned header may have
+a status attribute of "deleted" if a record matching the arguments specified in
+the request has been deleted.
+
+ARGUMENTS
+-from (optional, UTCdatetime value)
+-until (optional, UTCdatetime value)
+-metadataPrefix (required)
+-set (optional)
+-resumptionToken (exclusive) [NOT IMPLEMENTED!]
+
+ERRORS
+-badArgument: already checked in validate_request
+-badResumptionToken: here
+-cannotDisseminateFormat: here
+-noRecordsMatch:here
+-noSetHierarchy: here. Can only appear if query has set
+
+LIMITATIONS
+By making the metadataPrefix required, the specification suggests that
+ListIdentifiers returns different sets of headers depending on which
+metadataPrefix is chose. HTTP:OAI::DataProvider assume, however, that there are
+only global metadata formats, so it will return the same set for all supported
+metadataFormats.
+
+TODO
+Hierarchical sets!
+
+=cut
+
 sub ListIdentifiers {
 	my $self   = shift;
 	my $params = _hashref(@_);
+	my @errors;
 
 	#check param syntax
 	if ( my $error = validate_request( %{$params} ) ) {
 		return $self->err2XML($error);
 	}
 
+	my $engine        = $self->{engine};
+	my $globalFormats = $self->{globalFormats};
+
+	Warning 'Enter ListIdentifiers (prefix:' . $params->{metadataPrefix};
+	Debug 'from:' . $params->{from}   if $params->{from};
+	Debug 'until:' . $params->{until} if $params->{until};
+	Debug 'set:' . $params->{set}     if $params->{set};
+	Debug 'resumption:' . $params->{resumptionToken}
+	  if $params->{resumptionToken};
+
+	#
+	# Error handling
+	#
+
+	#I don't need to push this error since argument is exclusive
+	my $resumptionToken = $params->{resumptionToken};
+	if ($resumptionToken) {
+		return $self->err2XML(
+			new HTTP::OAI::Error( code => 'badResumptionToken' ) );
+	}
+
+	if ( my $e =
+		$globalFormats->check_format_supported( $params->{metadataPrefix} ) )
+	{
+
+		#cannotDisseminateFormat if necessary
+		push @errors, $e;
+	}
+
+	if ( $params->{Set} ) {
+
+		#sets defined in data store
+		my @used_sets = $engine->listSets;
+
+		#query contains sets, but data has no set defined
+		if ( !@used_sets ) {
+
+			return $self->err2XML(
+				new HTTP::OAI::Error( code => 'noRecordsMatch' ) );
+		}
+	}
+
+	#
+	# Metadata handling
+	#
+
+	#required: metadataPrefix; optional: from, until, set
+	my $result = $engine->queryHeaders($params);
+
+	#
+	# Check result
+	#
+
+	#checkRecordsMatch is now done inside queryHeaders
+	if ( $result->isError ) {
+		return $result->err2XML(@errors);
+	}
+
+	#
+	# Return
+	#
+
+	return $self->_output( $result->{ListIdentifiers} );
 }
 
 sub ListRecords {
