@@ -14,6 +14,9 @@ use lib '/home/Mengel/projects/HTTP-OAI-DataProvider/lib';    #for development
 use HTTP::OAI::DataProvider::GlobalFormats;
 use HTTP::OAI::DataProvider::SetLibrary;
 
+#for debugging
+use Data::Dumper qw/Dumper/;
+
 =head1 NAME
 
 HTTP::OAI::DataProvider - A flexible OAI data provider
@@ -422,7 +425,9 @@ sub ListMetadataFormats {
 	return $self->_output($lmfs);
 }
 
-=head2 ListIdentifiers (params());
+=head2 my $xml=$provider->ListIdentifiers ($params);
+
+Returns xml as string, either one or multiple errors or a ListIdentifiers verb.
 
 The Spec in my words: This verb is an abbreviated form of ListRecords,
 retrieving only headers rather than headers and records. Optional arguments
@@ -462,15 +467,7 @@ Hierarchical sets!
 sub ListIdentifiers {
 	my $self   = shift;
 	my $params = _hashref(@_);
-	my @errors;
-
-	#check param syntax
-	if ( my $error = validate_request( %{$params} ) ) {
-		return $self->err2XML($error);
-	}
-
-	my $engine        = $self->{engine};
-	my $globalFormats = $self->{globalFormats};
+	my @errors;    #stores errors before there is a result object
 
 	Warning 'Enter ListIdentifiers (prefix:' . $params->{metadataPrefix};
 	Debug 'from:' . $params->{from}   if $params->{from};
@@ -479,9 +476,17 @@ sub ListIdentifiers {
 	Debug 'resumption:' . $params->{resumptionToken}
 	  if $params->{resumptionToken};
 
+	my $engine        = $self->{engine};
+	my $globalFormats = $self->{globalFormats};
+
 	#
 	# Error handling
 	#
+
+	#check param syntax. Frontend will likely check it, but why not again?
+	if ( my $e = validate_request( %{$params} ) ) {
+		push @errors, $e;
+	}
 
 	#I don't need to push this error since argument is exclusive
 	my $resumptionToken = $params->{resumptionToken};
@@ -505,10 +510,13 @@ sub ListIdentifiers {
 
 		#query contains sets, but data has no set defined
 		if ( !@used_sets ) {
-
-			return $self->err2XML(
-				new HTTP::OAI::Error( code => 'noRecordsMatch' ) );
+			push @errors,
+			  new HTTP::OAI::Error( code => 'noRecordsMatch' );
 		}
+	}
+
+	if (@errors) {
+		return $self->err2xml (@errors);
 	}
 
 	#
@@ -522,9 +530,10 @@ sub ListIdentifiers {
 	# Check result
 	#
 
+	Debug "check results";
 	#checkRecordsMatch is now done inside queryHeaders
 	if ( $result->isError ) {
-		return $result->err2XML(@errors);
+		return $self->err2XML($result->isError);
 	}
 
 	#
@@ -666,7 +675,11 @@ Includes the nicer output stylesheet setting from init.
 
 sub err2XML {
 	my $self = shift;
+	Debug 'dddddd' . Dumper @_;
 	if (@_) {
+		if (ref $_ ne 'HTTP::OAI::Error') {
+			croak "Internal Error: Error has wrong format!";
+		}
 		my $response = new HTTP::OAI::Response;
 		my @errors;
 		foreach (@_) {

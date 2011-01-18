@@ -329,11 +329,16 @@ sub queryHeaders {
 	my $params = shift;
 	my $result = {};
 	bless $result, 'HTTP::OAI::DataProvider::SQLite';
-	my @errors;
+
+	Debug "Enter queryHeaders ($params)";
+
+	#
+	# check parameters
+	#
 
 	#should already be tested, so only croak
 	if ( !$params->{metadataPrefix} ) {
-		Debug Dumper $params;
+		#Debug Dumper $params;
 		croak "metadataPrefix missing!";
 	}
 
@@ -344,7 +349,7 @@ sub queryHeaders {
 		if ( $params->{$_} ) {
 			if ( validate_date $params->{$_} ) {
 				push(
-					@errors,
+					@{ $result->{errors} },
 					new HTTP::OAI::Error(
 						code    => 'badArgument',
 						message => "Argument $_ is not a valid date"
@@ -354,13 +359,25 @@ sub queryHeaders {
 		}
 	}
 
-	if (@errors) {
-		$result->{errors} = @errors;
+	if ( $result->{errors} ) {
 		return $result;
 	}
 
+	#
+	# metadata munging
+	#
+
+	#these are not defaults in a strict sense
+	my $defaults = {
+		identifier => '*',
+		datestamp  => '*',
+		setSpec    => '*',
+	};
+
 	my $sql = q/SELECT records.identifier, datestamp, status, setSpec
 	FROM records JOIN sets ON records.identifier = sets.identifier/;
+
+	#WHERE records.identifier=?/;
 
 	#About order: I could add "ORDER BY records.identifier ASC" which gives us
 	#strict alphabetical order. Not want is expected. That wdn't really be a
@@ -402,33 +419,46 @@ sub queryHeaders {
 		$LI->identifier($header);
 	}
 
+	#
+	# Check result
+	#
+
 	if ( $i == 0 ) {
-		push( @errors, new HTTP::OAI::Error( code => 'noRecordsMatch', ) );
+		push(
+			@{ $result->{errors} },
+			new HTTP::OAI::Error( code => 'noRecordsMatch', )
+		);
 	}
 
-	if (@errors) {
-		$result->{errors} = @errors;
+	if ($result->{errors}) {
 		return $result;
 	}
+
+	#
+	# Output
+	#
+
 	$result->{ListIdentifiers} = $LI;
 	return $result;
 }
 
-=head2 isError
-	if ($cache->isError){
-		#do in case of error
+=head2 my @err=$result->isError
+
+Returns a list of arrays if any.
+
+	if ( $result->isError ) {
+		return $self->err2XML($result->isError);
 	}
-	#return usually contains HTTP::OAI::Error, but not always
-	my @return=$cache->isError
 
 =cut
 
 sub isError {
 	my $self = shift;
+	Debug "bumble";
 	if ( exists $self->{errors} ) {
+		Debug 'isError:'.Dumper $self->{errors};
 		return @{ $self->{errors} };
 	}
-	return ();
 }
 
 #
@@ -468,164 +498,162 @@ sub _init_db {
 	#I could make identifier the primary key. What are advantages and
 	#disadvantages? I guess primary key cannot be text
 
-	my $sql = q / CREATE TABLE IF NOT EXISTS sets(
-		'setSpec' STRING NOT NULL,
-		'identifier' TEXT NOT NULL REFERENCES records(identifier)
-	)/;
+	my $sql = q / CREATE TABLE IF NOT EXISTS sets( 'setSpec' STRING NOT NULL,
+			'identifier' TEXT NOT NULL REFERENCES records(identifier) ) /;
 
-	#Debug $sql. "\n";
-	$dbh->do($sql) or die $dbh->errstr;
+		#Debug $sql. "\n";
+		$dbh->do($sql) or die $dbh->errstr;
 
-	#TODO: Status not yet implemented
-	$sql = q/CREATE TABLE IF NOT EXISTS records (
+		#TODO: Status not yet implemented
+		$sql = q/CREATE TABLE IF NOT EXISTS records (
   		'identifier' TEXT PRIMARY KEY NOT NULL ,
   		'datestamp'  TEXT NOT NULL ,
   		'status'     INTEGER -- null or 1,
   		'native_md'  BLOB)/;
 
-	#Debug $sql. "\n";
-	$dbh->do($sql) or die $dbh->errstr;
-}
-
-#my $doc=$cache->_loadXML ($file);
-sub _loadXML {
-	my $self     = shift;
-	my $location = shift;
-
-	Debug "Enter _loadXML ($location)";
-
-	if ( !$location ) {
-		croak "Nothing to load";
+		#Debug $sql. "\n";
+		$dbh->do($sql) or die $dbh->errstr;
 	}
 
-	my $doc = XML::LibXML->load_xml( location => $location )
-	  or croak "Could not load " . $location;
+	#my $doc=$cache->_loadXML ($file);
+	sub _loadXML {
+		my $self     = shift;
+		my $location = shift;
 
-	$doc = _registerNS( $self, $doc );
+		Debug "Enter _loadXML ($location)";
 
-	if ( !$doc ) {
-		croak "Warning: somethings strange with $location of them";
-	}
-	return $doc;
-}
-
-sub _registerNS {
-	my $self = shift;
-	my $doc  = shift;
-
-	Debug 'Enter _registerNS';
-
-	if ( $self->{ns_prefix} ) {
-		if ( !$self->{ns_uri} ) {
-			croak "ns_prefix specified, but ns_uri missing";
+		if ( !$location ) {
+			croak "Nothing to load";
 		}
-		Debug 'ns: ' . $self->{ns_prefix} . ':' . $self->{ns_uri};
 
-		$doc = XML::LibXML::XPathContext->new($doc);
-		$doc->registerNs( $self->{ns_prefix}, $self->{ns_uri} );
-	}
-	return $doc;
-}
+		my $doc = XML::LibXML->load_xml( location => $location )
+		  or croak "Could not load " . $location;
 
-sub _storeRecord {
-	my $self   = shift;
-	my $record = shift;
+		$doc = _registerNS( $self, $doc );
 
-	my $header     = $record->header;
-	my $md         = $record->metadata;
-	my $identifier = $header->identifier;
-	my $datestamp  = $header->datestamp;
-
-	#todo: overwrite only those items where datestamp is equal or newer
-
-	Debug "Enter _storeRecord";
-
-	if ( !$record ) {
-		croak "No record!";
+		if ( !$doc ) {
+			croak "Warning: somethings strange with $location of them";
+		}
+		return $doc;
 	}
 
-	if ( !$header ) {
-		croak "No header!";
+	sub _registerNS {
+		my $self = shift;
+		my $doc  = shift;
+
+		Debug 'Enter _registerNS';
+
+		if ( $self->{ns_prefix} ) {
+			if ( !$self->{ns_uri} ) {
+				croak "ns_prefix specified, but ns_uri missing";
+			}
+			Debug 'ns: ' . $self->{ns_prefix} . ':' . $self->{ns_uri};
+
+			$doc = XML::LibXML::XPathContext->new($doc);
+			$doc->registerNs( $self->{ns_prefix}, $self->{ns_uri} );
+		}
+		return $doc;
 	}
 
-	if ( !$md ) {
-		croak "No metadata!";
-	}
+	sub _storeRecord {
+		my $self   = shift;
+		my $record = shift;
 
-	if ( !$datestamp ) {
-		croak "No datestamp!";
-	}
-	if ( !$identifier ) {
-		croak "No identifier!";
-	}
+		my $header     = $record->header;
+		my $md         = $record->metadata;
+		my $identifier = $header->identifier;
+		my $datestamp  = $header->datestamp;
 
-	if ( !$dbh ) {
-		croak "No database handle!";
-	}
+		#todo: overwrite only those items where datestamp is equal or newer
 
-	#now I want to add: update only when datestamp equal or newer
-	#i.e. correct behavior might be
-	#a) insert because rec does not yet exist at all
-	#b) update because rec exists and is older
-	#c) do nothing because rec exists already and is newer
-	#my first idea is to check with a SELECT
-	#get datestamp and determine which of the two actions or none
-	#have to be taken
+		Debug "Enter _storeRecord";
 
-	my $check = qq(SELECT datestamp FROM records WHERE identifier = ?);
-	my $sth = $dbh->prepare($check) or croak $dbh->errstr();
-	$sth->execute($identifier) or croak $dbh->errstr();
-	my $datestamp_db = $sth->fetchrow_array;
+		if ( !$record ) {
+			croak "No record!";
+		}
 
-	#croak $dbh->errstr();
+		if ( !$header ) {
+			croak "No header!";
+		}
 
-	if ($datestamp_db) {
+		if ( !$md ) {
+			croak "No metadata!";
+		}
 
-		#if datestamp, then compare db and source datestamp
-		#Debug "datestamp source: $datestamp // datestamp $datestamp_db";
-		if ( $datestamp_db le $datestamp ) {
-			Debug "$identifier exists and date equal or newer -> update";
-			my $up =
-			    q/UPDATE records SET datestamp=?, native_md =? /
-			  . q/WHERE identifier=?/;
+		if ( !$datestamp ) {
+			croak "No datestamp!";
+		}
+		if ( !$identifier ) {
+			croak "No identifier!";
+		}
 
-			#Debug "UPDATE:$up";
-			my $sth = $dbh->prepare($up) or croak $dbh->errstr();
-			$sth->execute( $datestamp, $md->toString, $identifier )
+		if ( !$dbh ) {
+			croak "No database handle!";
+		}
+
+		#now I want to add: update only when datestamp equal or newer
+		#i.e. correct behavior might be
+		#a) insert because rec does not yet exist at all
+		#b) update because rec exists and is older
+		#c) do nothing because rec exists already and is newer
+		#my first idea is to check with a SELECT
+		#get datestamp and determine which of the two actions or none
+		#have to be taken
+
+		my $check = qq(SELECT datestamp FROM records WHERE identifier = ?);
+		my $sth = $dbh->prepare($check) or croak $dbh->errstr();
+		$sth->execute($identifier) or croak $dbh->errstr();
+		my $datestamp_db = $sth->fetchrow_array;
+
+		#croak $dbh->errstr();
+
+		if ($datestamp_db) {
+
+			#if datestamp, then compare db and source datestamp
+			#Debug "datestamp source: $datestamp // datestamp $datestamp_db";
+			if ( $datestamp_db le $datestamp ) {
+				Debug "$identifier exists and date equal or newer -> update";
+				my $up =
+				    q/UPDATE records SET datestamp=?, native_md =? /
+				  . q/WHERE identifier=?/;
+
+				#Debug "UPDATE:$up";
+				my $sth = $dbh->prepare($up) or croak $dbh->errstr();
+				$sth->execute( $datestamp, $md->toString, $identifier )
+				  or croak $dbh->errstr();
+			}
+
+			#else: db date is older than current one -> NO update
+		} else {
+			Debug "$identifier new -> insert";
+
+			#if no datestamp, then no record -> insert one
+			#this implies every record MUST have a datestamp!
+			my $in =
+			    q/INSERT INTO records(identifier, datestamp, native_md)/
+			  . q/VALUES (?,?,?)/;
+
+			#Debug "INSERT:$in";
+			my $sth = $dbh->prepare($in) or croak $dbh->errstr();
+			$sth->execute( $identifier, $datestamp, $md->toString )
 			  or croak $dbh->errstr();
 		}
 
-		#else: db date is older than current one -> NO update
-	} else {
-		Debug "$identifier new -> insert";
+		Debug "delete Sets for record $identifier";
+		my $deleteSets = qq/DELETE FROM sets WHERE identifier=?/;
+		$sth = $dbh->prepare($deleteSets) or croak $dbh->errstr();
+		$sth->execute($identifier) or croak $dbh->errstr();
 
-		#if no datestamp, then no record -> insert one
-		#this implies every record MUST have a datestamp!
-		my $in =
-		    q/INSERT INTO records(identifier, datestamp, native_md)/
-		  . q/VALUES (?,?,?)/;
-
-		#Debug "INSERT:$in";
-		my $sth = $dbh->prepare($in) or croak $dbh->errstr();
-		$sth->execute( $identifier, $datestamp, $md->toString )
-		  or croak $dbh->errstr();
-	}
-
-	Debug "delete Sets for record $identifier";
-	my $deleteSets = qq/DELETE FROM sets WHERE identifier=?/;
-	$sth = $dbh->prepare($deleteSets) or croak $dbh->errstr();
-	$sth->execute($identifier) or croak $dbh->errstr();
-
-	if ( $header->setSpec ) {
-		foreach my $set ( $header->setSpec ) {
-			Debug "write new set:" . $set;
-			my $addSet =
-			  q/INSERT INTO sets (setSpec, identifier) VALUES (?, ?)/;
-			$sth = $dbh->prepare($addSet) or croak $dbh->errstr();
-			$sth->execute( $set, $identifier ) or croak $dbh->errstr();
+		if ( $header->setSpec ) {
+			foreach my $set ( $header->setSpec ) {
+				Debug "write new set:" . $set;
+				my $addSet =
+				  q/INSERT INTO sets (setSpec, identifier) VALUES (?, ?)/;
+				$sth = $dbh->prepare($addSet) or croak $dbh->errstr();
+				$sth->execute( $set, $identifier ) or croak $dbh->errstr();
+			}
 		}
 	}
-}
 
-1;
+	1;
 
