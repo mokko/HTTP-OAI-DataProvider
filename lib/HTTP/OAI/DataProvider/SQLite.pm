@@ -336,13 +336,15 @@ if ($result->isError) {
 
 =cut
 
+
 sub queryHeaders {
 	my $self   = shift;
 	my $params = shift;
 
-	my $result = _new HTTP::OAI::DataProvider::SQLite;
-
 	Debug "Enter queryHeaders ($params)";
+
+	my $result = $self->_newResult;
+
 
 	#i now think they are not necessary
 	#$result->_queryChecks($params);
@@ -448,7 +450,7 @@ OLD
 sub queryRecords {
 	my $self   = shift;
 	my $params = shift;
-	my $result = _new HTTP::OAI::DataProvider::SQLite;
+	my $result = $self->_newResult;
 
 	Debug "Enter queryRecords ($params)";
 
@@ -464,7 +466,6 @@ sub queryRecords {
 
 	my $header;
 	my $md;
-	$result->{records} = [];    #not necessary?
 	my $i       = 0;            #count the results to test if none
 	my $last_id = '';           #needs to be an empty string
 
@@ -514,7 +515,7 @@ sub queryRecords {
 	#if only 1 row it doesn't work, because there is no more iteration
 	#pthis accounts for every last distinct identifier, so call it here
 	#save the last record
-	$result->_saveRecord( $header, $md );
+	$result->_saveRecord( $params, $header, $md );
 
 	Debug "queryRecords found matching $i headers";
 
@@ -570,6 +571,21 @@ sub _new {
 	return ( bless $result, $class );
 }
 
+#copy transformer...
+sub _newResult {
+	my $self = shift;
+	my $result = _new HTTP::OAI::DataProvider::SQLite;
+	$result->{records} = [];    #not necessary?
+
+	#Debug "_newResult self". ref $self;
+	#Debug "_newResult result". ref $result;
+
+	#copy the transformer in all result objects
+	if ($self->{transformer}) {
+		$result->{transformer}=$self->{transformer};
+	}
+	return $result;
+}
 
 
 #adds an error to a result object
@@ -613,6 +629,11 @@ sub _addRecord {
 
 sub _connect_db {
 	my $dbfile = shift;
+
+	if (!$dbfile) {
+		croak "_connect_db: No dbfile";
+	}
+
 	Debug "Connecting to $dbfile...";
 
 	$dbh = DBI->connect(
@@ -808,9 +829,33 @@ sub _saveRecord {
 
 	Debug "Enter _saveRecords";
 
+	if (! $result) {
+		croak "Result is missing";
+	}
+
+	if (ref $result ne 'HTTP::OAI::DataProvider::SQLite') {
+		croak "$result is wrong type". ref $result;
+	}
+
+	if (! $params) {
+		croak "Params are missing";
+	}
+
+	if (! $header) {
+		croak "Header missing";
+	}
+
+	#md is optional
+	if (! $md) {
+		Debug "Metadata missing, but that might well be";
+	}
+
+
+	#prepare params to make OAI::Record
 	$params{header} = $header;
 
 	if ($md) {
+		Debug "Metadata available";
 		#currently md is a string, possibly in a wrong encoding
 		$md = decode("utf8", $md);
 
@@ -824,13 +869,16 @@ sub _saveRecord {
 
 		#now md should become appropriate metadata
 		if ($result->{transformer}) {
-			$dom=$result->{transformer}->toTarget($dom,$params->{metadataPrefix});
+			Debug "TRANSFORMER EXISTS";
+			$dom=$result->{transformer}->toTargetPrefix($dom,$params->{metadataPrefix});
 		}
 
 		$md = new HTTP::OAI::Metadata( dom => $dom );
 		$params{metadata} = $md
 	}
+
 	my $record = new HTTP::OAI::Record(%params);
+
 	$result->_addRecord($record);
 
 	Debug "save records in \@records. Now count is " . $result->_countRecords;
