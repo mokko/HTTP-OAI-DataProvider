@@ -272,17 +272,74 @@ sub new {
 
 Todo: Might become AUTOLOAD? Better than this senseless code duplication!
 
+=head2 GetRecord
+
+Arguments
+-identifier (required)
+-metadataPrefix (required)
+
+Errors
+-badArgument: already tested
+-cannotDisseminateFormat: gets checked here
+-idDoesNotExist: gets checked here
+
 =cut
 
 sub GetRecord {
 	my $self   = shift;
 	my $params = _hashref(@_);
+	my @errors;
 
+	Warning 'Enter GetRecord (id:'
+	  . $params->{identifier}
+	  . 'prefix:'
+	  . $params->{metadataPrefix} . ')';
+
+	my $engine        = $self->{engine};
+	my $globalFormats = $self->{globalFormats};
+
+	#
+	# Error handling
+	#
+
+	#somethings utterly wrong, so sense in continuing
 	if ( my $error = validate_request( %{$params} ) ) {
 		return $self->err2XML($error);
 	}
 
-	#eturn ( HTTP::OAI::DataProvider::GetRecord->do( $self, %params ) );
+	#check is metadataFormat is supported
+	if ( my $e =
+		$globalFormats->check_format_supported( $params->{metadataPrefix} ) )
+	{
+		push @errors, $e;
+	}
+
+	if (@errors) {
+		return $self->err2XML(@errors);
+	}
+
+	#
+	# Metadata handling
+	#
+
+	#named parameter would have saved me trouble. Todo?
+	my $result = $engine->queryRecords($params);
+
+	#
+	# Check result
+	#
+
+	#Debug "check results";
+	#checkRecordsMatch is now done inside queryHeaders
+	if ( $result->isError ) {
+		return $self->err2XML( $result->isError );
+	}
+
+	#
+	# Return
+	#
+	return $self->_output( $result->_records2GetRecord );
+
 }
 
 =head2 my $response=$provider->Identify();
@@ -476,12 +533,20 @@ sub ListIdentifiers {
 	Debug 'resumption:' . $params->{resumptionToken}
 	  if $params->{resumptionToken};
 
-	my $engine        = $self->{engine};
+	my $engine        = $self->{engine};          #provider
 	my $globalFormats = $self->{globalFormats};
 
 	#
 	# Error handling
 	#
+
+	if ( !$engine ) {
+		croak "Internal error: Data store missing!";
+	}
+
+	if ( !$globalFormats ) {
+		croak "Internal error: Formats missing!";
+	}
 
 	#check param syntax. Frontend will likely check it, but why not again?
 	if ( my $e = validate_request( %{$params} ) ) {
@@ -498,9 +563,7 @@ sub ListIdentifiers {
 	if ( my $e =
 		$globalFormats->check_format_supported( $params->{metadataPrefix} ) )
 	{
-
-		#cannotDisseminateFormat if necessary
-		push @errors, $e;
+		push @errors, $e;    #cannotDisseminateFormat if necessary
 	}
 
 	if ( $params->{Set} ) {
@@ -521,6 +584,8 @@ sub ListIdentifiers {
 	#
 	# Metadata handling
 	#
+
+	Debug "engine:" . ref $engine;
 
 	#required: metadataPrefix; optional: from, until, set
 	my $result = $engine->queryHeaders($params);
@@ -680,9 +745,10 @@ sub err2XML {
 		my $response = new HTTP::OAI::Response;
 		my @errors;
 		foreach (@_) {
+
 			#Debug 'Kennedy' . ref $_;
 
-			if (ref $_ ne 'HTTP::OAI::Error') {
+			if ( ref $_ ne 'HTTP::OAI::Error' ) {
 				die "Internal Error: Error has wrong format!";
 			}
 			$response->errors($_);
@@ -701,6 +767,11 @@ sub err2XML {
 
 Expects a HTTP::OAI::Response object and returns it as xml string. It applies
 $self->{xslt} if set.
+
+TODO: Should deal with multiple records. Maybe I should transform the
+_records2GetRecord: @records -> HTTP::OAI::GetRecord
+_records2ListIdentifiers: @records -> HTTP::OAI::ListIdentifiers
+_records2ListRecords:@records -> HTTP::OAI::ListRecords
 
 =cut
 
