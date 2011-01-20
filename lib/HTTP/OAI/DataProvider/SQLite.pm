@@ -7,13 +7,13 @@ use YAML::Syck qw/Dump LoadFile/;
 #use XML::LibXML;
 use HTTP::OAI;
 use HTTP::OAI::Repository qw/validate_date/;
-use Encode qw/decode/; #encoding problem when dealing with data from sqlite;
+use Encode qw/decode/;    #encoding problem when dealing with data from sqlite;
 use XML::LibXML;
 use XML::LibXML::XPathContext;
 use XML::SAX::Writer;
 use Dancer::CommandLine qw/Debug Warning/;
 use Carp qw/carp croak/;
-use DBI qw(:sql_types); #new
+use DBI qw(:sql_types);    #new
 our $dbh;
 
 #only for debug during development
@@ -150,10 +150,12 @@ sub new {
 	}
 
 	if ( $args{ns_uri} ) {
+		Debug "ns_uri" . $args{ns_uri};
 		$self->{ns_uri} = $args{ns_uri};
 	}
 
 	if ( $args{ns_prefix} ) {
+		Debug "ns_prefix" . $args{ns_prefix};
 		$self->{ns_prefix} = $args{ns_prefix};
 	}
 
@@ -162,7 +164,9 @@ sub new {
 
 	_connect_db( $args{dbfile} );
 	_init_db();
-	$self->earliestDate();    #just to see if this creates an error;
+
+	#I cannot test earlierstDate since non existant in new db
+	#$self->earliestDate();    #just to see if this creates an error;
 
 	return $self;
 }
@@ -336,7 +340,6 @@ if ($result->isError) {
 
 =cut
 
-
 sub queryHeaders {
 	my $self   = shift;
 	my $params = shift;
@@ -344,7 +347,6 @@ sub queryHeaders {
 	Debug "Enter queryHeaders ($params)";
 
 	my $result = $self->_newResult;
-
 
 	#i now think they are not necessary
 	#$result->_queryChecks($params);
@@ -466,8 +468,8 @@ sub queryRecords {
 
 	my $header;
 	my $md;
-	my $i       = 0;            #count the results to test if none
-	my $last_id = '';           #needs to be an empty string
+	my $i       = 0;     #count the results to test if none
+	my $last_id = '';    #needs to be an empty string
 
 	#this loop is a bit complicated
 	#it loops over db rows which contain redundant info (cartesian product)
@@ -476,7 +478,7 @@ sub queryRecords {
 	#start the next header
 	while ( my $aref = $sth->fetch ) {
 		if ( $last_id ne $aref->[0] ) {
-			$i++;               #count distinct identifiers
+			$i++;        #count distinct identifiers
 
 			if ($header) {
 
@@ -563,7 +565,6 @@ sub isError {
 
 =cut
 
-
 #standard constructor
 sub _new {
 	my $class  = shift;
@@ -573,7 +574,7 @@ sub _new {
 
 #copy transformer...
 sub _newResult {
-	my $self = shift;
+	my $self   = shift;
 	my $result = _new HTTP::OAI::DataProvider::SQLite;
 	$result->{records} = [];    #not necessary?
 
@@ -581,12 +582,11 @@ sub _newResult {
 	#Debug "_newResult result". ref $result;
 
 	#copy the transformer in all result objects
-	if ($self->{transformer}) {
-		$result->{transformer}=$self->{transformer};
+	if ( $self->{transformer} ) {
+		$result->{transformer} = $self->{transformer};
 	}
 	return $result;
 }
-
 
 #adds an error to a result object
 # $self->_addError($code[, $message]);
@@ -630,7 +630,7 @@ sub _addRecord {
 sub _connect_db {
 	my $dbfile = shift;
 
-	if (!$dbfile) {
+	if ( !$dbfile ) {
 		croak "_connect_db: No dbfile";
 	}
 
@@ -670,9 +670,9 @@ sub _init_db {
 	$sql = q/CREATE TABLE IF NOT EXISTS records (
   		'identifier' TEXT PRIMARY KEY NOT NULL ,
   		'datestamp'  TEXT NOT NULL ,
-  		'status'     INTEGER -- null or 1,
+  		'status'     INTEGER,
   		'native_md'  BLOB)/;
-
+	# -- null or 1
 	#Debug $sql. "\n";
 	$dbh->do($sql) or die $dbh->errstr;
 }
@@ -769,6 +769,8 @@ sub _registerNS {
 #
 
 sub _countRecords {
+
+	#synonym to returnRecords
 	goto &_returnRecords;
 }
 
@@ -795,31 +797,40 @@ sub _records2GetRecord {
 
 sub _records2ListRecords {
 
-	#TODO
-	my $result    = shift;
-	my $GetRecord = new HTTP::OAI::GetRecord;
+	my $result      = shift;
+	my $ListRecords = new HTTP::OAI::ListRecords;
 
-	if ( $result->_countRecords != 1 ) {
-		croak "_records2GetRecord: count doesn't fit";
+	if ( $result->_countRecords == 0 ) {
+		croak "_records2ListRecords: count doesn't fit";
 	}
 
-	return $GetRecord->record( $result->_returnRecords );
+	$ListRecords->record( $result->_returnRecords );
+
+	my $i;
+
+	#while (){
+	#	$i++;
+	#	Debug "record $i";
+	#	$ListRecords->record($_);
+	#}
+
+	return $ListRecords;
 }
 
 sub _records2ListIdentifiers {
 
-	#TODO
-	my $result    = shift;
-	my $GetRecord = new HTTP::OAI::GetRecord;
+	my $result          = shift;
+	my $ListIdentifiers = new HTTP::OAI::ListIdentifiers;
 
-	if ( $result->_countRecords != 1 ) {
+	#not sure if we tested this before
+	if ( $result->_countRecords == 0 ) {
 		croak "_records2GetRecord: count doesn't fit";
 	}
 
-	return $GetRecord->record( $result->_returnRecords );
+	return $ListIdentifiers->record( $result->_returnRecords );
 }
 
-#called in queryRecords
+#called in queryRecords to create array with result records
 sub _saveRecord {
 	my $result = shift;
 	my $params = shift;
@@ -829,52 +840,54 @@ sub _saveRecord {
 
 	Debug "Enter _saveRecords";
 
-	if (! $result) {
+	if ( !$result ) {
 		croak "Result is missing";
 	}
 
-	if (ref $result ne 'HTTP::OAI::DataProvider::SQLite') {
-		croak "$result is wrong type". ref $result;
+	if ( ref $result ne 'HTTP::OAI::DataProvider::SQLite' ) {
+		croak "$result is wrong type" . ref $result;
 	}
 
-	if (! $params) {
+	if ( !$params ) {
 		croak "Params are missing";
 	}
 
-	if (! $header) {
+	if ( !$header ) {
 		croak "Header missing";
 	}
 
 	#md is optional
-	if (! $md) {
+	if ( !$md ) {
 		Debug "Metadata missing, but that might well be";
 	}
-
 
 	#prepare params to make OAI::Record
 	$params{header} = $header;
 
 	if ($md) {
 		Debug "Metadata available";
+
 		#currently md is a string, possibly in a wrong encoding
-		$md = decode("utf8", $md);
+		$md = decode( "utf8", $md );
 
 		#this line fails on encoding problem
-		my $dom=XML::LibXML->load_xml(string => $md);
+		my $dom = XML::LibXML->load_xml( string => $md );
+
 		#Debug "----- dom's actual encoding: ".$dom->actualEncoding;
 
-		#load $dom from source file works perfectly
-		#my $dom = XML::LibXML->load_xml( location => '/home/Mengel/projects/Salsa_OAI2/data/fs/objId-1305695.mpx' )
-	 	# or return "Salsa Error: Loading xml file failed for strange reason";
+#load $dom from source file works perfectly
+#my $dom = XML::LibXML->load_xml( location => '/home/Mengel/projects/Salsa_OAI2/data/fs/objId-1305695.mpx' )
+# or return "Salsa Error: Loading xml file failed for strange reason";
 
 		#now md should become appropriate metadata
-		if ($result->{transformer}) {
-			Debug "TRANSFORMER EXISTS";
-			$dom=$result->{transformer}->toTargetPrefix($dom,$params->{metadataPrefix});
+		if ( $result->{transformer} ) {
+			$dom =
+			  $result->{transformer}
+			  ->toTargetPrefix( $params->{metadataPrefix}, $dom );
 		}
 
 		$md = new HTTP::OAI::Metadata( dom => $dom );
-		$params{metadata} = $md
+		$params{metadata} = $md;
 	}
 
 	my $record = new HTTP::OAI::Record(%params);
@@ -884,6 +897,7 @@ sub _saveRecord {
 	Debug "save records in \@records. Now count is " . $result->_countRecords;
 }
 
+#store record in db
 sub _storeRecord {
 	my $self   = shift;
 	my $record = shift;
@@ -892,8 +906,6 @@ sub _storeRecord {
 	my $md         = $record->metadata;
 	my $identifier = $header->identifier;
 	my $datestamp  = $header->datestamp;
-
-	#todo: overwrite only those items where datestamp is equal or newer
 
 	Debug "Enter _storeRecord";
 
@@ -959,12 +971,13 @@ sub _storeRecord {
 		#if no datestamp, then no record -> insert one
 		#this implies every record MUST have a datestamp!
 		my $in =
-		    q/INSERT INTO records(identifier, datestamp, native_md)/
-		  . q/VALUES (?,?,?)/;
+		  q/INSERT INTO records(identifier, datestamp, native_md, status) /;
+		$in .= q/VALUES (?,?,?,?)/;
 
 		#Debug "INSERT:$in";
 		my $sth = $dbh->prepare($in) or croak $dbh->errstr();
-		$sth->execute( $identifier, $datestamp, $md->toString )
+		my $status;
+		$sth->execute( $identifier, $datestamp, $md->toString, $status )
 		  or croak $dbh->errstr();
 	}
 

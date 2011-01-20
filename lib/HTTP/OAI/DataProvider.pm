@@ -302,6 +302,8 @@ sub GetRecord {
 	# Error handling
 	#
 
+	#TODO: check if id exists!
+
 	#somethings utterly wrong, so sense in continuing
 	if ( my $error = validate_request( %{$params} ) ) {
 		return $self->err2XML($error);
@@ -607,14 +609,91 @@ sub ListIdentifiers {
 	return $self->_output( $result->{ListIdentifiers} );
 }
 
+
+=head2 ListRecords
+
+returns multiple items (headers plus records) at once. In its capacity to
+return multiple objects it is similar to the other list verbs
+(ListIdentifiers). ListRecord also has the same arguments as ListIdentifier.
+In its capacity to return full records (incl. header), ListRecords is similar
+to GetRecord.
+
+ARGUMENTS
+-from (optional, UTCdatetime value) TODO: Check if it works
+-until (optional, UTCdatetime value)  TODO: Check if it works
+-metadataPrefix (required unless resumptionToken)
+-set (optional)
+-resumptionToken (exclusive)
+
+ERRORS
+-badArgument: checked for before you get here
+-badResumptionToken - TODO
+-cannotDisseminateFormat - TODO
+-noRecordsMatch - here
+-noSetHierarchy - TODO
+
+TODO
+-Check if error appears as excepted when non-supported metadataFormat
+
+=cut
+
 sub ListRecords {
 	my $self   = shift;
 	my $params = _hashref(@_);
+	my @errors;
+
+	Warning 'Enter ListRecords (prefix:'
+	  . $params->{metadataPrefix};
+
+	Debug 'from:' . $params->{from}   if $params->{from};
+	Debug 'until:' . $params->{until} if $params->{until};
+	Debug 'set:' . $params->{set}     if $params->{set};
+	Debug 'resumption:' . $params->{resumptionToken}
+	  if $params->{resumptionToken};
+
+	my $engine        = $self->{engine};
+	my $globalFormats = $self->{globalFormats};
+
+	#
+	# Error handling
+	#
 
 	#check param syntax
 	if ( my $error = validate_request( %{$params} ) ) {
 		return $self->err2XML($error);
 	}
+
+	#check is metadataFormat is supported
+	if ( my $e =
+		$globalFormats->check_format_supported( $params->{metadataPrefix} ) )
+	{
+		push @errors, $e;
+	}
+
+	if (@errors) {
+		return $self->err2XML(@errors);
+	}
+
+	#
+	# Metadata handling
+	#
+
+	my $result = $engine->queryRecords($params);
+
+	#
+	# Check result
+	#
+
+	#checkRecordsMatch is now done inside queryRecords
+	if ( $result->isError ) {
+		return $self->err2XML( $result->isError );
+	}
+
+	#
+	# Return
+	#
+	return $self->_output( $result->_records2ListRecords );
+
 
 }
 
@@ -724,7 +803,7 @@ sub ListSets {
 #
 #
 
-=head1 METHODS - VARIOUS PUBLIC UTILITY FUNCTIONS
+=head1 METHODS - VARIOUS PUBLIC UTILITY FUNCTIONS / METHODS
 
 check error, display error, warning, debug etc.
 
@@ -740,14 +819,10 @@ Includes the nicer output stylesheet setting from init.
 sub err2XML {
 	my $self = shift;
 
-	#Debug 'dddddd' . Dumper @_;
 	if (@_) {
 		my $response = new HTTP::OAI::Response;
 		my @errors;
 		foreach (@_) {
-
-			#Debug 'Kennedy' . ref $_;
-
 			if ( ref $_ ne 'HTTP::OAI::Error' ) {
 				die "Internal Error: Error has wrong format!";
 			}
@@ -762,6 +837,27 @@ sub err2XML {
 		return $response->toDOM->toString;
 	}
 }
+
+#
+# PRIVATE STUFF
+#
+
+=head1 PRIVATE METHODS
+
+HTTP::OAI::DataProvider is to be used by frontend developers. What is not meant
+for them, is private.
+
+=head2 my $params=_hashref (@_);
+
+Little thingy that transforms array of parameters to hashref and returns it.
+
+=cut
+
+sub _hashref {
+	my %params = @_;
+	return \%params;
+}
+
 
 =head2 return $self->_output($response);
 
@@ -788,25 +884,7 @@ sub _output {
 	#return $xml;
 }
 
-#
-# PRIVATE STUFF
-#
 
-=head1 PRIVATE METHODS
-
-HTTP::OAI::DataProvider is to be used by frontend developers. What is not meant
-for them, is private.
-
-=head2 my $params=_hashref (@_);
-
-Little thingy that transforms array of parameters to hashref and returns it.
-
-=cut
-
-sub _hashref {
-	my %params = @_;
-	return \%params;
-}
 
 =head2 $obj= $self->_init_xslt($obj)
 
