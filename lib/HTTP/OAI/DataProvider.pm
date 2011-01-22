@@ -226,9 +226,9 @@ development and not during runtime it may also croak.
 
 =head3 OPTIONS
 
-only options not otherwise explained?
+List here only options not otherwise explained?
 
-isMetadaFormatSupported=>Callback,
+isMetadaFormatSupported=>Callback, TODO
 
 	The callback expects a single prefix and returns 1 if true and nothing
 	when not supported. Currently only global metadataFormats, i.e. for all
@@ -244,6 +244,8 @@ xslt=>'path/to/style.xslt',
 	still uncertain, maybe even unlikely if engine will be option at all.
 	(Alternative would be to just to use the engine.)
 
+requestURL
+	Overwrite normal requestURL, e.g. when using a reverse proxy cache etc.
 
 =cut
 
@@ -406,6 +408,7 @@ sub Identify {
 		repositoryName    => $id_data->{repositoryName},
 	  )
 	  or return "Cannot create new HTTP::OAI::Identify";
+
 
 	#
 	# Output
@@ -609,7 +612,6 @@ sub ListIdentifiers {
 	return $self->_output( $result->{ListIdentifiers} );
 }
 
-
 =head2 ListRecords
 
 returns multiple items (headers plus records) at once. In its capacity to
@@ -642,8 +644,7 @@ sub ListRecords {
 	my $params = _hashref(@_);
 	my @errors;
 
-	Warning 'Enter ListRecords (prefix:'
-	  . $params->{metadataPrefix};
+	Warning 'Enter ListRecords (prefix:' . $params->{metadataPrefix};
 
 	Debug 'from:' . $params->{from}   if $params->{from};
 	Debug 'until:' . $params->{until} if $params->{until};
@@ -693,7 +694,6 @@ sub ListRecords {
 	# Return
 	#
 	return $self->_output( $result->_records2ListRecords );
-
 
 }
 
@@ -858,7 +858,6 @@ sub _hashref {
 	return \%params;
 }
 
-
 =head2 return $self->_output($response);
 
 Expects a HTTP::OAI::Response object and returns it as xml string. It applies
@@ -876,6 +875,12 @@ sub _output {
 	my $response = shift;
 
 	$response = $self->_init_xslt($response);
+
+	#overwrite requestURL so that nginx cache appears to be origin
+	if ($self->{requestURL}) {
+		#Debug "RequestURL:".$self->{requestURL};
+		$response->requestURL ($self->{requestURL});
+	}
 	return $response->toDOM->toString;
 
 	#my $xml;
@@ -883,8 +888,6 @@ sub _output {
 	#$response->generate;
 	#return $xml;
 }
-
-
 
 =head2 $obj= $self->_init_xslt($obj)
 
