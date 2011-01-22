@@ -471,10 +471,11 @@ sub ListMetadataFormats {
 
 	#Metadata Handling
 	my $lmfs = $globalFormats->get_list();
+
 	#TODO
 	#This is a bit dirty. I guess the proper way would be if globalFormats
 	#returns expected defaults!
-	$lmfs->requestURL($self->{requestURL}."?verb=ListMetadataFormats");
+	$lmfs->requestURL( $self->{requestURL} . "?verb=ListMetadataFormats" );
 	my @mdfs = $lmfs->metadataFormat();
 
 	#check if noMetadataFormats
@@ -833,8 +834,8 @@ sub err2XML {
 			push @errors, $response;
 		}
 
-		$self->_requestURL ($response);
-		$self->_init_xslt ($response);
+		$self->_requestURL($response);
+		$self->_init_xslt($response);
 
 		return $response->toDOM->toString;
 	}
@@ -877,7 +878,7 @@ sub _output {
 	my $response = shift;
 
 	$self->_init_xslt($response);
-	$self->_requestURL ($response);
+	$self->_requestURL($response);
 
 	return $response->toDOM->toString;
 
@@ -895,29 +896,37 @@ params like "verb=Identify".
 
 =cut
 
-sub _requestURL  {
-	my $self = shift;
-	my $response  = shift;    #e.g. HTTP::OAI::ListRecord
+sub _requestURL {
+	my $self     = shift;
+	my $response = shift;    #e.g. HTTP::OAI::ListRecord
 
 	#overwrite requestURL so that nginx cache appears original
+	#overwrite only when requestURL argument during init
 	if ( $self->{requestURL} ) {
+
+		#replace part before question mark
+		if ( $response->requestURL =~ /\?/ ) {
+
 	 #I can overwrite the URL part, but how do i access and preserve the params?
-	 #replace everything before the ?
-		my @f = split( /\?/, $response->requestURL, 2 );
-		if ( $f[1] ) {
-			my $new = $self->{requestURL} . '?' . $f[1];
-			#Debug "HANOVER: Correct requestURL\n\t"
-			#  . $response->requestURL
-			#  . "\n\t$new";
-			$response->requestURL($new);
+	 #replace everything before the '?'
+			my @f = split( /\?/, $response->requestURL, 2 );
+			if ( $f[1] ) {
+				my $new = $self->{requestURL} . '?' . $f[1];
+
+				#Debug "HANOVER: Correct requestURL\n\t"
+				#  . $response->requestURL
+				#  . "\n\t$new";
+				$response->requestURL($new);
+			} else {
+
+				#if no 2nd part we know it's a badVerb
+				#badVerb has no question mark
+				Debug "badVerb" . $response->requestURL;
+				$response->requestURL( $self->{requestURL} );
+			}
 		}
 	}
-
-	return $response;
 }
-
-
-
 
 =head2 $obj= $self->_init_xslt($obj)
 
@@ -941,7 +950,6 @@ sub _init_xslt {
 	if ( $self->{xslt} ) {
 		$obj->xslt( $self->{xslt} );
 	}
-	return $obj;
 }
 
 =head1 AUTHOR
