@@ -47,10 +47,29 @@ HTTP::OAI::DataProvider::SQLite - A sqlite engine for HTTP::OAI::DataProvider
 
 	TODO
 
+=head1 VERSION
+
+Version 0.01
+
+=cut
+
+our $VERSION = '0.01';
+
+
 =head1 DESCRIPTION
 
 Provide a sqlite for HTTP::OAI::DataProvider and abstract all the database
 action to store, modify and access header and metadata information.
+
+=head1 TODO
+
+Separate out everything that is not sql-related engine work, so that writing
+another engine is MUCH less work. I will probably take out all the stuff to
+create results. That looks like another module. Maybe it could be a base
+module which the actual engine inherits. That would serve the purpose. Then
+it would be
+	HTTP::OAI::DataProvider::Engine
+
 
 =head2 	my $err=$engine->digest_single (source=>$xml_fn, mapping=>&mapping);
 =cut
@@ -85,42 +104,6 @@ sub digest_single {
 
 }
 
-=head2 $self->showRecord($record);
-=cut
-
-sub showRecord {
-	my $self   = shift;
-	my $record = shift;
-	Debug "Enter showRecord";
-
-	if ( $record->header ) {
-		Debug "--HEADER--";
-		Debug $record->header->dom->toString;
-
-	}
-	if ( $record->metadata ) {
-		Debug "--METADATA--";
-		Debug $record->metadata->toString;
-	}
-	if ( $record->about ) {
-		Debug "--ABOUT--";
-		Debug $record->metadata->toString;
-	}
-
-	#	my $list= new HTTP::OAI::ListRecord;
-	#	$list->record($record);
-	#	Debug $list->toDOM->toString;
-	#my $gr = new HTTP::OAI::GetRecord();
-	#$gr->record($record);
-
-	#Debug $gr->toDOM;
-
-	#Debug 'writer:'. $gr->toDOM()->toString;
-	#my $writer = XML::SAX::Writer->new();
-	#$record->set_handler($writer);
-	#$record->generate;
-	#Debug "wewe" . $writer;
-}
 
 =head2 my $cache=new HTTP::OAI::DataRepository::SQLite (
 	mapping=>'main::mapping',
@@ -191,14 +174,9 @@ sub earliestDate {
 		croak "No date";
 	}
 
-	$aref->[0] =~ /(^\d{4}-\d{2}-\d{2})/;
-
-	if ( !$1 ) {
-		Warning "No date pattern found!";
-		return ();
-	}
-
-	return $1;
+	#$aref->[0] =~ /(^\d{4}-\d{2}-\d{2})/;
+	#datestamp must have the format/length which is specified by granularity
+	return $aref->[0];
 
 }
 
@@ -357,7 +335,7 @@ sub queryHeaders {
 
 	# metadata munging
 	my $sql = _querySQL($params);
-	Debug $sql;
+	#Debug $sql;
 	my $sth = $dbh->prepare($sql) or croak $dbh->errstr();
 	$sth->execute() or croak $dbh->errstr();
 
@@ -404,6 +382,7 @@ sub queryHeaders {
 	return $result;
 }
 
+# seems not to be necessary!
 # $result->_queryChecks ($params);
 sub _queryChecks {
 	my $result = shift;
@@ -536,6 +515,8 @@ sub queryRecords {
 
 }
 
+
+#should go to HTTP::OAI::DataProvider::Record
 =head2 my @err=$result->isError
 
 Returns a list of arrays if any.
@@ -572,6 +553,7 @@ sub _new {
 	return ( bless $result, $class );
 }
 
+#should go to HTTP::OAI::DataProvider::Record
 #copy transformer...
 sub _newResult {
 	my $self   = shift;
@@ -611,6 +593,7 @@ sub _addError {
 	}
 }
 
+#should go to HTTP::OAI::DataProvider::Record
 sub _addRecord {
 	my $result = shift;
 	my $record = shift;
@@ -656,9 +639,6 @@ sub _init_db {
 	$dbh->do("PRAGMA foreign_keys");
 	$dbh->do("PRAGMA cache_size = 8000");    #doesn't make a big difference
 	                                         #default is 2000
-
-	#I could make identifier the primary key. What are advantages and
-	#disadvantages? I guess primary key cannot be text
 
 	my $sql = q / CREATE TABLE IF NOT EXISTS sets( 'setSpec' STRING NOT NULL,
 			'identifier' TEXT NOT NULL REFERENCES records(identifier) ) /;
@@ -857,15 +837,15 @@ sub _saveRecord {
 	}
 
 	#md is optional
-	if ( !$md ) {
-		Debug "Metadata missing, but that might well be";
-	}
+	#if ( !$md ) {
+	#	Debug "Metadata missing, but that might well be";
+	#}
 
 	#prepare params to make OAI::Record
 	$params{header} = $header;
 
 	if ($md) {
-		Debug "Metadata available";
+		#Debug "Metadata available";
 
 		#currently md is a string, possibly in a wrong encoding
 		$md = decode( "utf8", $md );
@@ -875,9 +855,9 @@ sub _saveRecord {
 
 		#Debug "----- dom's actual encoding: ".$dom->actualEncoding;
 
-#load $dom from source file works perfectly
-#my $dom = XML::LibXML->load_xml( location => '/home/Mengel/projects/Salsa_OAI2/data/fs/objId-1305695.mpx' )
-# or return "Salsa Error: Loading xml file failed for strange reason";
+		#load $dom from source file works perfectly
+		#my $dom = XML::LibXML->load_xml( location => '/home/Mengel/projects/Salsa_OAI2/data/fs/objId-1305695.mpx' )
+		# or return "Salsa Error: Loading xml file failed for strange reason";
 
 		#now md should become appropriate metadata
 		if ( $result->{transformer} ) {
@@ -894,7 +874,7 @@ sub _saveRecord {
 
 	$result->_addRecord($record);
 
-	Debug "save records in \@records. Now count is " . $result->_countRecords;
+	#Debug "save records in \@records. Now count is " . $result->_countRecords;
 }
 
 #store record in db
@@ -966,7 +946,7 @@ sub _storeRecord {
 
 		#else: db date is older than current one -> NO update
 	} else {
-		Debug "$identifier new -> insert";
+		#Debug "$identifier new -> insert";
 
 		#if no datestamp, then no record -> insert one
 		#this implies every record MUST have a datestamp!
@@ -988,7 +968,7 @@ sub _storeRecord {
 
 	if ( $header->setSpec ) {
 		foreach my $set ( $header->setSpec ) {
-			Debug "write new set:" . $set;
+			#Debug "write new set:" . $set;
 			my $addSet =
 			  q/INSERT INTO sets (setSpec, identifier) VALUES (?, ?)/;
 			$sth = $dbh->prepare($addSet) or croak $dbh->errstr();

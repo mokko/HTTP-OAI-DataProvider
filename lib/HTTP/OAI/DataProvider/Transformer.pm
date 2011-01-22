@@ -75,7 +75,7 @@ sub toTargetPrefix {
 		return $dom;
 	}
 
-	Debug "We need a transformation";
+	#Debug "We need a transformation";
 	$self->_cache_stylesheet($targetPrefix);
 	my $stylesheet = $stylesheet_cache{$targetPrefix};
 

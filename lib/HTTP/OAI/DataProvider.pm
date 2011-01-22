@@ -19,7 +19,7 @@ use Data::Dumper qw/Dumper/;
 
 =head1 NAME
 
-HTTP::OAI::DataProvider - A flexible OAI data provider
+HTTP::OAI::DataProvider - Simple perl OAI data provider
 
 =head1 VERSION
 
@@ -27,7 +27,7 @@ Version 0.01
 
 =cut
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 =head1 SYNOPSIS
 
@@ -587,7 +587,7 @@ sub ListIdentifiers {
 	# Metadata handling
 	#
 
-	Debug "engine:" . ref $engine;
+	#Debug "engine:" . ref $engine;
 
 	#required: metadataPrefix; optional: from, until, set
 	my $result = $engine->queryHeaders($params);
