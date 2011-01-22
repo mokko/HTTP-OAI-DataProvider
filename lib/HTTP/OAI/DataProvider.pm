@@ -409,7 +409,6 @@ sub Identify {
 	  )
 	  or return "Cannot create new HTTP::OAI::Identify";
 
-
 	#
 	# Output
 	#
@@ -472,6 +471,10 @@ sub ListMetadataFormats {
 
 	#Metadata Handling
 	my $lmfs = $globalFormats->get_list();
+	#TODO
+	#This is a bit dirty. I guess the proper way would be if globalFormats
+	#returns expected defaults!
+	$lmfs->requestURL($self->{requestURL}."?verb=ListMetadataFormats");
 	my @mdfs = $lmfs->metadataFormat();
 
 	#check if noMetadataFormats
@@ -830,9 +833,8 @@ sub err2XML {
 			push @errors, $response;
 		}
 
-		if ( $self->{xslt} ) {
-			$response->xslt( $self->{xslt} );
-		}
+		$self->_requestURL ($response);
+		$self->_init_xslt ($response);
 
 		return $response->toDOM->toString;
 	}
@@ -874,13 +876,9 @@ sub _output {
 	my $self     = shift;
 	my $response = shift;
 
-	$response = $self->_init_xslt($response);
+	$self->_init_xslt($response);
+	$self->_requestURL ($response);
 
-	#overwrite requestURL so that nginx cache appears to be origin
-	if ($self->{requestURL}) {
-		#Debug "RequestURL:".$self->{requestURL};
-		$response->requestURL ($self->{requestURL});
-	}
 	return $response->toDOM->toString;
 
 	#my $xml;
@@ -888,6 +886,38 @@ sub _output {
 	#$response->generate;
 	#return $xml;
 }
+
+=head2 $obj= $self->_responseURL($obj)
+
+If $provider->{requestURL} exists take that value and overwrite the requestURL
+in the responseURL. I assume that $provider->{requestURL} does not have any
+params like "verb=Identify".
+
+=cut
+
+sub _requestURL  {
+	my $self = shift;
+	my $response  = shift;    #e.g. HTTP::OAI::ListRecord
+
+	#overwrite requestURL so that nginx cache appears original
+	if ( $self->{requestURL} ) {
+	 #I can overwrite the URL part, but how do i access and preserve the params?
+	 #replace everything before the ?
+		my @f = split( /\?/, $response->requestURL, 2 );
+		if ( $f[1] ) {
+			my $new = $self->{requestURL} . '?' . $f[1];
+			#Debug "HANOVER: Correct requestURL\n\t"
+			#  . $response->requestURL
+			#  . "\n\t$new";
+			$response->requestURL($new);
+		}
+	}
+
+	return $response;
+}
+
+
+
 
 =head2 $obj= $self->_init_xslt($obj)
 
