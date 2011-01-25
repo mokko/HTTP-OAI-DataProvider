@@ -55,7 +55,6 @@ Version 0.01
 
 our $VERSION = '0.01';
 
-
 =head1 DESCRIPTION
 
 Provide a sqlite for HTTP::OAI::DataProvider and abstract all the database
@@ -103,7 +102,6 @@ sub digest_single {
 	use strict "refs";
 
 }
-
 
 =head2 my $cache=new HTTP::OAI::DataRepository::SQLite (
 	mapping=>'main::mapping',
@@ -246,6 +244,7 @@ sub findByIdentifier {
 		croak "No identifier specified";
 	}
 
+	#Debug "Id: $identifier";
 	#If I cannot compose a header from the db I have the wrong db scheme
 	#TODO: status is missing in db
 	#I could do a join and get the setSpecs
@@ -262,9 +261,12 @@ sub findByIdentifier {
 	#However, I do want to test if I really get a result at all
 	if ( $aref->[0] ) {
 
-		my $h = new HTTP::OAI::Header;
-		$h->identifier = $identifier;
-		$h->datestamp  = $aref->[0];
+		my $h = new HTTP::OAI::Header(
+			identifier => $identifier,
+			datestamp  => $aref->[0]
+		);
+		#$h->identifier = $identifier;
+		#$h->datestamp  = $aref->[0];
 
 		#TODO $h->status=$aref->[1];
 
@@ -335,6 +337,7 @@ sub queryHeaders {
 
 	# metadata munging
 	my $sql = _querySQL($params);
+
 	#Debug $sql;
 	my $sth = $dbh->prepare($sql) or croak $dbh->errstr();
 	$sth->execute() or croak $dbh->errstr();
@@ -483,11 +486,13 @@ sub queryRecords {
 
 		#every row
 		if ( $aref->[3] ) {
-			my $set = new HTTP::OAI::Set;
+			#wrong: OAI:Set seems to be only for ListSets
+			#use header->setSpec instead!
+			#my $set = new HTTP::OAI::Set;
 
 			#TODO: Do I need to expand info from setLibrary?
-			$set->setSpec( $aref->[3] );
-			$header->setSpec($set);
+			#$set->setSpec( $aref->[3] );
+			$header->setSpec($aref->[3]);
 		}
 
 		$last_id = $aref->[0];
@@ -515,8 +520,8 @@ sub queryRecords {
 
 }
 
-
 #should go to HTTP::OAI::DataProvider::Record
+
 =head2 my @err=$result->isError
 
 Returns a list of arrays if any.
@@ -652,6 +657,7 @@ sub _init_db {
   		'datestamp'  TEXT NOT NULL ,
   		'status'     INTEGER,
   		'native_md'  BLOB)/;
+
 	# -- null or 1
 	#Debug $sql. "\n";
 	$dbh->do($sql) or die $dbh->errstr;
@@ -845,6 +851,7 @@ sub _saveRecord {
 	$params{header} = $header;
 
 	if ($md) {
+
 		#Debug "Metadata available";
 
 		#currently md is a string, possibly in a wrong encoding
@@ -855,9 +862,9 @@ sub _saveRecord {
 
 		#Debug "----- dom's actual encoding: ".$dom->actualEncoding;
 
-		#load $dom from source file works perfectly
-		#my $dom = XML::LibXML->load_xml( location => '/home/Mengel/projects/Salsa_OAI2/data/fs/objId-1305695.mpx' )
-		# or return "Salsa Error: Loading xml file failed for strange reason";
+#load $dom from source file works perfectly
+#my $dom = XML::LibXML->load_xml( location => '/home/Mengel/projects/Salsa_OAI2/data/fs/objId-1305695.mpx' )
+# or return "Salsa Error: Loading xml file failed for strange reason";
 
 		#now md should become appropriate metadata
 		if ( $result->{transformer} ) {
@@ -946,6 +953,7 @@ sub _storeRecord {
 
 		#else: db date is older than current one -> NO update
 	} else {
+
 		#Debug "$identifier new -> insert";
 
 		#if no datestamp, then no record -> insert one
@@ -968,6 +976,7 @@ sub _storeRecord {
 
 	if ( $header->setSpec ) {
 		foreach my $set ( $header->setSpec ) {
+
 			#Debug "write new set:" . $set;
 			my $addSet =
 			  q/INSERT INTO sets (setSpec, identifier) VALUES (?, ?)/;
