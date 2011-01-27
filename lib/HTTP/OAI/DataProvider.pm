@@ -10,7 +10,6 @@ use HTTP::OAI::Repository qw/validate_request/;
 #use Dancer ':syntax'; #this module should abstract from Dancer
 use Dancer::CommandLine qw/Debug Warning/;
 
-use lib '/home/Mengel/projects/HTTP-OAI-DataProvider/lib';    #for development
 use HTTP::OAI::DataProvider::GlobalFormats;
 use HTTP::OAI::DataProvider::SetLibrary;
 
@@ -246,6 +245,15 @@ xslt=>'path/to/style.xslt',
 
 requestURL
 	Overwrite normal requestURL, e.g. when using a reverse proxy cache etc.
+	Note that
+	a) requestURL specified during new is only the http://domain.com:port
+	part (without ? followed by GET params), but that HTTP::OAI treats the
+	complete URL as requestURL
+	b) badVerb has no URL and no question mark
+	c) in modern OAI specification it is actually called request and requestURL
+
+	Currently, requestURL evaporates if Salsa_OAI is run under anything else
+	than HTTP::Server::Simple.
 
 =cut
 
@@ -474,8 +482,8 @@ sub ListMetadataFormats {
 
 	#TODO
 	#This is a bit dirty. I guess the proper way would be if globalFormats
-	#returns expected defaults!
-	$lmfs->requestURL( $self->{requestURL} . "?verb=ListMetadataFormats" );
+	#returned expected defaults!
+	$lmfs->requestURL( $self->{requestURL} . '?verb=ListMetadataFormats' );
 	my @mdfs = $lmfs->metadataFormat();
 
 	#check if noMetadataFormats
@@ -718,7 +726,7 @@ sub ListSets {
 	my $params = _hashref(@_);
 	my $engine = $self->{engine};
 
-	Warning 'Enter ListSets';
+	#Warning 'Enter ListSets';
 
 	#
 	# Check for errors
@@ -740,7 +748,7 @@ sub ListSets {
 	#resumptionTokens not supported
 	if ( $params->{resumptionToken} ) {
 
-		Debug "resumptionToken";
+		#Debug "resumptionToken";
 		return $self->err2XML(
 			new HTTP::OAI::Error( code => 'badResumptionToken' ) );
 	}
@@ -765,9 +773,9 @@ sub ListSets {
 	}
 
 	# just for debug
-	foreach (@used_sets) {
-		Debug "used_sets: $_\n";
-	}
+	#foreach (@used_sets) {
+	#	Debug "used_sets: $_\n";
+	#}
 
 	#
 	# Complete naked setSpecs with info from setLibrary
@@ -891,8 +899,9 @@ sub _output {
 =head2 $obj= $self->_responseURL($obj)
 
 If $provider->{requestURL} exists take that value and overwrite the requestURL
-in the responseURL. I assume that $provider->{requestURL} does not have any
-params like "verb=Identify".
+in the responseURL. requestURL specified in this module consists only of
+	http://blablabla.com:8080
+All params following the quetion mark will be preserved.
 
 =cut
 
@@ -901,14 +910,12 @@ sub _requestURL {
 	my $response = shift;    #e.g. HTTP::OAI::ListRecord
 
 	#overwrite requestURL so that nginx cache appears original
-	#overwrite only when requestURL argument during init
+	#overwrite only when requestURL argument specified during init
 	if ( $self->{requestURL} ) {
 
 		#replace part before question mark
 		if ( $response->requestURL =~ /\?/ ) {
 
-	 #I can overwrite the URL part, but how do i access and preserve the params?
-	 #replace everything before the '?'
 			my @f = split( /\?/, $response->requestURL, 2 );
 			if ( $f[1] ) {
 				my $new = $self->{requestURL} . '?' . $f[1];
@@ -918,10 +925,7 @@ sub _requestURL {
 				#  . "\n\t$new";
 				$response->requestURL($new);
 			} else {
-
-				#if no 2nd part we know it's a badVerb
-				#badVerb has no question mark
-				Debug "badVerb" . $response->requestURL;
+				#requestURL has no ? in case of an badVerb
 				$response->requestURL( $self->{requestURL} );
 			}
 		}

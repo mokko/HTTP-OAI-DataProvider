@@ -64,14 +64,14 @@ sub toTargetPrefix {
 
 	#we imply that prefix is always able to be a hash
 
-	Debug "Enter toTargetPrefix ($targetPrefix)";
+	#Debug "Enter toTargetPrefix ($targetPrefix)";
 	#Debug "self: " . ref $self;
 	#Debug "nativePrefix: " . $self->{nativePrefix};
 	#Debug "locateXSL: " . $self->{locateXSL};
 	#Debug "dom:" . ref $dom;
 
 	if ( $targetPrefix eq $self->{nativePrefix} ) {
-		Debug "toTargetPrefix: native and target are eq";
+		#Debug "toTargetPrefix: native and target are eq";
 		return $dom;
 	}
 
@@ -97,7 +97,7 @@ sub _cache_stylesheet {
 	#if current style does not exist yet
 	if ( !$stylesheet_cache{$targetPrefix} ) {
 
-		Debug "Update stylesheet cache (prefix:$targetPrefix)";
+		#Debug "Update stylesheet cache (prefix:$targetPrefix)";
 
 		# I need a callback which gets the target_prefix and returns the
 		# fullpath to the xsl which transforms to new (non native) format

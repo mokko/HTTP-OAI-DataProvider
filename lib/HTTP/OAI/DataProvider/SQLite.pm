@@ -14,7 +14,8 @@ use XML::SAX::Writer;
 use Dancer::CommandLine qw/Debug Warning/;
 use Carp qw/carp croak/;
 use DBI qw(:sql_types);    #new
-our $dbh;
+use DBIx::Connector;
+#our $dbh;
 
 #only for debug during development
 use Data::Dumper;
@@ -77,7 +78,7 @@ sub digest_single {
 	my $self = shift;
 	my %args = @_;
 
-	Debug "Enter digest_single";
+	#Debug "Enter digest_single";
 
 	if ( !-e $args{source} ) {
 		return "Source file not found";
@@ -130,21 +131,24 @@ sub new {
 		carp "Error: need dbfile";
 	}
 
+	#for experiment
+	$self->{dbfile} = $args{dbfile};
+
 	if ( $args{ns_uri} ) {
-		Debug "ns_uri" . $args{ns_uri};
+		#Debug "ns_uri" . $args{ns_uri};
 		$self->{ns_uri} = $args{ns_uri};
 	}
 
 	if ( $args{ns_prefix} ) {
-		Debug "ns_prefix" . $args{ns_prefix};
+		#Debug "ns_prefix" . $args{ns_prefix};
 		$self->{ns_prefix} = $args{ns_prefix};
 	}
 
 	#i could check if directory in $dbfile exists; if not provide
 	#intelligble warning that path is strange
 
-	_connect_db( $args{dbfile} );
-	_init_db();
+	$self->_connect_db( $args{dbfile} );
+	$self->_init_db();
 
 	#I cannot test earlierstDate since non existant in new db
 	#$self->earliestDate();    #just to see if this creates an error;
@@ -161,7 +165,7 @@ the Identify verb.
 
 sub earliestDate {
 	my $self = shift;
-
+	my $dbh=$self->{connection}->dbh() or die $DBI::errstr;
 	my $sql = qq/SELECT MIN (datestamp) FROM records/;
 	my $sth = $dbh->prepare($sql) or croak $dbh->errstr();
 	$sth->execute() or croak $dbh->errstr();
@@ -193,11 +197,13 @@ TODO: Check weather all datestamps comply with format
 sub granularity {
 
 	#Debug "Enter granularity";
+	my $self=shift;
 
 	my $long    = 'YYYY-MM-DDThh:mm:ssZ';
 	my $short   = 'YYYY-MM-DD';
 	my $default = $long;
 
+	my $dbh=$self->{connection}->dbh() or die $DBI::errstr;
 	my $sql = q/SELECT datestamp FROM records/;
 	my $sth = $dbh->prepare($sql) or croak $dbh->errstr();
 	$sth->execute() or croak $dbh->errstr();
@@ -208,9 +214,8 @@ sub granularity {
 	#	}
 
 	my $aref = $sth->fetch;
-
 	if ( !$aref->[0] ) {
-		Debug "granuarity cannot find a datestamp and hence assumes $default";
+		Warning "granuarity cannot find a datestamp and hence assumes $default";
 		return $default;
 	}
 
@@ -244,6 +249,9 @@ sub findByIdentifier {
 		croak "No identifier specified";
 	}
 
+	my $dbh=$self->{connection}->dbh() or die $DBI::errstr;;
+
+
 	#Debug "Id: $identifier";
 	#If I cannot compose a header from the db I have the wrong db scheme
 	#TODO: status is missing in db
@@ -265,6 +273,7 @@ sub findByIdentifier {
 			identifier => $identifier,
 			datestamp  => $aref->[0]
 		);
+
 		#$h->identifier = $identifier;
 		#$h->datestamp  = $aref->[0];
 
@@ -288,8 +297,9 @@ returns an array of setSpecs as string. Called from DataProvider::ListSets.
 
 sub listSets {
 	my $self = shift;
+	my $dbh=$self->{connection}->dbh() or die $DBI::errstr;
 
-	Debug "Enter ListSets";
+	#Debug "Enter ListSets";
 
 	my $sql = q/SELECT DISTINCT setSpec FROM sets ORDER BY setSpec ASC/;
 	my $sth = $dbh->prepare($sql) or croak $dbh->errstr();
@@ -298,7 +308,7 @@ sub listSets {
 	#can this be done easier without another setSpec?
 	my @setSpecs;
 	while ( my $aref = $sth->fetch ) {
-		Debug "listSets:setSpec='$aref->[0]'";
+		#Debug "listSets:setSpec='$aref->[0]'";
 		push( @setSpecs, $aref->[0] );
 	}
 	return @setSpecs;
@@ -324,7 +334,9 @@ sub queryHeaders {
 	my $self   = shift;
 	my $params = shift;
 
-	Debug "Enter queryHeaders ($params)";
+	my $dbh=$self->{connection}->dbh() or die $DBI::errstr;
+
+	#Debug "Enter queryHeaders ($params)";
 
 	my $result = $self->_newResult;
 
@@ -372,7 +384,7 @@ sub queryHeaders {
 		#add header to LI
 		$LI->identifier($header);
 	}
-	Debug "queryHeaders found $i headers";
+	#Debug "queryHeaders found $i headers";
 
 	$result->{ListIdentifiers} = $LI;
 
@@ -436,7 +448,8 @@ sub queryRecords {
 	my $params = shift;
 	my $result = $self->_newResult;
 
-	Debug "Enter queryRecords ($params)";
+	my $dbh=$self->{connection}->dbh() or die $DBI::errstr;
+	#Debug "Enter queryRecords ($params)";
 
 	# check parameters
 	# I believe now we don't need that at this point.
@@ -444,7 +457,7 @@ sub queryRecords {
 	# metadata munging
 	my $sql = _querySQL( $params, 'md' );
 
-	Debug $sql;
+	#Debug $sql;
 	my $sth = $dbh->prepare($sql) or croak $dbh->errstr();
 	$sth->execute() or croak $dbh->errstr();
 
@@ -472,7 +485,7 @@ sub queryRecords {
 			}
 
 			#on every distinct identifier
-			Debug "result found identifier: " . $aref->[0];
+			#Debug "result found identifier: " . $aref->[0];
 			$header = new HTTP::OAI::Header;
 			$header->identifier( $aref->[0] );
 			$header->datestamp( $aref->[1] );
@@ -486,13 +499,14 @@ sub queryRecords {
 
 		#every row
 		if ( $aref->[3] ) {
+
 			#wrong: OAI:Set seems to be only for ListSets
 			#use header->setSpec instead!
 			#my $set = new HTTP::OAI::Set;
 
 			#TODO: Do I need to expand info from setLibrary?
 			#$set->setSpec( $aref->[3] );
-			$header->setSpec($aref->[3]);
+			$header->setSpec( $aref->[3] );
 		}
 
 		$last_id = $aref->[0];
@@ -503,7 +517,7 @@ sub queryRecords {
 	#save the last record
 	$result->_saveRecord( $params, $header, $md );
 
-	Debug "queryRecords found matching $i headers";
+	#Debug "queryRecords found matching $i headers";
 
 	#does not make much of a difference
 	#$stylesheet_cache{ $params->{metadataPrefix} } = undef;
@@ -608,7 +622,7 @@ sub _addRecord {
 	}
 
 	if ( ref $record ne 'HTTP::OAI::Record' ) {
-		Debug ref $record;
+		#Debug ref $record;
 		croak 'Internal Error: record is not HTTP::OAI::Record';
 	}
 
@@ -616,27 +630,29 @@ sub _addRecord {
 }
 
 sub _connect_db {
+	my $self=shift;
 	my $dbfile = shift;
 
 	if ( !$dbfile ) {
 		croak "_connect_db: No dbfile";
 	}
 
-	Debug "Connecting to $dbfile...";
+	#Debug "Connecting to $dbfile...";
 
-	$dbh = DBI->connect(
+	$self->{connection} = DBIx::Connector->new(
 		"dbi:SQLite:dbname=$dbfile",
 		'', '',
 		{
 			sqlite_unicode => 1,
 			RaiseError     => 1
 		}
-	  )
-	  or die $DBI::errstr;
+	  ) or die "Problems with DBIx::connector";
 }
 
 sub _init_db {
-	Debug "Enter _init_db";
+	#Debug "Enter _init_db";
+	my $self=shift;
+	my $dbh=$self->{connection}->dbh() or die $DBI::errstr;
 
 	if ( !$dbh ) {
 		carp "Error: database handle missing";
@@ -668,7 +684,7 @@ sub _loadXML {
 	my $self     = shift;
 	my $location = shift;
 
-	Debug "Enter _loadXML ($location)";
+	#Debug "Enter _loadXML ($location)";
 
 	if ( !$location ) {
 		croak "Nothing to load";
@@ -736,13 +752,13 @@ sub _registerNS {
 	my $self = shift;
 	my $doc  = shift;
 
-	Debug 'Enter _registerNS';
+	#Debug 'Enter _registerNS';
 
 	if ( $self->{ns_prefix} ) {
 		if ( !$self->{ns_uri} ) {
 			croak "ns_prefix specified, but ns_uri missing";
 		}
-		Debug 'ns: ' . $self->{ns_prefix} . ':' . $self->{ns_uri};
+		#Debug 'ns: ' . $self->{ns_prefix} . ':' . $self->{ns_uri};
 
 		$doc = XML::LibXML::XPathContext->new($doc);
 		$doc->registerNs( $self->{ns_prefix}, $self->{ns_uri} );
@@ -824,7 +840,7 @@ sub _saveRecord {
 	my $md     = shift;
 	my %params;
 
-	Debug "Enter _saveRecords";
+	#Debug "Enter _saveRecords";
 
 	if ( !$result ) {
 		croak "Result is missing";
@@ -894,7 +910,9 @@ sub _storeRecord {
 	my $identifier = $header->identifier;
 	my $datestamp  = $header->datestamp;
 
-	Debug "Enter _storeRecord";
+	my $dbh=$self->{connection}->dbh() or die $DBI::errstr;
+
+	#Debug "Enter _storeRecord";
 
 	if ( !$record ) {
 		croak "No record!";
@@ -940,7 +958,7 @@ sub _storeRecord {
 		#if datestamp, then compare db and source datestamp
 		#Debug "datestamp source: $datestamp // datestamp $datestamp_db";
 		if ( $datestamp_db le $datestamp ) {
-			Debug "$identifier exists and date equal or newer -> update";
+			#Debug "$identifier exists and date equal or newer -> update";
 			my $up =
 			    q/UPDATE records SET datestamp=?, native_md =? /
 			  . q/WHERE identifier=?/;
@@ -969,7 +987,7 @@ sub _storeRecord {
 		  or croak $dbh->errstr();
 	}
 
-	Debug "delete Sets for record $identifier";
+	#Debug "delete Sets for record $identifier";
 	my $deleteSets = qq/DELETE FROM sets WHERE identifier=?/;
 	$sth = $dbh->prepare($deleteSets) or croak $dbh->errstr();
 	$sth->execute($identifier) or croak $dbh->errstr();
