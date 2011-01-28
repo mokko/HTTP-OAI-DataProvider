@@ -7,7 +7,7 @@ use YAML::Syck qw/Dump LoadFile/;
 #use XML::LibXML;
 use HTTP::OAI;
 use HTTP::OAI::Repository qw/validate_date/;
-use Encode qw/decode/;    #encoding problem when dealing with data from sqlite;
+use HTTP::OAI::DataProvider::Result;
 use XML::LibXML;
 use XML::LibXML::XPathContext;
 use XML::SAX::Writer;
@@ -15,6 +15,7 @@ use Dancer::CommandLine qw/Debug Warning/;
 use Carp qw/carp croak/;
 use DBI qw(:sql_types);    #new
 use DBIx::Connector;
+
 #our $dbh;
 
 #only for debug during development
@@ -39,7 +40,7 @@ HTTP::OAI::DataProvider::SQLite - A sqlite engine for HTTP::OAI::DataProvider
 	use HTTP::OAI::DataProvider::SQLite;
 	my $engine=new HTTP::OAI::DataProvider::SQLite(
 		ns_prefix=>$prefix, ns_uri=$uri,
-		transformer=>''
+		transformer=>$transformer,
 		);
 
 	my $header=$engine->findByIdentifier($identifier);
@@ -100,8 +101,6 @@ sub digest_single {
 	while ( my $record = $self->$mapping($doc) ) {
 		$self->_storeRecord($record);
 	}
-	use strict "refs";
-
 }
 
 =head2 my $cache=new HTTP::OAI::DataRepository::SQLite (
@@ -113,7 +112,9 @@ sub digest_single {
 
 sub new {
 	my $class = shift;
-	my $self  = _new $class;
+	my $args  = @_;
+	my $self  = {};
+	bless $self, $class;
 
 	if ( !@_ ) {
 		croak "Internal Error: Parameters missing";
@@ -135,11 +136,13 @@ sub new {
 	$self->{dbfile} = $args{dbfile};
 
 	if ( $args{ns_uri} ) {
+
 		#Debug "ns_uri" . $args{ns_uri};
 		$self->{ns_uri} = $args{ns_uri};
 	}
 
 	if ( $args{ns_prefix} ) {
+
 		#Debug "ns_prefix" . $args{ns_prefix};
 		$self->{ns_prefix} = $args{ns_prefix};
 	}
@@ -165,9 +168,9 @@ the Identify verb.
 
 sub earliestDate {
 	my $self = shift;
-	my $dbh=$self->{connection}->dbh() or die $DBI::errstr;
-	my $sql = qq/SELECT MIN (datestamp) FROM records/;
-	my $sth = $dbh->prepare($sql) or croak $dbh->errstr();
+	my $dbh  = $self->{connection}->dbh() or die $DBI::errstr;
+	my $sql  = qq/SELECT MIN (datestamp) FROM records/;
+	my $sth  = $dbh->prepare($sql) or croak $dbh->errstr();
 	$sth->execute() or croak $dbh->errstr();
 
 	my $aref = $sth->fetch;
@@ -197,13 +200,13 @@ TODO: Check weather all datestamps comply with format
 sub granularity {
 
 	#Debug "Enter granularity";
-	my $self=shift;
+	my $self = shift;
 
 	my $long    = 'YYYY-MM-DDThh:mm:ssZ';
 	my $short   = 'YYYY-MM-DD';
 	my $default = $long;
 
-	my $dbh=$self->{connection}->dbh() or die $DBI::errstr;
+	my $dbh = $self->{connection}->dbh() or die $DBI::errstr;
 	my $sql = q/SELECT datestamp FROM records/;
 	my $sth = $dbh->prepare($sql) or croak $dbh->errstr();
 	$sth->execute() or croak $dbh->errstr();
@@ -249,8 +252,7 @@ sub findByIdentifier {
 		croak "No identifier specified";
 	}
 
-	my $dbh=$self->{connection}->dbh() or die $DBI::errstr;;
-
+	my $dbh = $self->{connection}->dbh() or die $DBI::errstr;
 
 	#Debug "Id: $identifier";
 	#If I cannot compose a header from the db I have the wrong db scheme
@@ -297,7 +299,7 @@ returns an array of setSpecs as string. Called from DataProvider::ListSets.
 
 sub listSets {
 	my $self = shift;
-	my $dbh=$self->{connection}->dbh() or die $DBI::errstr;
+	my $dbh  = $self->{connection}->dbh() or die $DBI::errstr;
 
 	#Debug "Enter ListSets";
 
@@ -308,6 +310,7 @@ sub listSets {
 	#can this be done easier without another setSpec?
 	my @setSpecs;
 	while ( my $aref = $sth->fetch ) {
+
 		#Debug "listSets:setSpec='$aref->[0]'";
 		push( @setSpecs, $aref->[0] );
 	}
@@ -331,21 +334,18 @@ if ($result->isError) {
 =cut
 
 sub queryHeaders {
-	my $self   = shift;
-	my $params = shift;
+	my $self    = shift;
+	my $params  = shift;
+	my $request = shift;
 
-	my $dbh=$self->{connection}->dbh() or die $DBI::errstr;
+	my $dbh = $self->{connection}->dbh() or die $DBI::errstr;
 
 	#Debug "Enter queryHeaders ($params)";
 
-	my $result = $self->_newResult;
-
-	#i now think they are not necessary
-	#$result->_queryChecks($params);
-
-	#if ( $result->isError ) {
-	#	return $result;
-	#}
+	my $result = new HTTP::OAI::DataProvider::Result(
+		requestURL  => $request,
+		transformer => $self->{transformer}
+	);
 
 	# metadata munging
 	my $sql = _querySQL($params);
@@ -357,7 +357,7 @@ sub queryHeaders {
 	my $header;
 	my $i       = 0;     #count the results to test if none
 	my $last_id = '';    #needs to be an empty string
-	my $LI = new HTTP::OAI::ListIdentifiers;
+	my $LI = new HTTP::OAI::ListIdentifiers( requestURL => $request );
 	while ( my $aref = $sth->fetch ) {
 		$i++;
 
@@ -384,6 +384,7 @@ sub queryHeaders {
 		#add header to LI
 		$LI->identifier($header);
 	}
+
 	#Debug "queryHeaders found $i headers";
 
 	$result->{ListIdentifiers} = $LI;
@@ -395,35 +396,6 @@ sub queryHeaders {
 
 	# Return
 	return $result;
-}
-
-# seems not to be necessary!
-# $result->_queryChecks ($params);
-sub _queryChecks {
-	my $result = shift;
-	my $params = shift;
-
-	if ( !$params ) {
-		croak "Internal Error: Params are missing";
-	}
-
-	#should already be tested, so only croak
-	if ( !$params->{metadataPrefix} ) {
-
-		#Debug Dumper $params;
-		croak "metadataPrefix missing!";
-	}
-
-	#date format has NOT been tested before
-	#a bit unexpected that validation succeeds when it fails, but who cares?
-	foreach (qw/until from/) {
-		if ( $params->{$_} ) {
-			if ( validate_date( $params->{$_} ) ) {
-				$result->_addError( 'badArgument',
-					"Argument $_ is not a valid date" );
-			}
-		}
-	}
 }
 
 =head2 my $result=$engine->queryRecords (identifier=>$identifier,
@@ -444,15 +416,18 @@ OLD
 =cut
 
 sub queryRecords {
-	my $self   = shift;
-	my $params = shift;
-	my $result = $self->_newResult;
+	my $self    = shift; #is initialized only once, cannot carry requestURL
+	my $params  = shift;
+	my $request = shift;
+	my $result = new HTTP::OAI::DataProvider::Result(
+		requestURL  => $request,
+		transformer => $self->{transformer}
+	);
 
-	my $dbh=$self->{connection}->dbh() or die $DBI::errstr;
+
+	my $dbh = $self->{connection}->dbh() or die $DBI::errstr;
+
 	#Debug "Enter queryRecords ($params)";
-
-	# check parameters
-	# I believe now we don't need that at this point.
 
 	# metadata munging
 	my $sql = _querySQL( $params, 'md' );
@@ -466,11 +441,9 @@ sub queryRecords {
 	my $i       = 0;     #count the results to test if none
 	my $last_id = '';    #needs to be an empty string
 
-	#this loop is a bit complicated
-	#it loops over db rows which contain redundant info (cartesian product)
-	#I keep track of last identifiers: if known it is a repetitive row
-	#and if a header is already defined, so I can have an action before I
-	#start the next header
+	#loop over db rows which contain redundant info (cartesian product)
+	#I keep track of identifiers: if known it is a repetitive row
+	#if header is already defined, have action before starting next header
 	while ( my $aref = $sth->fetch ) {
 		if ( $last_id ne $aref->[0] ) {
 			$i++;        #count distinct identifiers
@@ -479,9 +452,9 @@ sub queryRecords {
 
 				#a new distinct id where header has already been defined
 				#first time on the row which has the 2nd distinct id
-				#previous header looks ready
+				#i.e. previous header should be ready
 
-				$result->_saveRecord( $params, $header, $md );
+				$result->saveRecord( $params, $header, $md );
 			}
 
 			#on every distinct identifier
@@ -499,23 +472,15 @@ sub queryRecords {
 
 		#every row
 		if ( $aref->[3] ) {
-
-			#wrong: OAI:Set seems to be only for ListSets
-			#use header->setSpec instead!
-			#my $set = new HTTP::OAI::Set;
-
-			#TODO: Do I need to expand info from setLibrary?
-			#$set->setSpec( $aref->[3] );
 			$header->setSpec( $aref->[3] );
 		}
 
 		$last_id = $aref->[0];
 	}
 
-	#if only 1 row it doesn't work, because there is no more iteration
-	#pthis accounts for every last distinct identifier, so call it here
 	#save the last record
-	$result->_saveRecord( $params, $header, $md );
+	#for every last distinct identifier, so call it here since no iteration
+	$result->saveRecord( $params, $header, $md );
 
 	#Debug "queryRecords found matching $i headers";
 
@@ -524,37 +489,10 @@ sub queryRecords {
 
 	# Check result
 	if ( $i == 0 ) {
-		$result->_addError('noRecordsMatch');
+		$result->addError('noRecordsMatch');
 	}
 
-	#Debug 'queryResults: ' . Dumper $result->{records};    #'@{};
-
-	# Return
 	return $result;
-
-}
-
-#should go to HTTP::OAI::DataProvider::Record
-
-=head2 my @err=$result->isError
-
-Returns a list of arrays if any.
-
-	if ( $result->isError ) {
-		return $self->err2XML($result->isError);
-	}
-
-=cut
-
-sub isError {
-	my $self = shift;
-
-	#Debug "bumble";
-	if ( exists $self->{errors} ) {
-
-		#Debug 'isError:' . Dumper $self->{errors};
-		return @{ $self->{errors} };
-	}
 }
 
 #
@@ -563,74 +501,16 @@ sub isError {
 
 =head1 Internal Methods - to be called from other inside this module
 
+=head2 my $connection=_connect_db ($dbfile);
+
+Now uses DBIx::Connector
+
+my $dbh=$connection->dbh;
+
 =cut
 
-#standard constructor
-sub _new {
-	my $class  = shift;
-	my $result = {};
-	return ( bless $result, $class );
-}
-
-#should go to HTTP::OAI::DataProvider::Record
-#copy transformer...
-sub _newResult {
-	my $self   = shift;
-	my $result = _new HTTP::OAI::DataProvider::SQLite;
-	$result->{records} = [];    #not necessary?
-
-	#Debug "_newResult self". ref $self;
-	#Debug "_newResult result". ref $result;
-
-	#copy the transformer in all result objects
-	if ( $self->{transformer} ) {
-		$result->{transformer} = $self->{transformer};
-	}
-	return $result;
-}
-
-#adds an error to a result object
-# $self->_addError($code[, $message]);
-sub _addError {
-	my $self = shift;
-	my $code = shift;    #required
-	my $msg  = shift;    #optional
-
-	if ( !$code ) {
-		die "_addError needs a code";
-	}
-
-	my %arg;
-	$arg{code} = $code;
-
-	if ($msg) {
-		$arg{message} = $msg;
-	}
-
-	if ($code) {
-		push( @{ $self->{errors} }, new HTTP::OAI::Error(%arg) );
-	}
-}
-
-#should go to HTTP::OAI::DataProvider::Record
-sub _addRecord {
-	my $result = shift;
-	my $record = shift;
-
-	if ( !$record ) {
-		croak "Internal Error: Nothing add";
-	}
-
-	if ( ref $record ne 'HTTP::OAI::Record' ) {
-		#Debug ref $record;
-		croak 'Internal Error: record is not HTTP::OAI::Record';
-	}
-
-	push @{ $result->{records} }, $record;
-}
-
 sub _connect_db {
-	my $self=shift;
+	my $self   = shift;
 	my $dbfile = shift;
 
 	if ( !$dbfile ) {
@@ -646,13 +526,15 @@ sub _connect_db {
 			sqlite_unicode => 1,
 			RaiseError     => 1
 		}
-	  ) or die "Problems with DBIx::connector";
+	  )
+	  or die "Problems with DBIx::connector";
 }
 
 sub _init_db {
+
 	#Debug "Enter _init_db";
-	my $self=shift;
-	my $dbh=$self->{connection}->dbh() or die $DBI::errstr;
+	my $self = shift;
+	my $dbh  = $self->{connection}->dbh() or die $DBI::errstr;
 
 	if ( !$dbh ) {
 		carp "Error: database handle missing";
@@ -758,146 +640,13 @@ sub _registerNS {
 		if ( !$self->{ns_uri} ) {
 			croak "ns_prefix specified, but ns_uri missing";
 		}
+
 		#Debug 'ns: ' . $self->{ns_prefix} . ':' . $self->{ns_uri};
 
 		$doc = XML::LibXML::XPathContext->new($doc);
 		$doc->registerNs( $self->{ns_prefix}, $self->{ns_uri} );
 	}
 	return $doc;
-}
-
-#
-# work on $result->{records}
-#
-
-sub _countRecords {
-
-	#synonym to returnRecords
-	goto &_returnRecords;
-}
-
-sub _returnRecords {
-
-	#same as _countRecords
-	my $result = shift;
-	return @{ $result->{records} };
-}
-
-sub _records2GetRecord {
-	my $result    = shift;
-	my $GetRecord = new HTTP::OAI::GetRecord;
-
-	if ( $result->_countRecords != 1 ) {
-		croak "_records2GetRecord: count doesn't fit";
-	}
-
-	$GetRecord->record( $result->_returnRecords );
-
-	#Debug "_records2GetRecord: ".$GetRecord;
-	return $GetRecord;
-}
-
-sub _records2ListRecords {
-
-	my $result      = shift;
-	my $ListRecords = new HTTP::OAI::ListRecords;
-
-	if ( $result->_countRecords == 0 ) {
-		croak "_records2ListRecords: count doesn't fit";
-	}
-
-	$ListRecords->record( $result->_returnRecords );
-
-	my $i;
-
-	#while (){
-	#	$i++;
-	#	Debug "record $i";
-	#	$ListRecords->record($_);
-	#}
-
-	return $ListRecords;
-}
-
-sub _records2ListIdentifiers {
-
-	my $result          = shift;
-	my $ListIdentifiers = new HTTP::OAI::ListIdentifiers;
-
-	#not sure if we tested this before
-	if ( $result->_countRecords == 0 ) {
-		croak "_records2GetRecord: count doesn't fit";
-	}
-
-	return $ListIdentifiers->record( $result->_returnRecords );
-}
-
-#called in queryRecords to create array with result records
-sub _saveRecord {
-	my $result = shift;
-	my $params = shift;
-	my $header = shift;
-	my $md     = shift;
-	my %params;
-
-	#Debug "Enter _saveRecords";
-
-	if ( !$result ) {
-		croak "Result is missing";
-	}
-
-	if ( ref $result ne 'HTTP::OAI::DataProvider::SQLite' ) {
-		croak "$result is wrong type" . ref $result;
-	}
-
-	if ( !$params ) {
-		croak "Params are missing";
-	}
-
-	if ( !$header ) {
-		croak "Header missing";
-	}
-
-	#md is optional
-	#if ( !$md ) {
-	#	Debug "Metadata missing, but that might well be";
-	#}
-
-	#prepare params to make OAI::Record
-	$params{header} = $header;
-
-	if ($md) {
-
-		#Debug "Metadata available";
-
-		#currently md is a string, possibly in a wrong encoding
-		$md = decode( "utf8", $md );
-
-		#this line fails on encoding problem
-		my $dom = XML::LibXML->load_xml( string => $md );
-
-		#Debug "----- dom's actual encoding: ".$dom->actualEncoding;
-
-#load $dom from source file works perfectly
-#my $dom = XML::LibXML->load_xml( location => '/home/Mengel/projects/Salsa_OAI2/data/fs/objId-1305695.mpx' )
-# or return "Salsa Error: Loading xml file failed for strange reason";
-
-		#now md should become appropriate metadata
-		if ( $result->{transformer} ) {
-			$dom =
-			  $result->{transformer}
-			  ->toTargetPrefix( $params->{metadataPrefix}, $dom );
-		}
-
-		$md = new HTTP::OAI::Metadata( dom => $dom );
-		$params{metadata} = $md;
-	}
-
-	my $record = new HTTP::OAI::Record(%params);
-
-	$result->_addRecord($record);
-
-	#Debug "save records in \@records. Now count is " . $result->_countRecords;
 }
 
 #store record in db
@@ -910,7 +659,7 @@ sub _storeRecord {
 	my $identifier = $header->identifier;
 	my $datestamp  = $header->datestamp;
 
-	my $dbh=$self->{connection}->dbh() or die $DBI::errstr;
+	my $dbh = $self->{connection}->dbh() or die $DBI::errstr;
 
 	#Debug "Enter _storeRecord";
 
@@ -958,6 +707,7 @@ sub _storeRecord {
 		#if datestamp, then compare db and source datestamp
 		#Debug "datestamp source: $datestamp // datestamp $datestamp_db";
 		if ( $datestamp_db le $datestamp ) {
+
 			#Debug "$identifier exists and date equal or newer -> update";
 			my $up =
 			    q/UPDATE records SET datestamp=?, native_md =? /

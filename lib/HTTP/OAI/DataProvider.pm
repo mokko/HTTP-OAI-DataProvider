@@ -296,14 +296,16 @@ Errors
 =cut
 
 sub GetRecord {
-	my $self   = shift;
+	my $self    = shift;
+	my $request = shift;
+
 	my $params = _hashref(@_);
 	my @errors;
 
-	Warning 'Enter GetRecord (id:'
-	  . $params->{identifier}
-	  . 'prefix:'
-	  . $params->{metadataPrefix} . ')';
+	#Warning 'Enter GetRecord (id:'
+	#  . $params->{identifier}
+	#  . 'prefix:'
+	#  . $params->{metadataPrefix} . ')';
 
 	my $engine        = $self->{engine};
 	my $globalFormats = $self->{globalFormats};
@@ -334,8 +336,10 @@ sub GetRecord {
 	# Metadata handling
 	#
 
-	#named parameter would have saved me trouble. Todo?
-	my $result = $engine->queryRecords($params);
+	my $result = $engine->queryRecords($params, $request);
+
+	#mk sure we don't lose requestURL in Starman
+	#$result->requestURL($request);
 
 	#
 	# Check result
@@ -350,7 +354,8 @@ sub GetRecord {
 	#
 	# Return
 	#
-	return $self->_output( $result->_records2GetRecord );
+
+	return $self->_output( $result->toGetRecord );
 
 }
 
@@ -373,10 +378,11 @@ prompty return a xml string.
 =cut
 
 sub Identify {
-	my $self   = shift;
-	my $params = _hashref(@_);
+	my $self    = shift;
+	my $request = shift;
+	my $params  = _hashref(@_);
 
-	Debug "Enter Identify (HTTP::OAI::DataProvider)";
+	#Debug "Enter Identify ($request)";
 
 	#
 	# Check
@@ -414,6 +420,9 @@ sub Identify {
 		earliestDatestamp => $self->{engine}->earliestDate(),
 		granularity       => $self->{engine}->granularity(),
 		repositoryName    => $id_data->{repositoryName},
+		requestURL        => $request
+		,    #under some servers like Starman it just won't work without it!
+
 	  )
 	  or return "Cannot create new HTTP::OAI::Identify";
 
@@ -445,19 +454,22 @@ ERRORS
 =cut
 
 sub ListMetadataFormats {
-	my $self   = shift;
+	my $self    = shift;
+	my $request = shift;
+
 	my $params = _hashref(@_);
 
 	Warning 'Enter ListMetadataFormats';
 
-	#check param syntax
+	#check param syntax, not really necessary
 	if ( my $error = validate_request( %{$params} ) ) {
 		return $self->err2XML($error);
 	}
 
-	if ( $params->{identifier} ) {
-		Debug 'with id' . $params->{identifier};
-	}
+	#DEBUG
+	#	if ( $params->{identifier} ) {
+	#		Debug 'with id' . $params->{identifier};
+	#	}
 
 	my $engine        = $self->{engine};          #TODO test
 	my $globalFormats = $self->{globalFormats};
@@ -467,7 +479,6 @@ sub ListMetadataFormats {
 	#
 
 	#only if there is actually an identifier
-	#TODO
 	if ( my $identifier = $params->{identifier} ) {
 
 		my $header = $engine->findByIdentifier($identifier);
@@ -480,10 +491,9 @@ sub ListMetadataFormats {
 	#Metadata Handling
 	my $lmfs = $globalFormats->get_list();
 
-	#TODO
-	#This is a bit dirty. I guess the proper way would be if globalFormats
-	#returned expected defaults!
-	$lmfs->requestURL( $self->{requestURL} . '?verb=ListMetadataFormats' );
+	#$lmfs has requestURL info, so recreate it from $params
+	#mk sure we don't lose requestURL in Starman
+	$lmfs->requestURL($request);
 	my @mdfs = $lmfs->metadataFormat();
 
 	#check if noMetadataFormats
@@ -539,16 +549,18 @@ Hierarchical sets!
 =cut
 
 sub ListIdentifiers {
-	my $self   = shift;
+	my $self    = shift;
+	my $request = shift;
+
 	my $params = _hashref(@_);
 	my @errors;    #stores errors before there is a result object
 
-	Warning 'Enter ListIdentifiers (prefix:' . $params->{metadataPrefix};
-	Debug 'from:' . $params->{from}   if $params->{from};
-	Debug 'until:' . $params->{until} if $params->{until};
-	Debug 'set:' . $params->{set}     if $params->{set};
-	Debug 'resumption:' . $params->{resumptionToken}
-	  if $params->{resumptionToken};
+	#Warning 'Enter ListIdentifiers (prefix:' . $params->{metadataPrefix};
+	#Debug 'from:' . $params->{from}   if $params->{from};
+	#Debug 'until:' . $params->{until} if $params->{until};
+	#Debug 'set:' . $params->{set}     if $params->{set};
+	#Debug 'resumption:' . $params->{resumptionToken}
+	#  if $params->{resumptionToken};
 
 	my $engine        = $self->{engine};          #provider
 	my $globalFormats = $self->{globalFormats};
@@ -605,7 +617,7 @@ sub ListIdentifiers {
 	#Debug "engine:" . ref $engine;
 
 	#required: metadataPrefix; optional: from, until, set
-	my $result = $engine->queryHeaders($params);
+	my $result = $engine->queryHeaders($params, $request);
 
 	#
 	# Check result
@@ -621,7 +633,12 @@ sub ListIdentifiers {
 	# Return
 	#
 
-	return $self->_output( $result->{ListIdentifiers} );
+	#TODO: I think this uses too much memory
+	my $LI = $result->{ListIdentifiers};
+
+	#mk sure we don't lose requestURL in Starman
+	$LI->requestURL($request);
+	return $self->_output($LI);
 }
 
 =head2 ListRecords
@@ -652,17 +669,19 @@ TODO
 =cut
 
 sub ListRecords {
-	my $self   = shift;
+	my $self    = shift;
+	my $request = shift;
+
 	my $params = _hashref(@_);
 	my @errors;
 
-	Warning 'Enter ListRecords (prefix:' . $params->{metadataPrefix};
+	#Warning 'Enter ListRecords (prefix:' . $params->{metadataPrefix};
 
-	Debug 'from:' . $params->{from}   if $params->{from};
-	Debug 'until:' . $params->{until} if $params->{until};
-	Debug 'set:' . $params->{set}     if $params->{set};
-	Debug 'resumption:' . $params->{resumptionToken}
-	  if $params->{resumptionToken};
+	#Debug 'from:' . $params->{from}   if $params->{from};
+	#Debug 'until:' . $params->{until} if $params->{until};
+	#Debug 'set:' . $params->{set}     if $params->{set};
+	#Debug 'resumption:' . $params->{resumptionToken}
+	#  if $params->{resumptionToken};
 
 	my $engine        = $self->{engine};
 	my $globalFormats = $self->{globalFormats};
@@ -691,7 +710,10 @@ sub ListRecords {
 	# Metadata handling
 	#
 
-	my $result = $engine->queryRecords($params);
+	my $result = $engine->queryRecords($params, $request);
+
+	#mk sure we don't lose requestURL in Starman
+	#$result->requestURL($request);
 
 	#
 	# Check result
@@ -705,26 +727,29 @@ sub ListRecords {
 	#
 	# Return
 	#
-	return $self->_output( $result->_records2ListRecords );
-
+	#my $lr=$result->records2ListRecords;
+	#$lr->requestURL($request);
+	return $self->_output( $result->toListRecords );
 }
 
 =head2 ListSets
 
-	##ARGUMENTS##
-	#resumptionToken (optional)
-	##ERRORS##
-	#badArgument -> HTTP::OAI::Repository
-	#badResumptionToken  -> here
-	#noSetHierarchy --> here
+	ARGUMENTS
+	resumptionToken (optional)
+
+	ERRORS
+	badArgument -> HTTP::OAI::Repository
+	badResumptionToken  -> here
+	noSetHierarchy --> here
 
 TODO
 =cut
 
 sub ListSets {
-	my $self   = shift;
-	my $params = _hashref(@_);
-	my $engine = $self->{engine};
+	my $self    = shift;
+	my $request = shift;
+	my $params  = _hashref(@_);
+	my $engine  = $self->{engine};
 
 	#Warning 'Enter ListSets';
 
@@ -805,6 +830,9 @@ sub ListSets {
 		$listSets = $library->expand(@used_sets);
 	}
 
+	#mk sure we don't lose requestURL in Starman
+	$listSets->requestURL($request);
+
 	#
 	#output fun!
 	#
@@ -842,7 +870,7 @@ sub err2XML {
 			push @errors, $response;
 		}
 
-		$self->_requestURL($response);
+		$self->overwriteRequestURL($response);
 		$self->_init_xslt($response);
 
 		return $response->toDOM->toString;
@@ -874,11 +902,6 @@ sub _hashref {
 Expects a HTTP::OAI::Response object and returns it as xml string. It applies
 $self->{xslt} if set.
 
-TODO: Should deal with multiple records. Maybe I should transform the
-_records2GetRecord: @records -> HTTP::OAI::GetRecord
-_records2ListIdentifiers: @records -> HTTP::OAI::ListIdentifiers
-_records2ListRecords:@records -> HTTP::OAI::ListRecords
-
 =cut
 
 sub _output {
@@ -886,8 +909,9 @@ sub _output {
 	my $response = shift;
 
 	$self->_init_xslt($response);
-	$self->_requestURL($response);
 
+	#overwrites real requestURL with config value
+	$self->overwriteRequestURL($response);
 	return $response->toDOM->toString;
 
 	#my $xml;
@@ -896,21 +920,21 @@ sub _output {
 	#return $xml;
 }
 
-=head2 $obj= $self->_responseURL($obj)
+=head2 $obj= $self->overwriteRequestURL($obj)
 
 If $provider->{requestURL} exists take that value and overwrite the requestURL
 in the responseURL. requestURL specified in this module consists only of
 	http://blablabla.com:8080
 All params following the quetion mark will be preserved.
+$provider->{requestURL} should a config value, e.g. to make the cache appear
+to be real.
 
 =cut
 
-sub _requestURL {
+sub overwriteRequestURL {
 	my $self     = shift;
 	my $response = shift;    #e.g. HTTP::OAI::ListRecord
 
-	#overwrite requestURL so that nginx cache appears original
-	#overwrite only when requestURL argument specified during init
 	if ( $self->{requestURL} ) {
 
 		#replace part before question mark
@@ -919,12 +943,9 @@ sub _requestURL {
 			my @f = split( /\?/, $response->requestURL, 2 );
 			if ( $f[1] ) {
 				my $new = $self->{requestURL} . '?' . $f[1];
-
-				#Debug "HANOVER: Correct requestURL\n\t"
-				#  . $response->requestURL
-				#  . "\n\t$new";
 				$response->requestURL($new);
 			} else {
+
 				#requestURL has no ? in case of an badVerb
 				$response->requestURL( $self->{requestURL} );
 			}
