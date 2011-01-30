@@ -338,14 +338,17 @@ sub queryHeaders {
 	my $params  = shift;
 	my $request = shift;
 
-	my $dbh = $self->{connection}->dbh() or die $DBI::errstr;
+	my $total = $self->_count($params);
+	my $dbh   = $self->{connection}->dbh() or die $DBI::errstr;
 
 	#Debug "Enter queryHeaders ($params)";
+	#transformer is obligatory
+	my $result = new HTTP::OAI::DataProvider::Result( $self, $total );
 
-	my $result = new HTTP::OAI::DataProvider::Result(
-		requestURL  => $request,
-		transformer => $self->{transformer}
-	);
+	#request and resumption are optional
+	if ($request) {
+		$result->{requestURL} = $request;
+	}
 
 	# metadata munging
 	my $sql = _querySQL($params);
@@ -357,7 +360,6 @@ sub queryHeaders {
 	my $header;
 	my $i       = 0;     #count the results to test if none
 	my $last_id = '';    #needs to be an empty string
-	my $LI = new HTTP::OAI::ListIdentifiers( requestURL => $request );
 	while ( my $aref = $sth->fetch ) {
 		$i++;
 
@@ -373,28 +375,27 @@ sub queryHeaders {
 		}
 		if ( $aref->[3] ) {
 			my $set = new HTTP::OAI::Set;
-
-			#TODO: Do I need to expand info from setLibrary?
-			#It seems that ListIdentifiers wants to know about setSpecs only
 			$set->setSpec( $aref->[3] );
 			$header->setSpec($set);
 		}
 		$last_id = $aref->[0];
-
-		#add header to LI
-		$LI->identifier($header);
+		$result->addHeader($header);
 	}
 
 	#Debug "queryHeaders found $i headers";
 
-	$result->{ListIdentifiers} = $LI;
-
 	# Check result
 	if ( $i == 0 ) {
-		$result->_addError('noRecordsMatch');
+		$result->addError('noRecordsMatch');
 	}
 
 	# Return
+	if ( $result->{firstChunk} ) {
+		Debug "Replace normal headers with firstChunk";
+
+		#$result->{headers} = $result->{firstChunk};
+		#delete $result->{firstChunk};
+	}
 	return $result;
 }
 
@@ -416,19 +417,22 @@ OLD
 =cut
 
 sub queryRecords {
-	my $self    = shift; #is initialized only once, cannot carry requestURL
+	my $self    = shift;    #is initialized only once, cannot carry requestURL
 	my $params  = shift;
 	my $request = shift;
-	my $result = new HTTP::OAI::DataProvider::Result(
-		requestURL  => $request,
-		transformer => $self->{transformer}
-	);
+	my $total = $self->_count($params);
 
+	#transformer is obligatory
+	my $result = new HTTP::OAI::DataProvider::Result( $self, $total );
+
+	#request and resumption are optional
+	if ($request) {
+		$result->{requestURL} = $request;
+	}
 
 	my $dbh = $self->{connection}->dbh() or die $DBI::errstr;
 
 	#Debug "Enter queryRecords ($params)";
-
 	# metadata munging
 	my $sql = _querySQL( $params, 'md' );
 
@@ -447,14 +451,17 @@ sub queryRecords {
 	while ( my $aref = $sth->fetch ) {
 		if ( $last_id ne $aref->[0] ) {
 			$i++;        #count distinct identifiers
-
 			if ($header) {
 
 				#a new distinct id where header has already been defined
 				#first time on the row which has the 2nd distinct id
-				#i.e. previous header should be ready
+				#i.e. previous header should be ready for storing it away
 
-				$result->saveRecord( $params, $header, $md );
+				$result->saveRecord(
+					params => $params,
+					header => $header,
+					md     => $md,
+				);
 			}
 
 			#on every distinct identifier
@@ -480,10 +487,13 @@ sub queryRecords {
 
 	#save the last record
 	#for every last distinct identifier, so call it here since no iteration
-	$result->saveRecord( $params, $header, $md );
+	$result->saveRecord(
+		params => $params,
+		header => $header,
+		md     => $md,
+	);
 
 	#Debug "queryRecords found matching $i headers";
-
 	#does not make much of a difference
 	#$stylesheet_cache{ $params->{metadataPrefix} } = undef;
 
@@ -528,6 +538,33 @@ sub _connect_db {
 		}
 	  )
 	  or die "Problems with DBIx::connector";
+}
+
+=head2 my $count=$self->_count ($params);
+Apparently, for resumptionToken I need to know the total number of results
+(headers or records) before I start chunking. So this metho performs a query
+and returns that number.
+
+=cut
+
+sub _count {
+	my $self   = shift;    #an SQLite object
+	my $params = shift;
+
+	my $sql = $self->_queryCount($params);
+	my $dbh = $self->{connection}->dbh() or die $DBI::errstr;
+	my $sth = $dbh->prepare($sql) or croak $dbh->errstr();
+	$sth->execute() or croak $dbh->errstr();
+
+	my $aref = $sth->fetch;
+
+	if ( !$aref->[0] ) {
+		croak "No count";
+	}
+
+	#Debug "Sql: $sql";
+	#Debug "COUNT: " . $aref->[0];
+	return $aref->[0];
 }
 
 sub _init_db {
@@ -583,9 +620,46 @@ sub _loadXML {
 	return $doc;
 }
 
+sub _queryCount {
+	my $self   = shift;
+	my $params = shift;
+	my $sql    = q/SELECT COUNT (DISTINCT records.identifier) FROM /;
+	$sql .= q/records JOIN sets ON records.identifier = sets.identifier WHERE
+	/;
+
+	if ( $params->{identifier} ) {
+		$sql .= qq/records.identifier = '$params->{identifier}' AND /;
+	}
+
+	if ( $params->{from} ) {
+		$sql .= qq/ datestamp > '$params->{from}' AND /;
+	}
+
+	if ( $params->{until} ) {
+		$sql .= qq/ datestamp < '$params-> {until}' AND /;
+	}
+
+	if ( $params->{set} ) {
+		$sql .= qq/setSpec = '$params->{set}' AND /;
+	}
+
+	$sql .= q/1=1/;
+	return $sql;
+}
+
 sub _querySQL {
 	my $params = shift;
 	my $md     = shift;
+
+	#md becomes modifier with values md and count?
+	# SELECT COUNT records.identifier FROM records WHERE
+	# records.identifier = ? AND
+	# datestamp > ? AND
+	# datestamp < ? AND
+	# setSpec = ?
+
+	#This version is SLOW, but does it really matter? It's just one query
+	#for each request. Who cares?
 
 	my $sql = q/SELECT records.identifier, datestamp, status, setSpec /;
 
@@ -618,7 +692,6 @@ sub _querySQL {
 
 	#About order: I could add "ORDER BY records.identifier ASC" which gives us
 	#strict alphabetical order. Not want is expected. That wdn' t really be a
-
 	#problem, but not nice. Now we have the order we put'em in. Less reliable,
 	#but more intuitive. Until it goes wrong.
 
