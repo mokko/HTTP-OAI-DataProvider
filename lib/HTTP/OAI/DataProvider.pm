@@ -7,7 +7,8 @@ use strict;
 use Carp qw/croak carp/;
 use HTTP::OAI;
 use HTTP::OAI::Repository qw/validate_request/;
-use XML::LibXML;    #to load chunk file
+
+#use XML::LibXML;    #to load chunk file
 
 #use Dancer ':syntax'; #this module should abstract from Dancer
 use Dancer::CommandLine qw/Debug Warning/;
@@ -505,11 +506,8 @@ sub ListIdentifiers {
 	#a) chunking not activated -> return nothing and continue
 	#b) wrong token -> error message
 	#c) right token -> return token
-	my $msg = $self->checkChunking($params);
-	if ($msg) {
-		Debug "dfdffddfdfdfdfdfdfd";
-		Debug $msg;
-		return $msg;
+	if ( $self->checkChunking($params) ) {
+		return $self->checkChunking($params);
 	}
 
 	if ( my $e =
@@ -540,13 +538,6 @@ sub ListIdentifiers {
 	# Check result
 	if ( $result->isError ) {
 		return $self->err2XML( $result->isError );
-	}
-
-	#Chunking exceptions
-	if ( $result->{firstChunk} ) {
-
-		#last chunk still needs to be written to disk!
-		$result->write_chunk_to_disk;
 	}
 
 	# Return
@@ -582,27 +573,20 @@ TODO
 
 =head2 my $err=checkChunking ($params);
 
-New name? checkChunking
-check chunking setting and return either HTTP::OAI::Error or a chunk from disk
-cache. Could also be split in two different functions? Or something like this.
+Just return HTTP::OAI::Error if
+a) wrong token -> error message
+b) chunking not supported -> error message
+when chunking not activated or no token -> return nothing
 
-Checks if resumption settings were defined in provider (during init in
-in $provider->{resumption}, hence in Dancer config). If they NOT exist,
-returns HTTP::OAI::Error when not. Use like this:
-
-contracted version untested
-
-	#No need to push this error since argument is exclusive
-	#a) chunking not activated -> return nothing and continue
-	#b) wrong token -> error message
-	#c) right token -> return token
-	my $msg = $self->checkChunking($params);
-	if ($msg) {
-		Debug "dfdffddfdfdfdfdfdfd";
-		Debug $msg;
-		return $msg;
+	my $err = $self->checkChunking($params);
+	if ($err) {
+		$self->err2XML($err);
 	}
 
+	Can this also be written as a 2-liner?
+	if (my $err = $self->checkChunking($params)) {
+		$self->err2XML($err);
+	}
 
 BTW: this is similar to HTTP::OAI::DataProvider::Result::chunking, but
 a) it doesn't require a result object and
@@ -612,62 +596,45 @@ c) it checks against value in engine (which is a reason why it SHOULD
 d) In the future this method might serve the chunks, then it might be placed
    here more or less correctly.
 
-New name? checkChunkingSettingAndReturnChunkFromDiskCacheIfAny
 =cut
 
-#a) chunking not activated -> return nothing and continue
-#b) wrong token -> error message
-#c) right token -> return token
+sub _badResumptionToken {
+	my $self = shift;
+	return $self->err2XML(
+		new HTTP::OAI::Error( code => 'badResumptionToken' ) );
+}
+
 sub checkChunking {
 	my $self   = shift;
 	my $params = shift;
+	my $token  = $params->{resumptionToken};
 
-	if ( $params->{resumptionToken} ) {
-		Debug "rt specified" . $params->{resumptionToken};
-		if ( !$self->{engine}->{resumption} ) {
+	Debug "Enter checkChunking";
 
-			#provider wasn't born with chunking ability...
-			Debug "chunking not activated";
-			return $self->err2XML(
-				new HTTP::OAI::Error( code => 'badResumptionToken' ) );
+	if ( !$self->{engine}->{chunking} ) {
+
+		#provider wasn't born with chunking ability...
+		if ($token) {
+			Debug 'provider wasn\'t born with chunking ability,but rt '
+			  . 'supplied via http';
+			return $self->_badResumptionToken;
 		}
-
-		#todo: test if chunk file exists, if not return badResumptionToken
-		my $rrr = $self->get_chunk( $params->{resumptionToken} );
-		return $rrr;
-	}
-	Debug "checkChunking (return nothing)";
-}
-
-sub get_chunk {
-	my $self  = shift;
-	my $token = shift;
-
-	Debug "Enter get_chunk";
-
-	#request has resumptionToken
-	if ($token) {
-		my $path = $self->{engine}->{chunk_dir} . '/' . $token;
-		my $dom;
-		if ( !-f $path ) {
-			Debug "chunk file NOT found";
+	} else {
+		Debug "Chunking activated in Salsa_OAI";
+		if ($token) {
+			Debug "resumptionToken supplied: " . $token;
+			my $path = $self->{engine}->{chunk_dir} . '/' . $token;
+			if ( !-f $path ) {
+				Debug "File doesn't exist";
+				return $self->_badResumptionToken;
+			}
+			local ($/);
+			open( my $fh, "<:encoding(UTF-8)", $path )
+			  or Warning "can't open UTF-8 encoded filename ($path): $!";
+			return $fh;
+			close $fh;
 		}
-		$dom = XML::LibXML->load_xml( location => $path )
-		  or croak "Could not load " . $path;
-		return $dom->toDOM->;
 	}
-
-}
-
-sub load_chunk {
-	my $self  = shift;                                         #provider
-	my $token = shift;
-	my $path  = $self->{engine}->{chunk_dir} . '/' . $token;
-
-	if ( -f $path ) {
-
-	}
-
 }
 
 sub ListRecords {
@@ -688,23 +655,21 @@ sub ListRecords {
 	my $engine        = $self->{engine};
 	my $globalFormats = $self->{globalFormats};
 
+	#
 	# Error handling
+	#
 
-	#No need to push this error since argument is exclusive
-	#a) chunking not activated -> return nothing and continue
-	#b) wrong token -> error message
-	#c) right token -> return token
-	my $msg = $self->checkChunking($params);
-	if ($msg) {
-		Debug "dfdffddfdfdfdfdfdfd";
-		Debug $msg;
-		return $msg;
+	#Just return HTTP::OAI::Error if wrong token or chunking not supported
+	if ( $self->checkChunking($params) ) {
+		my $response = $self->checkChunking($params);
+		return $response;    #a chunk AS UTF-8 STR
 	}
 
 	#check is metadataFormat is supported
 	if ( my $e =
 		$globalFormats->check_format_supported( $params->{metadataPrefix} ) )
 	{
+		Debug "error in check_format_supported" . $e;
 		push @errors, $e;
 	}
 
@@ -719,17 +684,9 @@ sub ListRecords {
 	my $result = $engine->queryRecords( $params, $request );
 
 	#checkRecordsMatch is now done inside queryRecords
-
 	# Check result
 	if ( $result->isError ) {
 		return $self->err2XML( $result->isError );
-	}
-
-	#Chunking exceptions
-	if ( $result->{firstChunk} ) {
-
-		#last chunk still needs to be written to disk!
-		$result->write_chunk_to_disk;
 	}
 
 	# Return
@@ -867,8 +824,6 @@ sub err2XML {
 		my $response = new HTTP::OAI::Response;
 		my @errors;
 		foreach (@_) {
-			Debug ref $_;
-			Debug "bla $_";
 			if ( ref $_ ne 'HTTP::OAI::Error' ) {
 				die "Internal Error: Error has wrong format!";
 			}

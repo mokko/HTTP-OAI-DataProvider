@@ -338,12 +338,13 @@ sub queryHeaders {
 	my $params  = shift;
 	my $request = shift;
 
-	my $total = $self->_count($params);
-	my $dbh   = $self->{connection}->dbh() or die $DBI::errstr;
+	$self->_countTotals($params)
+	  ;    #save total in $engine->{requestChunk}->{total}
+	my $dbh = $self->{connection}->dbh() or die $DBI::errstr;
 
 	#Debug "Enter queryHeaders ($params)";
 	#transformer is obligatory
-	my $result = new HTTP::OAI::DataProvider::Result( $self, $total );
+	my $result = new HTTP::OAI::DataProvider::Result($self);
 
 	#request and resumption are optional
 	if ($request) {
@@ -357,15 +358,60 @@ sub queryHeaders {
 	my $sth = $dbh->prepare($sql) or croak $dbh->errstr();
 	$sth->execute() or croak $dbh->errstr();
 
+	my $i = $self->parseHeaders( $result, $sth );
+
+	#Debug "queryHeaders found $i headers";
+	# Check result
+	if ( $i == 0 ) {
+		$result->addError('noRecordsMatch');
+	}
+
+	return $result;
+}
+
+=head2 my $i=$self->parseHeaders ($result, $sth);
+
+Expects an empty result object and a statement handle. Returns number of
+records parsed. This is the loop that essentially turns queryHeaders into
+HTTP::OAI::Headers.
+
+Chunking:
+Among others its loop contains a condition to break the loop if chunking is
+activated and the first chunk is completed. To access the remaining chunks we
+will re-enter this loop at a later point in time.
+
+=cut
+
+sub parseHeaders {
+	my $self   = shift;    #$engine
+	my $result = shift;
+	my $sth    = shift;
+
+	if ( !$sth ) {
+		Warning "Something's wrong with \$sth!";
+	}
+	if ( !$result ) {
+		Warning "Something's wrong with \$result!";
+	}
+
+	if ( ref $result ne 'HTTP::OAI::DataProvider::Result' ) {
+		Warning "Something's wrong!";
+	}
+
+	#Debug "Parsing headers";
+
 	my $header;
 	my $i       = 0;     #count the results to test if none
 	my $last_id = '';    #needs to be an empty string
 	while ( my $aref = $sth->fetch ) {
-		$i++;
 
+		#Debug "Inside while";
+
+		#$i++;            #counts lines not records
 		if ( $last_id ne $aref->[0] ) {
+			$i++;        #counts records
 
-			#a new item
+			#a new item with new identifier
 			$header = new HTTP::OAI::Header;
 			$header->identifier( $aref->[0] );
 			$header->datestamp( $aref->[1] );
@@ -378,25 +424,30 @@ sub queryHeaders {
 			$set->setSpec( $aref->[3] );
 			$header->setSpec($set);
 		}
+
+		#save current identifier to weed out duplicates
 		$last_id = $aref->[0];
+		$result->addHeader($header);
+
+		#addHeader calls $result->chunk and that should set EOFChunk
+		#when chunk is full; NOT {EOFChunk}!
+		#save state
+		if ( $result->EOFChunk ) {
+			$result->chunkRequest( sth => $sth, type => 'header' );
+			return $result;    #break loop
+		}
+	}
+
+	#don't we have to add the laster Header? Todo:untested!
+	if ($header) {
 		$result->addHeader($header);
 	}
 
-	#Debug "queryHeaders found $i headers";
-
-	# Check result
-	if ( $i == 0 ) {
-		$result->addError('noRecordsMatch');
-	}
-
-	# Return
-	if ( $result->{firstChunk} ) {
-		Debug "Replace normal headers with firstChunk";
-
-		#$result->{headers} = $result->{firstChunk};
-		#delete $result->{firstChunk};
-	}
-	return $result;
+	#loop is finished! No records in sth
+	#if while loop is over-> raise CurChunkNo
+	my $chunkRequest = $result->chunkRequest;
+	$chunkRequest->{curChunkNo}++;
+	return $i;
 }
 
 =head2 my $result=$engine->queryRecords (identifier=>$identifier,
@@ -420,10 +471,12 @@ sub queryRecords {
 	my $self    = shift;    #is initialized only once, cannot carry requestURL
 	my $params  = shift;
 	my $request = shift;
-	my $total = $self->_count($params);
+
+	#save total in $engine->{requestChunk}->{total}
+	$self->_countTotals($params);
 
 	#transformer is obligatory
-	my $result = new HTTP::OAI::DataProvider::Result( $self, $total );
+	my $result = new HTTP::OAI::DataProvider::Result($self);
 
 	#request and resumption are optional
 	if ($request) {
@@ -439,6 +492,34 @@ sub queryRecords {
 	#Debug $sql;
 	my $sth = $dbh->prepare($sql) or croak $dbh->errstr();
 	$sth->execute() or croak $dbh->errstr();
+
+	my $i = $self->parseRecords( $result, $sth, $params );
+
+	#Debug "queryRecords found matching $i headers";
+	#does not make much of a difference
+	#$stylesheet_cache{ $params->{metadataPrefix} } = undef;
+
+	# Check result
+	if ( $i == 0 ) {
+		$result->addError('noRecordsMatch');
+	}
+
+	return $result;
+}
+
+sub parseRecords {
+	my $self   = shift;
+	my $result = shift;
+	my $sth    = shift;
+	my $params = shift;
+
+	if ( !$sth or !$result or !$params ) {
+		Warning "Something's wrong!";
+	}
+
+	if ( ref $result ne 'HTTP::OAI::DataProvider::Result' ) {
+		Warning "Something's wrong!";
+	}
 
 	my $header;
 	my $md;
@@ -462,6 +543,22 @@ sub queryRecords {
 					header => $header,
 					md     => $md,
 				);
+
+				#check here if first chunk is ready
+				#Debug "break the loop, but save loop state";
+				if ( $result->EOFChunk ) {
+
+					#Debug "curPos" . $result->{posInChunk};
+					#Debug "rt" . ref $result->EOFChunk;
+					$result->chunkRequest(
+						params => $params,
+						sth    => $sth,
+						type   => 'records',
+					);
+					return $i;    #break loop
+				}
+
+				#Debug "md".$md;
 			}
 
 			#on every distinct identifier
@@ -492,17 +589,137 @@ sub queryRecords {
 		header => $header,
 		md     => $md,
 	);
+	my $chunkRequest = $result->chunkRequest;
+	$chunkRequest->{curChunkNo}++;
 
-	#Debug "queryRecords found matching $i headers";
-	#does not make much of a difference
-	#$stylesheet_cache{ $params->{metadataPrefix} } = undef;
+	#TODO: Decide i we need to save state here?
+	return $i;
+}
 
-	# Check result
-	if ( $i == 0 ) {
-		$result->addError('noRecordsMatch');
+=head2 $engine->completeChunks;
+
+WHAT IT SHOULD DO
+
+1. test signal
+completeChunks is called in Salsa_OAI after the first dance. It checks whether
+there is a queryResult to be finished. It does so by checking
+chunkRequest->{EOFChunk}. If that is set, it continues; otherwise it returns
+without doing anything else.
+
+2. Re-enter parseResult/parseHeader loop
+If that signal is encountered, the loop should save its state and this method
+should re-enter the loop in parseRecords / parseHeaders where it left off
+(using the saved sate). Re-Entering the loop ONCE should be enough. Via the
+loop $result->chunk the loop should be able to figure out what to do on its
+own.
+
+3. write remaining chunks to disk
+
+Saving loop state
+
+When: It should be necessary to save the loop state information only ONCE
+when moving from normal route to after.
+
+What: I need
+-the statement handle
+-the first token (for writing down the 2nd chunk under the name of the first
+ token)
+
+
+DISCUSSION OF WHAT ACTUALLY HAPPENS
+
+Currently, this does not work, since completeChunk can not
+find the saved state from the loop. Hence I must assume that saving state does
+work.
+
+Saving state for the loop is separate for headers and records and takes place
+in parseHeaders and parseRecords. I corrected an error here, so now we get a
+little further. Apparently, now it dies in getResponse.
+
+=cut
+
+sub completeChunks {
+	my $engine   = shift;
+	my $provider = shift;
+
+	#We do not have a result obj at this time, so we cannot call:
+	#my $chunkRequest = $result->chunkRequest;
+
+	my $chunkRequest = $engine->{chunkRequest};
+
+	#Debug "Enter completeChunks";
+	if ( $chunkRequest->{EOFChunk} ) {
+
+		Debug "WORKING ON REMAINING CHUNKS!";
+
+		#EOFChunk exists,i.e. chunking is on and we have come here to work on
+		#remaining chunks
+
+		#Debug "first token:" . $token;
+		my $sth = $chunkRequest->{sth};
+
+		if ($sth) {
+			Debug "statement handle:" . $sth;
+		} else {
+			Warning "No sth!" . $chunkRequest->{type};
+		}
+
+		Debug "total items in request:" . $chunkRequest->{total};
+		Debug "curChunkNo/maxChunkNo:"
+		  . $chunkRequest->{curChunkNo} . '/'
+		  . $chunkRequest->{maxChunkNo};
+
+		#now we need that loop to break after each chunk
+		while ( $chunkRequest->{curChunkNo} lt $chunkRequest->{maxChunkNo} ) {
+			my $rt = $chunkRequest->{EOFChunk};
+			my $old_token = $rt->resumptionToken;  #rt was made when chunk was ready
+
+			#rm EOFChunk so loop doesn't break there anymore until set again
+			#gets set by $result->chunk if a chunk is full
+			delete $chunkRequest->{EOFChunk};
+
+			#I am still officially in chunk 1. I need to re-enter the loop to
+			#raise the chunkNo
+			#Debug "ENTER CHUNK NO" . $chunkRequest->{curChunkNo};
+
+			#should we make a new result object for every chunk
+			#that takes care of resetting record/header info in result
+			#the QUESTION is if that messes with our chunkRequest info!?
+			my $result = new HTTP::OAI::DataProvider::Result($engine);
+
+			if ( $chunkRequest->{type} eq 'records' ) {
+				my $params = $chunkRequest->{params};
+
+				if ( !$params ) {
+					Warning "Something's wrong";
+				}
+
+				#Debug "About to re-enter at parseRecords";
+				$engine->parseRecords( $result, $sth, $params );
+			} else {
+
+				#Debug "About to re-enter at parseHeaders";
+				$engine->parseHeaders( $result, $sth );
+			}
+			#new token!
+			$rt = $chunkRequest->{EOFChunk};
+
+			my $response = $result->getResponse;
+			Debug "AFTER PARSING CHUNK " . $chunkRequest->{curChunkNo};
+			$response->resumptionToken ($rt);
+			#$result->responseCount();
+
+			#_output applies xslt and replaces requestURL if necessary
+			#chunkStr returns wrong output
+			my $chunkStr = $provider->_output($response);
+
+			#Debug "CHUNKSTR $chunkStr";
+			$result->writeChunk( $chunkStr, $old_token );
+
+			#Debug "TODO: I should be writing chunk to file here";
+			#Debug "AFTER writeChunk";
+		}
 	}
-
-	return $result;
 }
 
 #
@@ -540,15 +757,15 @@ sub _connect_db {
 	  or die "Problems with DBIx::connector";
 }
 
-=head2 my $count=$self->_count ($params);
+=head2 my $count=$self->_countTotals ($params);
 Apparently, for resumptionToken I need to know the total number of results
 (headers or records) before I start chunking. So this metho performs a query
 and returns that number.
 
 =cut
 
-sub _count {
-	my $self   = shift;    #an SQLite object
+sub _countTotals {
+	my $self   = shift;    #an engine, SQLite object
 	my $params = shift;
 
 	my $sql = $self->_queryCount($params);
@@ -564,7 +781,7 @@ sub _count {
 
 	#Debug "Sql: $sql";
 	#Debug "COUNT: " . $aref->[0];
-	return $aref->[0];
+	$self->{chunkRequest}->{total} = $aref->[0];
 }
 
 sub _init_db {
