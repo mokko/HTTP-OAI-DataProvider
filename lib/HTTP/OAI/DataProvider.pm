@@ -487,6 +487,7 @@ sub ListIdentifiers {
 
 	my $engine        = $self->{engine};          #provider
 	my $globalFormats = $self->{globalFormats};
+	$engine->{chunkRequest}->{request}=$request;
 
 	# Error handling
 	if ( !$engine ) {
@@ -609,7 +610,7 @@ sub checkChunking {
 	my $params = shift;
 	my $token  = $params->{resumptionToken};
 
-	Debug "Enter checkChunking";
+	#Debug "Enter checkChunking";
 
 	if ( !$self->{engine}->{chunking} ) {
 
@@ -620,7 +621,7 @@ sub checkChunking {
 			return $self->_badResumptionToken;
 		}
 	} else {
-		Debug "Chunking activated in Salsa_OAI";
+		#Debug "Chunking activated in Salsa_OAI";
 		if ($token) {
 			Debug "resumptionToken supplied: " . $token;
 			my $path = $self->{engine}->{chunk_dir} . '/' . $token;
@@ -654,6 +655,7 @@ sub ListRecords {
 
 	my $engine        = $self->{engine};
 	my $globalFormats = $self->{globalFormats};
+	$engine->{chunkRequest}->{request}=$request;
 
 	#
 	# Error handling

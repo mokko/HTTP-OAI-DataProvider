@@ -625,17 +625,6 @@ What: I need
 -the first token (for writing down the 2nd chunk under the name of the first
  token)
 
-
-DISCUSSION OF WHAT ACTUALLY HAPPENS
-
-Currently, this does not work, since completeChunk can not
-find the saved state from the loop. Hence I must assume that saving state does
-work.
-
-Saving state for the loop is separate for headers and records and takes place
-in parseHeaders and parseRecords. I corrected an error here, so now we get a
-little further. Apparently, now it dies in getResponse.
-
 =cut
 
 sub completeChunks {
@@ -659,20 +648,23 @@ sub completeChunks {
 		my $sth = $chunkRequest->{sth};
 
 		if ($sth) {
-			Debug "statement handle:" . $sth;
+
+			#Debug "statement handle:" . $sth;
 		} else {
 			Warning "No sth!" . $chunkRequest->{type};
 		}
 
+		Debug "requestURL" . $chunkRequest->{request};
 		Debug "total items in request:" . $chunkRequest->{total};
 		Debug "curChunkNo/maxChunkNo:"
 		  . $chunkRequest->{curChunkNo} . '/'
 		  . $chunkRequest->{maxChunkNo};
 
 		#now we need that loop to break after each chunk
-		while ( $chunkRequest->{curChunkNo} lt $chunkRequest->{maxChunkNo} ) {
-			my $rt = $chunkRequest->{EOFChunk};
-			my $old_token = $rt->resumptionToken;  #rt was made when chunk was ready
+		while ( $chunkRequest->{curChunkNo} < $chunkRequest->{maxChunkNo} ) {
+			my $rt        = $chunkRequest->{EOFChunk};
+			my $old_token =
+			  $rt->resumptionToken;    #rt was made when chunk was ready
 
 			#rm EOFChunk so loop doesn't break there anymore until set again
 			#gets set by $result->chunk if a chunk is full
@@ -686,6 +678,8 @@ sub completeChunks {
 			#that takes care of resetting record/header info in result
 			#the QUESTION is if that messes with our chunkRequest info!?
 			my $result = new HTTP::OAI::DataProvider::Result($engine);
+
+			#HERE
 
 			if ( $chunkRequest->{type} eq 'records' ) {
 				my $params = $chunkRequest->{params};
@@ -701,12 +695,18 @@ sub completeChunks {
 				#Debug "About to re-enter at parseHeaders";
 				$engine->parseHeaders( $result, $sth );
 			}
+
 			#new token!
 			$rt = $chunkRequest->{EOFChunk};
 
 			my $response = $result->getResponse;
-			Debug "AFTER PARSING CHUNK " . $chunkRequest->{curChunkNo};
-			$response->resumptionToken ($rt);
+			Debug "Chunk "
+			  . $chunkRequest->{curChunkNo} . ' of '
+			  . $chunkRequest->{maxChunkNo}
+			  . ' parsed';
+			$response->resumptionToken($rt);
+			$response->request($chunkRequest->{request});
+			Debug "response request".$response->request;
 			#$result->responseCount();
 
 			#_output applies xslt and replaces requestURL if necessary
@@ -716,8 +716,9 @@ sub completeChunks {
 			#Debug "CHUNKSTR $chunkStr";
 			$result->writeChunk( $chunkStr, $old_token );
 
-			#Debug "TODO: I should be writing chunk to file here";
-			#Debug "AFTER writeChunk";
+			#Debug "Why does the loop end here?";
+			#Debug "curChunkNo".$chunkRequest->{curChunkNo};
+			#Debug "maxChunkNo".$chunkRequest->{maxChunkNo};
 		}
 	}
 }

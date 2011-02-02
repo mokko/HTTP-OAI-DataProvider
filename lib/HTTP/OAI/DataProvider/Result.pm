@@ -104,8 +104,10 @@ sub requestURL {
 	my $request = shift;
 
 	if ($request) {
+		#setter
 		$result->{requestURL} = $request;
 	} else {
+		#getter
 		return $result->{requestURL};
 	}
 }
@@ -348,14 +350,14 @@ sub chunk {
 		#
 
 		$chunkRequest->{curChunkNo}++;
-		debug "Raise curChunkNo ($total)" . $chunkRequest->{curChunkNo};
+		#debug "Raise curChunkNo ($total)" . $chunkRequest->{curChunkNo};
 
 		#
 		# getCursor
 		#
 
 		my $cursor = $result->getCursor;
-		debug "Cursor: $cursor";
+		#debug "Cursor: $cursor";
 
 		#debug "curChunk:" . $chunkRequest->{curChunkNo};
 		#apparently  $chunkRequest->{curChunkNo} can be undefined.
@@ -457,15 +459,10 @@ sub getResponse {
 	return $response;
 }
 
-=head2 $result->writeChunk ($token);
+=head2 $result->writeChunk ($chunk_as_string, $token);
 
 Write chunk currently contained in $result to disk. Warning on error.
 
-Inside writeChunk we need to perform requestURL and xslt.
-
-	my $response=$result->getResponse;
-	my $obj=$engine->_output ($response);
-	$result->writeChunk ($response, $token);
 =cut
 
 sub writeChunk {
@@ -473,21 +470,18 @@ sub writeChunk {
 	my $chunk_as_string = shift;
 	my $token           = shift;
 
-	if ( !$result or !$token ) {
+	if ( !$result or !$token or !$chunk_as_string) {
 		warning "Something's wrong";
 	}
 
 	my $path = $result->{engine}->{chunk_dir} . '/' . $token;
-	debug "write chunk file: $path";
 
 	open( my $fh, ">:encoding(UTF-8)", $path )
 	  or warning "can't open UTF-8 encoded filename ($path): $!";
 	print $fh $chunk_as_string;
 	close $fh;
 
-	#	my $w = XML::SAX::Writer->new( Output => $fh );
-	#$result->{bufferChunk}->set_handler($w);
-	#$result->{bufferChunk}->generate();
+	#debug "chunk file written: $path";
 }
 
 =head2 my $token=$result->mkToken;
