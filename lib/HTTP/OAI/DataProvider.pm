@@ -894,18 +894,26 @@ to be real.
 =cut
 
 sub overwriteRequestURL {
-	my $self     = shift;
+	my $self     = shift;    #$provider
 	my $response = shift;    #e.g. HTTP::OAI::ListRecord
 
 	if ( $self->{requestURL} ) {
 
 		#replace part before question mark
 		if ( $response->requestURL =~ /\?/ ) {
-
 			my @f = split( /\?/, $response->requestURL, 2 );
 			if ( $f[1] ) {
 				my $new = $self->{requestURL} . '?' . $f[1];
+
+				#very dirty
+				if ($new =~/verb=/) {
+					$self->{engine}->{chunkRequest}->{_requestURI}=$new;
+				} else {
+					$new = $self->{engine}->{chunkRequest}->{_requestURI};
+				}
+
 				$response->requestURL($new);
+				Debug "overwriteRequestURL: ".$response->requestURL.'->'.$new;
 			} else {
 
 				#requestURL has no ? in case of an badVerb

@@ -706,7 +706,7 @@ sub completeChunks {
 			  . ' parsed';
 			$response->resumptionToken($rt);
 			$response->request($chunkRequest->{request});
-			Debug "response request".$response->request;
+			#Debug "response request".$response->request;
 			#$result->responseCount();
 
 			#_output applies xslt and replaces requestURL if necessary

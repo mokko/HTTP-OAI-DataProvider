@@ -684,11 +684,10 @@ sub toListIdentifiers {
 	}
 
 	if ( $result->{requestURL} ) {
-		$listIdentifiers->requestURL( $result->requestURL );
+		$result->{headers}->requestURL( $result->requestURL );
 	}
 
 	if ( $result->EOFChunk ) {
-
 		#debug "add resumptionToken". ref $result->EOFChunk;
 		$result->{headers}->resumptionToken( $result->EOFChunk );
 	}
