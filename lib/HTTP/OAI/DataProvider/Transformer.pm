@@ -30,7 +30,12 @@ Little helper that applies an xslt on a $dom
 
 =head1 METHODS
 
-=head2 	my $dom=$t->toTargetPrefix ($targetPrefix,$dom);
+=head2 new
+
+	my $t=new HTTP::OAI::DataProvider::Transformer (
+		nativePrefix=> 'mpx',
+		locateXSL=>'Salsa_OAI::salsa_locateXSL', #callback
+	);
 
 =cut
 
@@ -56,6 +61,10 @@ sub new {
 
 	return ( bless $self, $class );
 }
+
+=head2 	my $dom=$t->toTargetPrefix ($targetPrefix,$dom);
+
+=cut
 
 sub toTargetPrefix {
 	my $self         = shift;    #transformer

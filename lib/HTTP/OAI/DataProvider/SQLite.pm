@@ -15,11 +15,10 @@ use Dancer::CommandLine qw/Debug Warning/;
 use Carp qw/carp croak/;
 use DBI qw(:sql_types);    #new
 use DBIx::Connector;
-
-#our $dbh;
+use parent qw(HTTP::OAI::DataProvider::Engine);
 
 #only for debug during development
-use Data::Dumper;
+#use Data::Dumper;
 
 #TODO: See if I want to use base or parent?
 
@@ -29,14 +28,13 @@ HTTP::OAI::DataProvider::SQLite - A sqlite engine for HTTP::OAI::DataProvider
 
 =head1 SYNOPSIS
 
-1) Create new cache
+1) Fill db
 	use HTTP::OAI::DataProvider::SQLite;
 	my $engine=new HTTP::OAI::DataProvider::SQLite (ns_prefix=>$prefix,
 		ns_uri=$uri);
+	my $err=$engine->digest_single (...);
 
-	my $err=$engine->digest_single (source=>$xml_fn, mapping=>&mapping);
-
-2) Use cache
+2) Use engine
 	use HTTP::OAI::DataProvider::SQLite;
 	my $engine=new HTTP::OAI::DataProvider::SQLite(
 		ns_prefix=>$prefix, ns_uri=$uri,
@@ -48,14 +46,6 @@ HTTP::OAI::DataProvider::SQLite - A sqlite engine for HTTP::OAI::DataProvider
 	my $result=$engine->queryRecords($params);
 
 	TODO
-
-=head1 VERSION
-
-Version 0.01
-
-=cut
-
-our $VERSION = '0.01';
 
 =head1 DESCRIPTION
 
@@ -103,54 +93,121 @@ sub digest_single {
 	}
 }
 
-=head2 my $cache=new HTTP::OAI::DataRepository::SQLite (
-	mapping=>'main::mapping',
-	ns_prefix=>'mpx',
-	ns_uri=>''
-);
+=head2 my $chunk=$engine->queryChunk($chunkDescription);
+
+Expects a chunkDescription which refers to a chunk of a db query. It returns that
+chunk as a HTTP::OAI::Response object. (Either HTTP::OAI::ListIdentifiers or
+HTTP::OAI::ListRecords.)
+
+The chunkDescription is a hashref which is structured like this, see
+HTTP::OAI::DataProvider::ChunkCache:
+	$chunkDescription={
+			chunkNo=>$chunkNo,
+			maxChunkNo=>$maxChunkNo,
+			next=>$token,
+			sql=>$sql,
+			token=>$token,
+			total=>$total
+	};
+
+=cut
+
+sub queryChunk {
+	my $self   = shift;
+	my $chunk  = shift;
+	my $params = shift;
+
+	my $result = new HTTP::DataProvider::Engine::Result($self);
+
+	my $dbh = $self->{connection}->dbh()     or die $DBI::errstr;
+	my $sth = $dbh->prepare( $chunk->{sql} ) or croak $dbh->errstr();
+	$sth->execute() or croak $dbh->errstr();
+
+	my $header;
+	my $md;
+	my $i       = 0;     #count the results to test if none
+	my $last_id = '';    #needs to be an empty string
+
+	#loop over db rows which contain redundant info (cartesian product)
+	#I keep track of identifiers: if known it is a repetitive row
+	#if header is already defined, have action before starting next header
+	while ( my $aref = $sth->fetch ) {
+		if ( $last_id ne $aref->[0] ) {
+			$i++;        #count distinct identifiers
+			if ($header) {
+
+				#a new distinct id where header has already been defined
+				#first time on the row which has the 2nd distinct id
+				#i.e. previous header should be ready for storing it away
+
+				$result->saveRecord(
+					params => $params,
+					header => $header,
+					md     => $md,
+				);
+
+				#Debug "md".$md;
+			}
+
+			#on every distinct identifier
+			#Debug "result found identifier: " . $aref->[0];
+			$header = new HTTP::OAI::Header;
+			$header->identifier( $aref->[0] );
+			$header->datestamp( $aref->[1] );
+			if ( $aref->[2] ) {
+				$header->status('deleted');
+			}
+			if ( $aref->[4] ) {
+				$md = $aref->[4];
+			}
+		}
+
+		#every row
+		if ( $aref->[3] ) {
+			$header->setSpec( $aref->[3] );
+		}
+
+		$last_id = $aref->[0];
+	}
+
+	#save the last record
+	#for every last distinct identifier, so call it here since no iteration
+	$result->saveRecord(
+		params => $params,
+		header => $header,
+		md     => $md,
+	);
+
+	my $chunk = $result->toListIdentifiers;
+	return $chunk;
+}
+
+=head2 my $cache=HTTP::OAI::DataRepository::SQLite::new (@args);
+
+Not sure at the moment about the arguments:
+   dbfile=>$dbfile #for sqlite
+   chunkSize=>$chunkSize #no of results per chunk
+
 =cut
 
 sub new {
 	my $class = shift;
-	my $args  = @_;
 	my $self  = {};
 	bless $self, $class;
 
-	if ( !@_ ) {
-		croak "Internal Error: Parameters missing";
-	}
+	my $self->import( shift, 'chunkSize', 'dbfile', )
+	  or die 'Error importing to engine';
 
-	my %args = @_;
-
-	if ( !$self ) {
-		croak "Internal error: Cannot create myself";
-	}
-
-	#Debug "Enter HTTP::OAI::DataProvider::SQLite::_new";
-
-	if ( !$args{dbfile} ) {
+	if ( !$self->{dbfile} ) {
 		carp "Error: need dbfile";
 	}
 
-	#for experiment
-	$self->{dbfile} = $args{dbfile};
-
-	if ( $args{ns_uri} ) {
-
-		#Debug "ns_uri" . $args{ns_uri};
-		$self->{ns_uri} = $args{ns_uri};
-	}
-
-	if ( $args{ns_prefix} ) {
-
-		#Debug "ns_prefix" . $args{ns_prefix};
-		$self->{ns_prefix} = $args{ns_prefix};
-	}
+	#Debug "Enter HTTP::OAI::DataProvider::Engine::_new";
 
 	#i could check if directory in $dbfile exists; if not provide
 	#intelligble warning that path is strange
 
-	$self->_connect_db( $args{dbfile} );
+	$self->_connect_db( $self->{dbfile} );
 	$self->_init_db();
 
 	#I cannot test earlierstDate since non existant in new db
@@ -159,7 +216,7 @@ sub new {
 	return $self;
 }
 
-=head1 my $date=$engine->earliestDate();
+=head2 my $date=$engine->earliestDate();
 
 Maybe your Identify callback wants to call this to get the earliest date for
 the Identify verb.
@@ -299,7 +356,7 @@ returns an array of setSpecs as string. Called from DataProvider::ListSets.
 
 sub listSets {
 	my $self = shift;
-	my $dbh  = $self->{connection}->dbh() or die $DBI::errstr;
+	my $dbh = $self->{connection}->dbh() or die $DBI::errstr;
 
 	#Debug "Enter ListSets";
 
@@ -317,15 +374,19 @@ sub listSets {
 	return @setSpecs;
 }
 
-=head2 $result=$provider->queryHeaders (metadataPrefix=>'x');
+=head2 $result=$provider->query ($params);
 
-Possible paramters are metadataPrefix, from, until and Set. Queries the data
-store and returns a HTTP::OAI::DataProvider::SQLite object which contains
-errors (in key {errors}) or a HTTP::OAI::ListIdentifiers (in key
-{ListIdentifiers}).
+Gets called from GetRecord, ListRecords, ListIdentifiers. Possible parameters
+are metadataPrefix, from, until and Set. (Queries including a resumptionToken
+should not get here.)
 
-TODO: Of course, it returns only those headers which comply with paramaters.
+Plans chunking, save request chunks in cache and returns the first chunk as
+HTTP::OAI::DataProvider::Result object.
 
+TODO: What to do on failure?
+TODO: Deal with a GetRecord request. Should this take place in planChunking?
+
+TODO: do i still need isError?
 Test for failure:
 if ($result->isError) {
 	#do this
@@ -333,39 +394,25 @@ if ($result->isError) {
 
 =cut
 
-sub queryHeaders {
+sub query {
 	my $self    = shift;
 	my $params  = shift;
 	my $request = shift;
 
-	$self->_countTotals($params)
-	  ;    #save total in $engine->{requestChunk}->{total}
-	my $dbh = $self->{connection}->dbh() or die $DBI::errstr;
+	#get here if called without resumptionToken
+	my $first = $self->planChunking($params);
 
-	#Debug "Enter queryHeaders ($params)";
-	#transformer is obligatory
-	my $result = new HTTP::OAI::DataProvider::Result($self);
+	if ( !$first ) {    #todo: not sure when this can be the case
+		die "I should not get here";
+	}
 
-	#request and resumption are optional
+	my $result = $self->queryChunk( $first, $params );
+
 	if ($request) {
 		$result->{requestURL} = $request;
 	}
 
-	# metadata munging
-	my $sql = _querySQL($params);
-
-	#Debug $sql;
-	my $sth = $dbh->prepare($sql) or croak $dbh->errstr();
-	$sth->execute() or croak $dbh->errstr();
-
-	my $i = $self->parseHeaders( $result, $sth );
-
-	#Debug "queryHeaders found $i headers";
-	# Check result
-	if ( $i == 0 ) {
-		$result->addError('noRecordsMatch');
-	}
-
+	#todo: we still have to test if result has any result at all
 	return $result;
 }
 
@@ -382,346 +429,71 @@ will re-enter this loop at a later point in time.
 
 =cut
 
-sub parseHeaders {
-	my $self   = shift;    #$engine
-	my $result = shift;
-	my $sth    = shift;
+=head2 my $sql=$self->querySQL ($params,$limit, $offset);
 
-	if ( !$sth ) {
-		Warning "Something's wrong with \$sth!";
-	}
-	if ( !$result ) {
-		Warning "Something's wrong with \$result!";
-	}
-
-	if ( ref $result ne 'HTTP::OAI::DataProvider::Result' ) {
-		Warning "Something's wrong!";
-	}
-
-	#Debug "Parsing headers";
-
-	my $header;
-	my $i       = 0;     #count the results to test if none
-	my $last_id = '';    #needs to be an empty string
-	while ( my $aref = $sth->fetch ) {
-
-		#Debug "Inside while";
-
-		#$i++;            #counts lines not records
-		if ( $last_id ne $aref->[0] ) {
-			$i++;        #counts records
-
-			#a new item with new identifier
-			$header = new HTTP::OAI::Header;
-			$header->identifier( $aref->[0] );
-			$header->datestamp( $aref->[1] );
-			if ( $aref->[2] ) {
-				$header->status('deleted');
-			}
-		}
-		if ( $aref->[3] ) {
-			my $set = new HTTP::OAI::Set;
-			$set->setSpec( $aref->[3] );
-			$header->setSpec($set);
-		}
-
-		#save current identifier to weed out duplicates
-		$last_id = $aref->[0];
-		$result->addHeader($header);
-
-		#addHeader calls $result->chunk and that should set EOFChunk
-		#when chunk is full; NOT {EOFChunk}!
-		#save state
-		if ( $result->EOFChunk ) {
-			$result->chunkRequest( sth => $sth, type => 'header' );
-			return $result;    #break loop
-		}
-	}
-
-	#don't we have to add the laster Header? Todo:untested!
-	if ($header) {
-		$result->addHeader($header);
-	}
-
-	#loop is finished! No records in sth
-	#if while loop is over-> raise CurChunkNo
-	my $chunkRequest = $result->chunkRequest;
-	$chunkRequest->{curChunkNo}++;
-	return $i;
-}
-
-=head2 my $result=$engine->queryRecords (identifier=>$identifier,
-metadataPrefix=>$prefix);
-
-Like queryHeaders getSingleRecord returns a HTTP::OAI::DataProvider::SQLite
-object which contains either
-a) one or more records as HTTP::OAI::Records in {@records}.
-b) or appropriate error messages (e.g. noRecordMatch).
-
-Apparently, it also transforms to destination format if prefix is not native
-format.
-
-OLD
-	#check if identifier exists in cache
-	my $header = $self->{engine}->findByIdentifier( $params->{identifier} );
+Returns the sql for the query (includes metadata for GetRecord and
+ListRecords).
 
 =cut
 
-sub queryRecords {
-	my $self    = shift;    #is initialized only once, cannot carry requestURL
-	my $params  = shift;
-	my $request = shift;
+sub querySQL {
+	my $params = shift;
+	my $limit  = shift;
+	my $offset = shift;
 
-	#save total in $engine->{requestChunk}->{total}
-	$self->_countTotals($params);
+	#md becomes modifier with values md and count?
+	# SELECT COUNT records.identifier FROM records WHERE
+	# records.identifier = ? AND
+	# datestamp > ? AND
+	# datestamp < ? AND
+	# setSpec = ?
 
-	#transformer is obligatory
-	my $result = new HTTP::OAI::DataProvider::Result($self);
+	#This version is SLOW, but does it really matter? It's just one query
+	#for each request. Who cares?
 
-	#request and resumption are optional
-	if ($request) {
-		$result->{requestURL} = $request;
+	my $sql = q/SELECT records.identifier, datestamp, status, setSpec /;
+
+	if ( $params->verb eq 'GetRecord' or $params->verb eq 'ListRecords' ) {
+		$sql .= q/, native_md /;
 	}
 
-	my $dbh = $self->{connection}->dbh() or die $DBI::errstr;
+	$sql .= q/FROM records JOIN sets ON records.identifier = sets.identifier
+	/;
 
-	#Debug "Enter queryRecords ($params)";
-	# metadata munging
-	my $sql = _querySQL( $params, 'md' );
+	$sql .= q/ WHERE /;
+
+	if ( $params->{identifier} ) {
+		$sql .= qq/records.identifier = '$params->{identifier}' AND /;
+	}
+
+	if ( $params->{from} ) {
+		$sql .= qq/ datestamp > '$params->{from}' AND /;
+	}
+
+	if ( $params->{until} ) {
+		$sql .= qq/ datestamp < '$params-> {until}' AND /;
+	}
+
+	if ( $params->{set} ) {
+		$sql .= qq/setSpec = '$params->{set}' AND /;
+	}
+
+	$sql .= q/LIMIT $limit OFFSET $offset/;
+
+	#About order: I could add "ORDER BY records.identifier ASC" which gives us
+	#strict alphabetical order. Not want is expected. That wdn' t really be a
+	#problem, but not nice. Now we have the order we put'em in. Less reliable,
+	#but more intuitive. Until it goes wrong.
+
+	#$sql = q/SELECT records.identifier, datestamp, status, setSpec
+	#FROM records JOIN sets ON records.identifier = sets.identifier/;
 
 	#Debug $sql;
-	my $sth = $dbh->prepare($sql) or croak $dbh->errstr();
-	$sth->execute() or croak $dbh->errstr();
+	return $sql
 
-	my $i = $self->parseRecords( $result, $sth, $params );
-
-	#Debug "queryRecords found matching $i headers";
-	#does not make much of a difference
-	#$stylesheet_cache{ $params->{metadataPrefix} } = undef;
-
-	# Check result
-	if ( $i == 0 ) {
-		$result->addError('noRecordsMatch');
-	}
-
-	return $result;
 }
 
-sub parseRecords {
-	my $self   = shift;
-	my $result = shift;
-	my $sth    = shift;
-	my $params = shift;
 
-	if ( !$sth or !$result or !$params ) {
-		Warning "Something's wrong!";
-	}
-
-	if ( ref $result ne 'HTTP::OAI::DataProvider::Result' ) {
-		Warning "Something's wrong!";
-	}
-
-	my $header;
-	my $md;
-	my $i       = 0;     #count the results to test if none
-	my $last_id = '';    #needs to be an empty string
-
-	#loop over db rows which contain redundant info (cartesian product)
-	#I keep track of identifiers: if known it is a repetitive row
-	#if header is already defined, have action before starting next header
-	while ( my $aref = $sth->fetch ) {
-		if ( $last_id ne $aref->[0] ) {
-			$i++;        #count distinct identifiers
-			if ($header) {
-
-				#a new distinct id where header has already been defined
-				#first time on the row which has the 2nd distinct id
-				#i.e. previous header should be ready for storing it away
-
-				$result->saveRecord(
-					params => $params,
-					header => $header,
-					md     => $md,
-				);
-
-				#check here if first chunk is ready
-				#Debug "break the loop, but save loop state";
-				if ( $result->EOFChunk ) {
-
-					#Debug "curPos" . $result->{posInChunk};
-					#Debug "rt" . ref $result->EOFChunk;
-					$result->chunkRequest(
-						params => $params,
-						sth    => $sth,
-						type   => 'records',
-					);
-					return $i;    #break loop
-				}
-
-				#Debug "md".$md;
-			}
-
-			#on every distinct identifier
-			#Debug "result found identifier: " . $aref->[0];
-			$header = new HTTP::OAI::Header;
-			$header->identifier( $aref->[0] );
-			$header->datestamp( $aref->[1] );
-			if ( $aref->[2] ) {
-				$header->status('deleted');
-			}
-			if ( $aref->[4] ) {
-				$md = $aref->[4];
-			}
-		}
-
-		#every row
-		if ( $aref->[3] ) {
-			$header->setSpec( $aref->[3] );
-		}
-
-		$last_id = $aref->[0];
-	}
-
-	#save the last record
-	#for every last distinct identifier, so call it here since no iteration
-	$result->saveRecord(
-		params => $params,
-		header => $header,
-		md     => $md,
-	);
-	my $chunkRequest = $result->chunkRequest;
-	$chunkRequest->{curChunkNo}++;
-
-	#TODO: Decide i we need to save state here?
-	return $i;
-}
-
-=head2 $engine->completeChunks;
-
-WHAT IT SHOULD DO
-
-1. test signal
-completeChunks is called in Salsa_OAI after the first dance. It checks whether
-there is a queryResult to be finished. It does so by checking
-chunkRequest->{EOFChunk}. If that is set, it continues; otherwise it returns
-without doing anything else.
-
-2. Re-enter parseResult/parseHeader loop
-If that signal is encountered, the loop should save its state and this method
-should re-enter the loop in parseRecords / parseHeaders where it left off
-(using the saved sate). Re-Entering the loop ONCE should be enough. Via the
-loop $result->chunk the loop should be able to figure out what to do on its
-own.
-
-3. write remaining chunks to disk
-
-Saving loop state
-
-When: It should be necessary to save the loop state information only ONCE
-when moving from normal route to after.
-
-What: I need
--the statement handle
--the first token (for writing down the 2nd chunk under the name of the first
- token)
-
-=cut
-
-sub completeChunks {
-	my $engine   = shift;
-	my $provider = shift;
-
-	#We do not have a result obj at this time, so we cannot call:
-	#my $chunkRequest = $result->chunkRequest;
-
-	my $chunkRequest = $engine->{chunkRequest};
-
-	#Debug "Enter completeChunks";
-	if ( $chunkRequest->{EOFChunk} ) {
-
-		Debug "WORKING ON REMAINING CHUNKS!";
-
-		#EOFChunk exists,i.e. chunking is on and we have come here to work on
-		#remaining chunks
-
-		#Debug "first token:" . $token;
-		my $sth = $chunkRequest->{sth};
-
-		if ($sth) {
-
-			#Debug "statement handle:" . $sth;
-		} else {
-			Warning "No sth!" . $chunkRequest->{type};
-		}
-
-		Debug "requestURL" . $chunkRequest->{request};
-		Debug "total items in request:" . $chunkRequest->{total};
-		Debug "curChunkNo/maxChunkNo:"
-		  . $chunkRequest->{curChunkNo} . '/'
-		  . $chunkRequest->{maxChunkNo};
-
-		#now we need that loop to break after each chunk
-		while ( $chunkRequest->{curChunkNo} < $chunkRequest->{maxChunkNo} ) {
-			my $rt        = $chunkRequest->{EOFChunk};
-			my $old_token =
-			  $rt->resumptionToken;    #rt was made when chunk was ready
-
-			#rm EOFChunk so loop doesn't break there anymore until set again
-			#gets set by $result->chunk if a chunk is full
-			delete $chunkRequest->{EOFChunk};
-
-			#I am still officially in chunk 1. I need to re-enter the loop to
-			#raise the chunkNo
-			#Debug "ENTER CHUNK NO" . $chunkRequest->{curChunkNo};
-
-			#should we make a new result object for every chunk
-			#that takes care of resetting record/header info in result
-			#the QUESTION is if that messes with our chunkRequest info!?
-			my $result = new HTTP::OAI::DataProvider::Result($engine);
-
-			#HERE
-
-			if ( $chunkRequest->{type} eq 'records' ) {
-				my $params = $chunkRequest->{params};
-
-				if ( !$params ) {
-					Warning "Something's wrong";
-				}
-
-				#Debug "About to re-enter at parseRecords";
-				$engine->parseRecords( $result, $sth, $params );
-			} else {
-
-				#Debug "About to re-enter at parseHeaders";
-				$engine->parseHeaders( $result, $sth );
-			}
-
-			#new token!
-			$rt = $chunkRequest->{EOFChunk};
-
-			my $response = $result->getResponse;
-			Debug "Chunk "
-			  . $chunkRequest->{curChunkNo} . ' of '
-			  . $chunkRequest->{maxChunkNo}
-			  . ' parsed';
-			$response->resumptionToken($rt);
-			$response->request($chunkRequest->{request});
-			#Debug "response request".$response->request;
-			#$result->responseCount();
-
-			#_output applies xslt and replaces requestURL if necessary
-			#chunkStr returns wrong output
-			my $chunkStr = $provider->_output($response);
-
-			#Debug "CHUNKSTR $chunkStr";
-			$result->writeChunk( $chunkStr, $old_token );
-
-			#Debug "Why does the loop end here?";
-			#Debug "curChunkNo".$chunkRequest->{curChunkNo};
-			#Debug "maxChunkNo".$chunkRequest->{maxChunkNo};
-		}
-	}
-}
 
 #
 #
@@ -754,14 +526,67 @@ sub _connect_db {
 			sqlite_unicode => 1,
 			RaiseError     => 1
 		}
-	  )
-	  or die "Problems with DBIx::connector";
+	) or die "Problems with DBIx::connector";
+}
+
+=head2 my $first=$self->planChunking($params);
+
+Counts the results for this request, creates chunk descriptions which allow
+to ask for specific chunks of this result set and saves those chunk
+descriptions in the chunkCache.
+
+Expects params hashref. Tests if chunking is active. Returns the first chunk
+description or nothing. Saves the remaining chunk descriptions in
+chunkCache.
+
+	#a) find out how many total
+	#b) calculate maxChunkNo
+	#c) save chunk descriptions in chunkCache
+
+=cut
+
+sub planChunking {
+	my $self   = shift;
+	my $params = shift;
+
+	#do NOT test if provider was born with chunking ability on intention!
+
+	my ( $total, $maxChunkNo ) = $self->_mk_numbers($params);
+
+	Debug "planChunking: total:$total, maxChunkNo:$maxChunkNo";
+
+	my $first;
+	my $chunkNo      = 1;
+	my $currentToken = $self->mkToken();
+	my $chunkSize    = $self->{chunkSize};
+
+	while ( $chunkNo <= $maxChunkNo ) {
+		my $offset = ( ( $chunkNo - 1 ) * $chunkSize );    #or with +1?
+		my $sql = $self->querySQL( $params, $chunkSize, $offset );
+		my $nextToken = $self->mkToken();
+
+		my $chunk = {
+			chunkNo    => $chunkNo,
+			maxChunkNo => $maxChunkNo,
+			'next'     => $nextToken,
+			sql        => $sql,
+			token      => $currentToken,
+			total      => $total
+		};
+
+		Debug "planChunking: chunkNo:$chunkNo, token:$currentToken"
+		  . ", next:$nextToken, offset: $offset, limit ";
+
+		$currentToken = $nextToken;
+		$first ? $self->{chunkCache}->add($chunk) : $first = $chunk;
+	}
+	return $first;
 }
 
 =head2 my $count=$self->_countTotals ($params);
-Apparently, for resumptionToken I need to know the total number of results
-(headers or records) before I start chunking. So this metho performs a query
-and returns that number.
+
+For chunking I need to know the total number of results (headers or records)
+before I start chunking. This method performs a query and returns that number.
 
 =cut
 
@@ -780,16 +605,15 @@ sub _countTotals {
 		croak "No count";
 	}
 
-	#Debug "Sql: $sql";
-	#Debug "COUNT: " . $aref->[0];
-	$self->{chunkRequest}->{total} = $aref->[0];
+	#todo: ensure that it is integer!
+	return $aref->[0];
 }
 
 sub _init_db {
 
 	#Debug "Enter _init_db";
 	my $self = shift;
-	my $dbh  = $self->{connection}->dbh() or die $DBI::errstr;
+	my $dbh = $self->{connection}->dbh() or die $DBI::errstr;
 
 	if ( !$dbh ) {
 		carp "Error: database handle missing";
@@ -838,6 +662,19 @@ sub _loadXML {
 	return $doc;
 }
 
+
+#hide that ugly code
+sub _mk_numbers {
+	my $self   = shift;
+	my $params = shift;
+	my $total  = $self->_countTotals($params);
+
+	#e.g. 2222 total with 500 chunk size: 1, 501, 1001, 1501, 2001
+	my $max = ( $total / $self->chunkSize ) + 1;    #max no of chunks
+	return $total, sprintf( "%d", $max );           #rounded up to int
+}
+
+#sql for count request
 sub _queryCount {
 	my $self   = shift;
 	my $params = shift;
@@ -865,61 +702,6 @@ sub _queryCount {
 	return $sql;
 }
 
-sub _querySQL {
-	my $params = shift;
-	my $md     = shift;
-
-	#md becomes modifier with values md and count?
-	# SELECT COUNT records.identifier FROM records WHERE
-	# records.identifier = ? AND
-	# datestamp > ? AND
-	# datestamp < ? AND
-	# setSpec = ?
-
-	#This version is SLOW, but does it really matter? It's just one query
-	#for each request. Who cares?
-
-	my $sql = q/SELECT records.identifier, datestamp, status, setSpec /;
-
-	if ($md) {
-		$sql .= q/, native_md /;
-	}
-
-	$sql .= q/FROM records JOIN sets ON records.identifier = sets.identifier
-	/;
-
-	$sql .= q/ WHERE /;
-
-	if ( $params->{identifier} ) {
-		$sql .= qq/records.identifier = '$params->{identifier}' AND /;
-	}
-
-	if ( $params->{from} ) {
-		$sql .= qq/ datestamp > '$params->{from}' AND /;
-	}
-
-	if ( $params->{until} ) {
-		$sql .= qq/ datestamp < '$params-> {until}' AND /;
-	}
-
-	if ( $params->{set} ) {
-		$sql .= qq/setSpec = '$params->{set}' AND /;
-	}
-
-	$sql .= q/1=1/;
-
-	#About order: I could add "ORDER BY records.identifier ASC" which gives us
-	#strict alphabetical order. Not want is expected. That wdn' t really be a
-	#problem, but not nice. Now we have the order we put'em in. Less reliable,
-	#but more intuitive. Until it goes wrong.
-
-	#$sql = q/SELECT records.identifier, datestamp, status, setSpec
-	#FROM records JOIN sets ON records.identifier = sets.identifier/;
-
-	#Debug $sql;
-	return $sql
-
-}
 
 sub _registerNS {
 	my $self = shift;
@@ -1000,8 +782,7 @@ sub _storeRecord {
 		if ( $datestamp_db le $datestamp ) {
 
 			#Debug "$identifier exists and date equal or newer -> update";
-			my $up =
-			    q/UPDATE records SET datestamp=?, native_md =? /
+			my $up = q/UPDATE records SET datestamp=?, native_md =? /
 			  . q/WHERE identifier=?/;
 
 			#Debug "UPDATE:$up";

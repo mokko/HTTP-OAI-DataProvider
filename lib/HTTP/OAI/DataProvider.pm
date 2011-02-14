@@ -2,22 +2,20 @@ package HTTP::OAI::DataProvider;
 
 use warnings;
 use strict;
-
-#use XML::SAX::Writer;
 use Carp qw/croak carp/;
+
 use HTTP::OAI;
 use HTTP::OAI::Repository qw/validate_request/;
-
-#use XML::LibXML;    #to load chunk file
-
-#use Dancer ':syntax'; #this module should abstract from Dancer
-use Dancer::CommandLine qw/Debug Warning/;
-
 use HTTP::OAI::DataProvider::GlobalFormats;
 use HTTP::OAI::DataProvider::SetLibrary;
+use HTTP::OAI::DataProvider::ChunkCache;
+
+#TODO
+#use HTTP::OAI::DataProvider::Message qw/Debug Warning/;
+use Dancer::CommandLine qw/Debug Warning/;
 
 #for debugging
-use Data::Dumper qw/Dumper/;
+#use Data::Dumper qw/Dumper/;
 
 =head1 NAME
 
@@ -29,28 +27,20 @@ Version 0.01
 
 =cut
 
-our $VERSION = '0.02';
+our $VERSION = '0.05';    #with query cache and chunking
 
 =head1 SYNOPSIS
 
-Initialize a data provider the with engine of your choice. Detailed
-engine-specific configuration requirements not shown here.
+Initialize a data provider (detailed configuration requirements not shown here)
 
 Init for use as provider
     use HTTP::OAI::DataProvider;
-	use HTTP::OAI::DataProvider::SQLite;
-
     my $provider = HTTP::OAI::DataProvider->new(%options);
 
 Verbs
 	my $response=$provider->$verb($params)
-	#e.g. ($response is xml fit to print)
-	$response=$engine->GetRecord(%param);
-
-Digest source data
-	# make sure that data is in the right form and in the right place
-    # see engine of your choice for more information, e.g.
-	my $err=$engine->digest_single (source=>$xml_fn, mapping=>&mapping);
+	$response=$engine->GetRecord(%params);
+	#response is xml ready for print/return
 
 Error checking/TODO
 	my $e=$response->isError
@@ -59,10 +49,25 @@ Error checking/TODO
 	}
 
 Debugging
-	I use Dancer::CommandLine
+	Currently, I use Dancer::CommandLine. Maybe I should build such a mechanism
+	into DataProvider which would also allow to choose a Debug and Warning
+	routine via config, something like
+
+    my $provider = HTTP::OAI::DataProvider->new(
+    	debug=>'SalsaOAI::Debug',
+    	warning=>'SalsaOAI::Warning'
+    );
 
 	Debug "message";
 	Warning "message";
+
+	TODO
+	use HTTP::OAI::DataProvider::Message qw/Debug Warning/;
+	new HTTP::OAI::DataProvider::Message (
+		Debug =>'&callback',
+		Warning=>'&callback'
+	);
+
 
 =head1 OAI DATA PROVIDER FEATURES
 
@@ -82,15 +87,15 @@ BACKEND/FRONTEND
 
 This module attempts to provide a neutral backend for your data provider. It is
 not a complete data provider. You will need a simple frontend which handles
-HTTP requests and triggers this backend. I typically use Dancer as frontend,
-see Salsa_OAI for an example:
+HTTP requests and triggers this backend. I use Dancer as frontend, see
+Salsa_OAI for an example:
 
-Apart from configuration and callbacks your frontend could look like this
+Apart from configuration and callbacks your frontend could look like this:
 
 any [ 'get', 'post' ] => '/oai' => sub {
 	if ( my $verb = params->{verb} ) {
 		no strict "refs";
-		my $respons=$dp->$verb( params() );
+		my $response=$provider->$verb( params() );
 		return $response->toXML;
 	}
 };
@@ -155,15 +160,16 @@ development and not during runtime it may also croak.
 
 List here only options not otherwise explained?
 
-isMetadaFormatSupported=>Callback, TODO
+debug=>callback (TODO)
+	If a callback is supplied use this callback for debug output
 
+isMetadaFormatSupported=>callback, TODO
 	The callback expects a single prefix and returns 1 if true and nothing
 	when not supported. Currently only global metadataFormats, i.e. for all
 	items in repository. This one seems to be obligatory, so croak when
 	missing.
 
 xslt=>'path/to/style.xslt',
-
 	Adds this path to HTTP::OAI::Repsonse objects to modify output in browser.
 	See also _init_xslt for more info.
 
@@ -183,17 +189,62 @@ requestURL
 	Currently, requestURL evaporates if Salsa_OAI is run under anything else
 	than HTTP::Server::Simple.
 
+warning =>callback (Todo)
+	If a callback is supplied use this callback for warning output
+
+
 =cut
 
 sub new {
 	my $class = shift;
-	my %args  = @_;
 
-	#TODO:
-	#probably not a secure thing to do:
-	my $self = \%args;
+	#TODO: not a secure thing
+	my $self =shift; #self has Dancer's complete config
+
+	if (!$self) {
+		die "Data provider's config is missing";
+	}
+
+	if (ref $self ne 'HASH') {
+		die "Data provider's config is not a hashref";
+	}
 
 	bless( $self, $class );
+
+	#init transformer
+	$self->{transformer} = new HTTP::OAI::DataProvider::Transformer(
+		nativePrefix => $self->{nativePrefix},
+		locateXSL => $self->{locateXSL},
+	);
+
+	#init chunker
+	$self->{chunkCache} =
+	  new HTTP::OAI::DataProvider::ChunkCache( maxSize => $self->{maxCacheSize}  )
+	  or die "Cannot init chunkCache";
+
+	#init global metadata formats
+	#small camel is object, big camel is its description
+	$self->{globalFormats} = new HTTP::OAI::DataProvider::GlobalFormats;
+
+	my %cnf = %{ $self->{GlobalFormats} };
+	foreach my $prefix ( keys %cnf ) {
+
+		#debug " Registering global format $prefix";
+		if ( !$cnf{$prefix}{ns_uri} or !$cnf{$prefix}{ns_schema} ) {
+			die "GlobalFormat $prefix in yaml configuration incomplete";
+		}
+		$self->{globalFormats}->register(
+			ns_prefix => $prefix,
+			ns_uri    => $cnf{$prefix}{ns_uri},
+			ns_schema => $cnf{$prefix}{ns_schema},
+		);
+	}
+
+	#init engine
+	#this is noT properly abstracted
+	$self->{engine} =
+	  new HTTP::OAI::DataProvider::SQLite( dbfile => $self->{dbfile} );
+
 	return $self;
 }
 
@@ -227,9 +278,7 @@ sub GetRecord {
 	my $engine        = $self->{engine};
 	my $globalFormats = $self->{globalFormats};
 
-	#
 	# Error handling
-	#
 
 	#only if there is actually an identifier
 	if ( $params->{identifier} ) {
@@ -257,11 +306,8 @@ sub GetRecord {
 		return $self->err2XML(@errors);
 	}
 
-	#
 	# Metadata handling
-	#
-
-	my $result = $engine->queryRecords( $params, $request );
+	my $result = $engine->query( $params, $request );
 
 	#mk sure we don't lose requestURL in Starman
 	#$result->requestURL($request);
@@ -269,15 +315,12 @@ sub GetRecord {
 	# Check result
 
 	#Debug "check results";
-	#checkRecordsMatch is now done inside queryHeaders
+	#checkRecordsMatch is now done inside query
 	if ( $result->isError ) {
 		return $self->err2XML( $result->isError );
 	}
 
-	#
 	# Return
-	#
-
 	return $self->_output( $result->toGetRecord );
 
 }
@@ -302,59 +345,25 @@ prompty return a xml string.
 
 sub Identify {
 	my $self    = shift;
-	my $request = shift;
+	#under some servers e.g. Starman HTTP::OAI's auto-requestURL gets confused
+	my $requestURL = shift;
 	my $params  = _hashref(@_);
 
 	#Debug "Enter Identify ($request)";
 
-	#
-	# Check
-	#
-
-	#syntax already checked, I don't NEED to check if again
-	if ( my $error = validate_request( %{$params} ) ) {
-		return $self->err2XML($error);
-	}
-
-	#
-	# Get data from frontend
-	#
-
-	no strict "refs";
-	if ( !$self->{Identify} ) {
-		return
-		  "Error: Identify callback seems not to exist. Check initialization "
-		  . "of HTTP::OAI::DataProvider";
-	}
-
-	#call the callback for actual data
-	my $identify_cb = $self->{Identify};
-	my $id_data     = $self->$identify_cb;
-	use strict "refs";
-
-	#
 	# Metadata munging
-	#
-
 	my $obj = new HTTP::OAI::Identify(
-		adminEmail        => $id_data->{adminEmail},
-		baseURL           => $id_data->{baseURL},
-		deletedRecord     => $id_data->{deletedRecord},
+		adminEmail        => $self->{adminEmail},
+		baseURL           => $self->{baseURL},
+		deletedRecord     => $self->{deletedRecord},
 		earliestDatestamp => $self->{engine}->earliestDate(),
 		granularity       => $self->{engine}->granularity(),
-		repositoryName    => $id_data->{repositoryName},
-		requestURL        => $request
-		,    #under some servers like Starman it just won't work without it!
+		repositoryName    => $self->{repositoryName},
+		requestURL        => $requestURL,
+	) or return "Cannot create new HTTP::OAI::Identify";
 
-	  )
-	  or return "Cannot create new HTTP::OAI::Identify";
-
-	#
 	# Output
-	#
-
 	return $self->_output($obj);
-
 }
 
 =head2 ListMetadataFormats (identifier);
@@ -487,7 +496,7 @@ sub ListIdentifiers {
 
 	my $engine        = $self->{engine};          #provider
 	my $globalFormats = $self->{globalFormats};
-	$engine->{chunkRequest}->{request}=$request;
+	$engine->{chunkRequest}->{request} = $request;
 
 	# Error handling
 	if ( !$engine ) {
@@ -503,12 +512,9 @@ sub ListIdentifiers {
 		push @errors, $e;
 	}
 
-	#No need to push this error since argument is exclusive
-	#a) chunking not activated -> return nothing and continue
-	#b) wrong token -> error message
-	#c) right token -> return token
-	if ( $self->checkChunking($params) ) {
-		return $self->checkChunking($params);
+	my $coe = $self->chunkOrError($params);
+	if ($coe) {
+		return $coe;    #chunk or error
 	}
 
 	if ( my $e =
@@ -534,7 +540,8 @@ sub ListIdentifiers {
 
 	#Metadata handling
 	#required: metadataPrefix; optional: from, until, set
-	my $result = $engine->queryHeaders( $params, $request );
+	#result is always only the first chunk
+	my $result = $engine->query( $params, $request );
 
 	# Check result
 	if ( $result->isError ) {
@@ -543,6 +550,42 @@ sub ListIdentifiers {
 
 	# Return
 	return $self->_output( $result->toListIdentifiers );
+}
+
+#this doesn't really make sense, does it?
+#where is it called?
+sub _badResumptionToken {
+	my $self = shift;
+	return $self->err2XML(
+		new HTTP::OAI::Error( code => 'badResumptionToken' ) );
+}
+
+=head2 $provider->returnChunk ($token);
+
+Returns a chunk (as xml fit to print) or an error message that chunk does not
+exist (as xml fit to print). Expects a resumptionToken as string.
+
+=cut
+
+sub returnChunk {
+	my $self  = shift;
+	my $token = shift;
+
+	if ( !$token ) {
+		return;    #how to react if token missing?
+	}
+
+	#ensure that it does return nothing on error! And not 0
+	my $chunk_desc = $self->{chunkCache}->get($token);
+
+	if ( !$chunk_desc ) {
+		return $self->err2XML(
+			new HTTP::OAI::Error( code => 'badResumptionToken' ) );
+	}
+
+	#chunk is a HTTP::OAI::Response object
+	my $chunk = $engine->queryChunk($chunk_desc);
+	return $self->_output($chunk);
 }
 
 =head2 ListRecords
@@ -572,72 +615,6 @@ TODO
 
 =cut
 
-=head2 my $err=checkChunking ($params);
-
-Just return HTTP::OAI::Error if
-a) wrong token -> error message
-b) chunking not supported -> error message
-when chunking not activated or no token -> return nothing
-
-	my $err = $self->checkChunking($params);
-	if ($err) {
-		$self->err2XML($err);
-	}
-
-	Can this also be written as a 2-liner?
-	if (my $err = $self->checkChunking($params)) {
-		$self->err2XML($err);
-	}
-
-BTW: this is similar to HTTP::OAI::DataProvider::Result::chunking, but
-a) it doesn't require a result object and
-b) it returns HTTP::OAI::Error or nothing.
-c) it checks against value in engine (which is a reason why it SHOULD
-   be part of the engine and not the provider, I guess).
-d) In the future this method might serve the chunks, then it might be placed
-   here more or less correctly.
-
-=cut
-
-sub _badResumptionToken {
-	my $self = shift;
-	return $self->err2XML(
-		new HTTP::OAI::Error( code => 'badResumptionToken' ) );
-}
-
-sub checkChunking {
-	my $self   = shift;
-	my $params = shift;
-	my $token  = $params->{resumptionToken};
-
-	#Debug "Enter checkChunking";
-
-	if ( !$self->{engine}->{chunking} ) {
-
-		#provider wasn't born with chunking ability...
-		if ($token) {
-			Debug 'provider wasn\'t born with chunking ability,but rt '
-			  . 'supplied via http';
-			return $self->_badResumptionToken;
-		}
-	} else {
-		#Debug "Chunking activated in Salsa_OAI";
-		if ($token) {
-			Debug "resumptionToken supplied: " . $token;
-			my $path = $self->{engine}->{chunk_dir} . '/' . $token;
-			if ( !-f $path ) {
-				Debug "File doesn't exist";
-				return $self->_badResumptionToken;
-			}
-			local ($/);
-			open( my $fh, "<:encoding(UTF-8)", $path )
-			  or Warning "can't open UTF-8 encoded filename ($path): $!";
-			return $fh;
-			close $fh;
-		}
-	}
-}
-
 sub ListRecords {
 	my $self    = shift;
 	my $request = shift;
@@ -655,16 +632,15 @@ sub ListRecords {
 
 	my $engine        = $self->{engine};
 	my $globalFormats = $self->{globalFormats};
-	$engine->{chunkRequest}->{request}=$request;
+	$engine->{chunkRequest}->{request} = $request;
 
 	#
 	# Error handling
 	#
 
-	#Just return HTTP::OAI::Error if wrong token or chunking not supported
-	if ( $self->checkChunking($params) ) {
-		my $response = $self->checkChunking($params);
-		return $response;    #a chunk AS UTF-8 STR
+	my $coe = $self->chunkOrError($params);
+	if ($coe) {
+		return $coe;    #chunk or error
 	}
 
 	#check is metadataFormat is supported
@@ -683,9 +659,9 @@ sub ListRecords {
 	# Metadata handling
 	#
 
-	my $result = $engine->queryRecords( $params, $request );
+	my $result = $engine->query( $params, $request );
 
-	#checkRecordsMatch is now done inside queryRecords
+	#checkRecordsMatch is now done inside query
 	# Check result
 	if ( $result->isError ) {
 		return $self->err2XML( $result->isError );
@@ -860,6 +836,44 @@ sub _hashref {
 	return \%params;
 }
 
+=head2 my $stuff=$self->chunkOrError ($params);
+
+Tests whether
+	a) chunking is activated in provider,
+	b) whether a resumptionToken is in params and
+	c) there is a chunk with that token in the cache.
+
+It returns either a chunk or appropriate error message as xml fit to print.
+
+Usage:
+	$stuff=$self->chunkOrError
+	if ($stuff) {
+		return $stuff;
+	}
+
+=cut
+
+sub chunkOrError {
+	my $self   = shift;
+	my $params = shift;
+
+	if ( $params->{resumptionToken} ) {
+
+		#check if provider is born with chunking ability
+		if ( $self->checkChunking() ) {
+
+			#a) wrong token -> error message
+			#b) right token -> return token
+			return $self->returnChunk($params);
+		} else {
+
+			#chunking not activated -> return error
+			#No need to push this error since argument is exclusive
+			return $self->err2XML( $self->_badResumptionToken );
+		}
+	}
+}
+
 =head2 return $self->_output($response);
 
 Expects a HTTP::OAI::Response object and returns it as xml string. It applies
@@ -906,14 +920,16 @@ sub overwriteRequestURL {
 				my $new = $self->{requestURL} . '?' . $f[1];
 
 				#very dirty
-				if ($new =~/verb=/) {
-					$self->{engine}->{chunkRequest}->{_requestURI}=$new;
+				if ( $new =~ /verb=/ ) {
+					$self->{engine}->{chunkRequest}->{_requestURI} = $new;
 				} else {
 					$new = $self->{engine}->{chunkRequest}->{_requestURI};
 				}
 
 				$response->requestURL($new);
-				Debug "overwriteRequestURL: ".$response->requestURL.'->'.$new;
+				Debug "overwriteRequestURL: "
+				  . $response->requestURL . '->'
+				  . $new;
 			} else {
 
 				#requestURL has no ? in case of an badVerb
@@ -963,27 +979,8 @@ You can find documentation for this module with the perldoc command.
     perldoc HTTP::OAI::DataProvider
 
 
-You can also look for information at:
+Look on GitHub.
 
-=over 4
-
-=item * RT: CPAN's request tracker
-
-L<http://rt.cpan.org/NoAuth/Bugs.html?Dist=HTTP-OAI-DataProvider-SQLite>
-
-=item * AnnoCPAN: Annotated CPAN documentation
-
-L<http://annocpan.org/dist/HTTP-OAI-DataProvider-SQLite>
-
-=item * CPAN Ratings
-
-L<http://cpanratings.perl.org/d/HTTP-OAI-DataProvider-SQLite>
-
-=item * Search CPAN
-
-L<http://search.cpan.org/dist/HTTP-OAI-DataProvider-SQLite/>
-
-=back
 
 =head1 ACKNOWLEDGEMENTS
 

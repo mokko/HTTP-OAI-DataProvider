@@ -1,0 +1,211 @@
+package HTTP::OAI::DataProvider::ChunkCache;
+
+use strict;
+use warnings;
+our $chunkCache = {};
+
+#we assume that ordering the tokens alphabetically will show them in the order
+#we are supposed to delete them
+
+=head1 NAME
+
+HTTP::OAI::DataProvider::ChunkCache - Store request info per resumptionToken
+
+=head1 SYNOPSIS
+
+	use HTTP::OAI::DataProvider::ChunkCache;
+	my $cache=new HTTP::OAI::DataProvider::ChunkCache (maxSize=>$integer);
+
+	#chunk is a description of a chunk not a chunk
+	my $chunk={
+		chunkNo=>$chunkNo,
+		maxChunkNo=>$maxChunkNo,
+		next=>$token,
+		sql=>$sql,
+		token=>$token,
+		total=>$total,
+	};
+
+	#add a chunk to cache
+	$cache->add ($chunk) or die $cache->error;
+
+	#get a chunk from cache
+	my $chunk=$cache->get ($token); #chunk is hashref
+
+	#size/maxSize
+	my $current_size=$cache->count;
+	my $max=$cache->size;
+
+	my @tokens=$cache->list;	#list tokens
+
+=head2 my $chunkCache=HTTP::OAI::DataProvider::ChunkCache::new (maxSize=>1000);
+
+=cut
+
+sub new {
+	my $class = shift;
+	my $self  = {};
+	my %args  = @_;
+
+	if ( $args{maxSize} ) {
+		$self->{maxSize} = $args{maxSize};
+	} else {
+		$self->{maxSize} = 0; # a weird default value
+	}
+
+	bless $self, $class;
+	return $self;
+}
+
+=head2 $chunkCache->add(%chunk);
+
+Add chunk information to the cache. Add will delete old chunks if no of cached
+chunks would exceed maxSize after adding it. On error: carps and returns 0.
+Return 1 on success.
+
+=cut
+
+sub add {
+	my $self  = shift;
+	my $chunk = shift;
+
+	#ensure that necessary info is there
+	foreach (qw /chunkNo maxChunkNo next sql total token/) {
+		if ( !$chunk->{$_} ) {
+			$self->{error}= "$_ missing";
+			return 0;
+		}
+	}
+
+	#write into cache
+	$self->_cacheSize();
+	$chunkCache->{ $chunk->{token} } = $chunk;
+	return 1;
+}
+
+=head2 my $integer=$cache->count;
+
+Returns the number of items in cache. See also $cache->size
+
+=cut
+
+sub count {
+	return scalar keys %{$chunkCache};
+}
+
+=head2 my $msg=$cache->error;
+
+Returns last error message. Usage example:
+
+	$cache->add($chunk_descr) or die $cache->error;
+
+=cut
+
+sub error {
+	my $self = shift;
+	if ( $self->{error} ) {
+		return $self->{error};
+	}
+}
+
+=head2 my $chunk=$chunkCache->get($token);
+
+Returns a chunk description as hashref or nothing on error.
+
+Structure of hashref:
+	$chunk={
+			chunkNo=>$chunkNo,
+			maxChunkNo=>$maxChunkNo,
+			next=>$token,
+			sql=>$sql,
+			token=>$token,
+			total=>$total
+	};
+
+Of course, it is not a chunk (i.e. results), but the description of a chunk.
+
+=cut
+
+sub get {
+	my $self  = shift;
+	my $token = shift;
+
+	if ( !$token ) {
+		$self->{error} = "No token specified when \$cache->get() was called";
+		return;
+	}
+
+	if ( !$chunkCache->{$token} ) {
+		$self->{error} = "This token does not exist in cache";
+		return;
+	}
+
+	return $chunkCache->{$token};
+
+}
+
+=head2 my @tokens=$cache->list;
+
+Returns an array of tokens in the cache (in no particular order).
+
+Todo: What do on error?
+
+=cut
+
+sub list {
+	my $self = shift;
+	return ( keys %{$chunkCache} );
+}
+
+=head2 my $maxSize=$cache->size;
+
+Gets or sets maximum size of cache.
+
+=cut
+
+sub size {
+	my $self = shift;
+	my $size=shift;
+
+	#i am not sure what scalar does
+	if ($size) {
+		$self->{maxSize} = scalar $size;
+	} else {
+		return $self->{maxSize};
+	}
+}
+
+#
+# PRIVATE
+#
+
+#gets called in add
+sub _cacheSize {
+	my $self  = shift;
+	my $count = $self->count();
+
+	#called before we add an item to cache, so we have to add one to the count
+	#overPar: no of items which cache exceeds maxSize, should max be 1
+	my $overPar = $count + 1 - $self->{maxSize};
+	if ( $overPar > 0 ) {
+		$self->_rmFromCache($overPar);
+	}
+}
+
+#gets called in _cacheSize
+sub _rmFromCache {
+	my $self    = shift;
+	my $overPar = shift;
+
+	#@array has chunks ordered according to their age
+	my @array = sort keys %{$chunkCache};
+
+	my $i = 0;
+	while ( $i < $overPar ) {
+		my $key = shift @array;
+		delete $chunkCache->{$key};
+		$i++;
+	}
+}
+
+1;
