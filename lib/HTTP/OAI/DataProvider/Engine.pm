@@ -3,6 +3,8 @@ package HTTP::OAI::DataProvider::Engine;
 use strict;
 use warnings;
 use Time::HiRes qw(gettimeofday);    #to generate unique tokens
+use Dancer ':syntax';
+use Carp qw/croak/;
 
 =head2 Engine Requirements
 
@@ -37,42 +39,85 @@ sub mkToken {
 	return time . $msec;    #time returns seconds since epoch
 }
 
+=head2 my $chunk_size=$result->chunkSize;
+
+Return chunk_size if defined or empty. Chunk_size is a config value that
+determines how big (number of records per chunk) the chunks are.
+
+=cut
+
+sub chunkSize {
+	my $self = shift;
+	debug "chunkSize" . $self->{chunkSize};
+	if ( $self->{chunkSize} ) {
+		return $self->{chunkSize};
+	}
+}
+
+=head2 $self->requiredType ('HTTP::OAI::DataProvider');
+
+Tests if $self is of specified type and croaks if not.
+
+=cut
+
+sub requiredType {
+	my $self = shift;
+	my $type = shift;
+
+	if ( !$type ) {
+		croak "requiredType called with type";
+	}
+
+	if ( ref $self ne $type ) {
+		croak "Wrong type: " . ref $self;
+	}
+
+}
+
+=head2 $self->requiredFeatures ($hashref, 'a', b');
+
+Feature is a key of a hashref, either the object itself or another hashref
+object.
+
+Croaks if a or b are not present. If hashref is omitted, checks in $self.
+
+Variation:
+	$self->requiredFeatures ('a', b');
+
+=cut
+
+sub requiredFeatures {
+	my $self = shift;    #hashref
+	#my $args;            #string or hashref
+	if (ref $_[0] eq 'HASH') {
+		my $args = shift;
+		foreach my $key (@_) {
+			if ( !$args->{$key} ) {
+				croak "Feature $key missing";
+			}
+		}
+	} else {
+		foreach my $key (@_) {
+			if ( !$self->{$key} ) {
+				croak "Feature $key missing";
+			}
+		}
+
+	}
+}
+
+sub argumentExists {
+	my $self = shift;
+	my $arg  = shift;
+
+	if ( !$arg ) {
+		croak "Argument missing!";
+	}
+}
+
 sub _hashref {
 	my %params = @_;
 	return \%params;
 }
 
-=head2 $engine->import ($source, 'a','b');
-
-Expects a hashref and a list of keys. Copies key value pairs mentioned in the
-list (not clones, but references) to the object. In this case engine.
-
-In usage example above,
-	$engine->{a}=$source->{a}
-
-Returns 0 for success and 1 or higher for error.
-
-If $source->{a} doesn't exist, $engine->{a} will not be created.
-
-=cut
-
-sub import {
-	my $self   = shift;
-	my $source = shift;
-	my $error=0;
-
-	if (ref $source ne 'HASH') {
-		return $error; #source not a hashref
-	}
-
-	foreach my $var (@_) {
-		if ( $self->$var ) {
-			$self->$var = $source->$var;
-		} else {
-			$error++;
-		}
-	}
-	return $error;
-}
-
-1;       #HTTP::OAI::DataProvider::Engine
+1;    #HTTP::OAI::DataProvider::Engine

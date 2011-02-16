@@ -9,6 +9,8 @@ use HTTP::OAI::Repository qw/validate_request/;
 use HTTP::OAI::DataProvider::GlobalFormats;
 use HTTP::OAI::DataProvider::SetLibrary;
 use HTTP::OAI::DataProvider::ChunkCache;
+use HTTP::OAI::DataProvider::Transformer;
+use HTTP::OAI::DataProvider::SQLite;
 
 #TODO
 #use HTTP::OAI::DataProvider::Message qw/Debug Warning/;
@@ -23,7 +25,7 @@ HTTP::OAI::DataProvider - Simple perl OAI data provider
 
 =head1 VERSION
 
-Version 0.01
+Version 0.05
 
 =cut
 
@@ -197,29 +199,12 @@ warning =>callback (Todo)
 
 sub new {
 	my $class = shift;
-
-	#TODO: not a secure thing
-	my $self =shift; #self has Dancer's complete config
-
-	if (!$self) {
-		die "Data provider's config is missing";
-	}
-
-	if (ref $self ne 'HASH') {
-		die "Data provider's config is not a hashref";
-	}
-
+	my $self  = shift;    #has Dancer's complete config, not secure
 	bless( $self, $class );
 
-	#init transformer
-	$self->{transformer} = new HTTP::OAI::DataProvider::Transformer(
-		nativePrefix => $self->{nativePrefix},
-		locateXSL => $self->{locateXSL},
-	);
-
 	#init chunker
-	$self->{chunkCache} =
-	  new HTTP::OAI::DataProvider::ChunkCache( maxSize => $self->{maxCacheSize}  )
+	$self->{chunkCache} = new HTTP::OAI::DataProvider::ChunkCache(
+		maxSize => $self->{chunkCacheMaxSize} )
 	  or die "Cannot init chunkCache";
 
 	#init global metadata formats
@@ -240,11 +225,16 @@ sub new {
 		);
 	}
 
-	#init engine
-	#this is noT properly abstracted
-	$self->{engine} =
-	  new HTTP::OAI::DataProvider::SQLite( dbfile => $self->{dbfile} );
-
+	#init engine (todo: this is noT properly abstracted)
+	$self->{engine} = new HTTP::OAI::DataProvider::SQLite(
+		dbfile      => $self->{dbfile},
+		chunkCache  => $self->{chunkCache},
+		chunkSize   => $self->{chunkSize},
+		transformer => new HTTP::OAI::DataProvider::Transformer(
+			nativePrefix => $self->{nativePrefix},
+			locateXSL    => $self->{locateXSL},
+		),
+	);
 	return $self;
 }
 
@@ -307,7 +297,9 @@ sub GetRecord {
 	}
 
 	# Metadata handling
-	my $result = $engine->query( $params, $request );
+	my $response = $engine->query( $params, $request );
+
+	#todo: we still have to test if result has any result at all
 
 	#mk sure we don't lose requestURL in Starman
 	#$result->requestURL($request);
@@ -316,12 +308,9 @@ sub GetRecord {
 
 	#Debug "check results";
 	#checkRecordsMatch is now done inside query
-	if ( $result->isError ) {
-		return $self->err2XML( $result->isError );
-	}
 
 	# Return
-	return $self->_output( $result->toGetRecord );
+	return $self->_output($response);
 
 }
 
@@ -344,10 +333,11 @@ prompty return a xml string.
 =cut
 
 sub Identify {
-	my $self    = shift;
+	my $self = shift;
+
 	#under some servers e.g. Starman HTTP::OAI's auto-requestURL gets confused
 	my $requestURL = shift;
-	my $params  = _hashref(@_);
+	my $params     = _hashref(@_);
 
 	#Debug "Enter Identify ($request)";
 
@@ -496,7 +486,6 @@ sub ListIdentifiers {
 
 	my $engine        = $self->{engine};          #provider
 	my $globalFormats = $self->{globalFormats};
-	$engine->{chunkRequest}->{request} = $request;
 
 	# Error handling
 	if ( !$engine ) {
@@ -512,11 +501,20 @@ sub ListIdentifiers {
 		push @errors, $e;
 	}
 
-	my $coe = $self->chunkOrError($params);
-	if ($coe) {
-		return $coe;    #chunk or error
-	}
+	if ( $params->{resumptionToken} ) {
 
+		#chunk is response object here!
+		my $chunk = $self->chunkExists( $params, $request );
+
+		if ($chunk) {
+
+			#Debug "Get here";
+			return $self->_output($chunk);
+		} else {
+			return $self->err2XML(
+				new HTTP::OAI::Error( code => 'badResumptionToken' ) );
+		}
+	}
 	if ( my $e =
 		$globalFormats->check_format_supported( $params->{metadataPrefix} ) )
 	{
@@ -538,18 +536,20 @@ sub ListIdentifiers {
 		return $self->err2xml(@errors);
 	}
 
-	#Metadata handling
-	#required: metadataPrefix; optional: from, until, set
-	#result is always only the first chunk
-	my $result = $engine->query( $params, $request );
+	#Metadata handling: query returns response
+	#always only the first chunk
+	my $response = $engine->query( $params, $request );
 
-	# Check result
-	if ( $result->isError ) {
-		return $self->err2XML( $result->isError );
+	if ( !$response ) {
+		return $self->err2XML(
+			new HTTP::OAI::Error( code => 'noRecordsMatch' ) );
 	}
 
+	#Debug "RESPONSE:".$response;
+	#todo: check if at least one record. On which level?
+
 	# Return
-	return $self->_output( $result->toListIdentifiers );
+	return $self->_output($response);
 }
 
 #this doesn't really make sense, does it?
@@ -558,34 +558,6 @@ sub _badResumptionToken {
 	my $self = shift;
 	return $self->err2XML(
 		new HTTP::OAI::Error( code => 'badResumptionToken' ) );
-}
-
-=head2 $provider->returnChunk ($token);
-
-Returns a chunk (as xml fit to print) or an error message that chunk does not
-exist (as xml fit to print). Expects a resumptionToken as string.
-
-=cut
-
-sub returnChunk {
-	my $self  = shift;
-	my $token = shift;
-
-	if ( !$token ) {
-		return;    #how to react if token missing?
-	}
-
-	#ensure that it does return nothing on error! And not 0
-	my $chunk_desc = $self->{chunkCache}->get($token);
-
-	if ( !$chunk_desc ) {
-		return $self->err2XML(
-			new HTTP::OAI::Error( code => 'badResumptionToken' ) );
-	}
-
-	#chunk is a HTTP::OAI::Response object
-	my $chunk = $engine->queryChunk($chunk_desc);
-	return $self->_output($chunk);
 }
 
 =head2 ListRecords
@@ -632,15 +604,19 @@ sub ListRecords {
 
 	my $engine        = $self->{engine};
 	my $globalFormats = $self->{globalFormats};
-	$engine->{chunkRequest}->{request} = $request;
 
 	#
 	# Error handling
 	#
 
-	my $coe = $self->chunkOrError($params);
-	if ($coe) {
-		return $coe;    #chunk or error
+	if ( $params->{resumptionToken} ) {
+		my $chunk = $self->chunkExists( $params, $request );
+		if ($chunk) {
+			return $self->_output($chunk);
+		} else {
+			return $self->err2XML(
+				new HTTP::OAI::Error( code => 'badResumptionToken' ) );
+		}
 	}
 
 	#check is metadataFormat is supported
@@ -659,16 +635,22 @@ sub ListRecords {
 	# Metadata handling
 	#
 
-	my $result = $engine->query( $params, $request );
+	my $response = $engine->query( $params, $request );
+
+	if ( !$response ) {
+		return $self->err2XML(
+			new HTTP::OAI::Error( code => 'noRecordsMatch' ) );
+	}
+
 
 	#checkRecordsMatch is now done inside query
 	# Check result
-	if ( $result->isError ) {
-		return $self->err2XML( $result->isError );
-	}
+	#if ( $result->isError ) {
+	#	return $self->err2XML( $result->isError );
+	#}
 
 	# Return
-	return $self->_output( $result->toListRecords );
+	return $self->_output($response);
 }
 
 =head2 ListSets
@@ -741,14 +723,9 @@ sub ListSets {
 	#	Debug "used_sets: $_\n";
 	#}
 
-	#
 	# Complete naked setSpecs with info from setLibrary
-	#
-
-	#the brackets () are important
-	#listSets from Dancer config
-	no strict "refs";
-	my $listSets = $self->{setLibrary}();
+	no strict "refs";    #listSets from Dancer config
+	my $listSets = $self->{setLibraryCB}();    #the brackets () are important
 	use strict "refs";
 
 	my $library = new HTTP::OAI::DataProvider::SetLibrary();
@@ -811,7 +788,6 @@ sub err2XML {
 
 		$self->overwriteRequestURL($response);
 		$self->_init_xslt($response);
-
 		return $response->toDOM->toString;
 	}
 }
@@ -825,6 +801,34 @@ sub err2XML {
 HTTP::OAI::DataProvider is to be used by frontend developers. What is not meant
 for them, is private.
 
+=cut
+
+#=head2 $provider->_countResponse($response);
+#
+#We should be able to count HTTP::OAI::ListIdentifiers and HTTP::OAI::ListRecords
+#objects.
+#
+#=cut
+#
+#sub _countResponse {
+#	my $provider=shift;
+#	my $response=shift;
+#	my $count=0;
+#
+#	my $type=ref $response;
+#	my $new=new $type;
+#
+#	while(my $item = $r->next) {
+#		$count++;
+#		if ($type eq 'HTTP::OAI::ListIdentifers') {
+#			$new->identifier ($item)
+#		}
+#		$new->identifier ($item)
+#	}
+#
+#	return $count;
+#}
+
 =head2 my $params=_hashref (@_);
 
 Little thingy that transforms array of parameters to hashref and returns it.
@@ -836,42 +840,57 @@ sub _hashref {
 	return \%params;
 }
 
-=head2 my $stuff=$self->chunkOrError ($params);
+=head2 my $chunk=$self->chunkExists ($params, [$request]);
 
 Tests whether
-	a) chunking is activated in provider,
-	b) whether a resumptionToken is in params and
-	c) there is a chunk with that token in the cache.
+	a) whether a resumptionToken is in params and
+	b) there is a chunk with that token in the cache.
 
-It returns either a chunk or appropriate error message as xml fit to print.
+It returns either a chunk or nothing.
 
 Usage:
-	$stuff=$self->chunkOrError
-	if ($stuff) {
-		return $stuff;
+	my $chunk=$self->chunkExists
+	if (!$chunk) {
+		return new HTTP::OAI::Error (code=>'badResumptionToken');
 	}
 
 =cut
 
-sub chunkOrError {
-	my $self   = shift;
-	my $params = shift;
+sub chunkExists {
+	my $self    = shift;
+	my $params  = shift;
+	my $request = shift;
+	my $token   = $params->{resumptionToken};
 
-	if ( $params->{resumptionToken} ) {
-
-		#check if provider is born with chunking ability
-		if ( $self->checkChunking() ) {
-
-			#a) wrong token -> error message
-			#b) right token -> return token
-			return $self->returnChunk($params);
-		} else {
-
-			#chunking not activated -> return error
-			#No need to push this error since argument is exclusive
-			return $self->err2XML( $self->_badResumptionToken );
-		}
+	#do NOT check if provider is born with chunking ability!
+	#check is request has token
+	if ( !$token ) {
+		return ();    #how to react if token missing?
 	}
+
+	#a) wrong token -> error message
+	#b) right token -> return token
+
+	my $chunkCache = $self->{chunkCache};
+
+	if ( !$chunkCache ) {
+		die "No chunkCache!";
+	}
+
+	#Debug "Query chunkCache for " . $token;
+
+	#ensure that it does return nothing on error! And not 0
+	my $chunk_desc = $self->{chunkCache}->get($token);
+
+	if ( !$chunk_desc ) {
+		Debug "no chunk returned!";
+		return ();
+	}
+
+	#chunk is a HTTP::OAI::Response object
+	my $response =
+	  $self->{engine}->queryChunk( $chunk_desc, $params, $request );
+	return $response;
 }
 
 =head2 return $self->_output($response);
@@ -884,6 +903,11 @@ $self->{xslt} if set.
 sub _output {
 	my $self     = shift;
 	my $response = shift;    #a HTTP::OAI::Response object
+
+	if ( !$response ) {
+		die "No response!";
+	}
+
 	$self->_init_xslt($response);
 
 	#overwrites real requestURL with config value
@@ -911,6 +935,10 @@ sub overwriteRequestURL {
 	my $self     = shift;    #$provider
 	my $response = shift;    #e.g. HTTP::OAI::ListRecord
 
+	if ( !$response ) {
+		carp "Cannot overwrite without a response!";
+	}
+
 	if ( $self->{requestURL} ) {
 
 		#replace part before question mark
@@ -927,9 +955,10 @@ sub overwriteRequestURL {
 				}
 
 				$response->requestURL($new);
-				Debug "overwriteRequestURL: "
-				  . $response->requestURL . '->'
-				  . $new;
+
+				#Debug "overwriteRequestURL: "
+				#  . $response->requestURL . '->'
+				#  . $new;
 			} else {
 
 				#requestURL has no ? in case of an badVerb
@@ -957,9 +986,11 @@ sub _init_xslt {
 		return ();
 	}
 
-	#todo: could loose the args
+	#Debug "Enter _init_xslt obj:$obj"; #beautify
 	if ( $self->{xslt} ) {
 		$obj->xslt( $self->{xslt} );
+	} else {
+		Warning "No beautify-xslt loaded!";
 	}
 }
 

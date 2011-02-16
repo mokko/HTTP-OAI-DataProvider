@@ -6,6 +6,7 @@ use Encode qw/decode/;    #encoding problem when dealing with data from sqlite
 use parent qw(HTTP::OAI::DataProvider::Engine);
 
 use Dancer ':syntax';     #only for debug in development, warnings?
+
 #use XML::SAX::Writer; #still necessary?
 
 =head1 HTTP::OAI::DataProvider::Result
@@ -28,7 +29,7 @@ The objective is to make DataProvider::SQLite leaner.
 	$result->saveRecord ($params, $header,$md);
 
 	# makes a record from parts, also transforms md
-	$result->addRecord ($record); #prefer saveRecord if possible
+	$result->_addRecord ($record); #prefer saveRecord if possible
 
 	#simple count
 	print $result->countRecords. ' results';
@@ -71,21 +72,17 @@ see Usage /TODO
 
 sub new {
 	my $class  = shift;
-	my $engine = shift;    #only cp what you need from here
-	my $result = {};
+	my %args   = @_;
+	my $result = \%args;
 	bless $result, $class;
-	$result->import( $engine, 'requestURL', 'transformer' );
 
-	# transformer
-	if ( !$engine->{transformer} ) {
-		warning "no transformer. Will not be able to use xslt";
-	}
+	$result->requiredFeatures( 'transformer', 'verb' );
 
 	#init values
-	#$result->{records}   = [];    #use $result->countRecords
-	#$result->{headCount} = 0;     #use $result->countHeaders
-	#$result->{headers} = new HTTP::OAI::ListIdentifiers;
-	#$result->{errors}  = [];
+	$result->{records}   = [];    #use $result->countRecords
+	$result->{headCount} = 0;     #use $result->countHeaders
+	$result->{headers} = new HTTP::OAI::ListIdentifiers;
+	$result->{errors}  = [];
 
 	return $result;
 }
@@ -104,6 +101,7 @@ is convenient.
 
 =cut
 
+#don't think this is necessary anymore, should be done by DataProvider::_output
 sub requestURL {
 	my $result  = shift;
 	my $request = shift;
@@ -146,19 +144,21 @@ sub addError {
 	}
 }
 
-=head2 $result->addHeader ($header);
+=head2 $result->_addHeader ($header);
 
 Adds a header to the result object.
 
 =cut
 
-sub addHeader {
+sub _addHeader {
 	my $result = shift;
 	my $header = shift;
-	$result->{posInChunk}++;    #position in chunk
-	$result->{headCount}++;     #cursor
+
+	#debug "Enter _addHeader";
+
+	$result->{headCount}++;
 	if ( !$header ) {
-		croak "Internal Error: Cannot add header, because missing!";
+		croak "Internal Error: Cannot add header, because \$header missing!";
 	}
 
 	if ( ref $header ne 'HTTP::OAI::Header' ) {
@@ -168,19 +168,15 @@ sub addHeader {
 	#debug "now " . $result->countHeaders . " headers";
 
 	$result->{headers}->identifier($header);
-
-	#every time we add a Header, test if chunk is complete & act accordingly
-	$result->chunk;
-
 }
 
-=head2 $result->addRecord ($record);
+=head2 $result->_addRecord ($record);
 
 Adds a record to the result object. Gets called by saveRecord.
 
 =cut
 
-sub addRecord {
+sub _addRecord {
 	my $result = shift;
 	my $record = shift;
 	$result->{recCount}++;      #number of records (cursor)
@@ -197,12 +193,6 @@ sub addRecord {
 	#debug "now" . $result->countRecords . "records";
 
 	push @{ $result->{records} }, $record;
-
-	#debug ref $record;
-	#debug $record->metadata;
-
-	#every time we add a RECORD, test if chunk is complete & act accordingly
-	$result->chunk();
 }
 
 =head2 my $number=$result->countHeaders;
@@ -237,22 +227,18 @@ sub responseCount {
 
 =head2 my $chunkSize=$result->chunkSize;
 
-Return chunk_size if defined or empty. Chunk_size is a config value that
+Return chunk_size if defined or empty. Chunk size is a config value that
 determines how big (number of records per chunk) the chunks are.
 
 =cut
 
 sub chunkSize {
-	my $result    = shift;
-	my $chunkSize = 100;     #another default, not clean
-	if ( $result->{engine}->{chunking} ) {
-		$chunkSize = $result->{engine}->{chunking};
+	my $result = shift;
+	if ( $result->{chunkSize} ) {
+		return $result->{chunkSize};
 	}
-
-	#debug "chunk_size: $chunkSize";
-	return $chunkSize;
+	return ();    #fail
 }
-
 
 =head2 $result->getType();
 
@@ -276,25 +262,6 @@ sub getType {
 	}
 }
 
-=head2 my $cursor=$result->getCursor;
-
-Return the cursor (needed for resumptionToken). Cursor is the current number of
-the first header or record in the chunk and it is absolute meaning that the 2nd
-chunk should start on cursor=501 if chunk_size=500. Right?
-
-=cut
-
-sub getCursor {
-	my $result       = shift;
-	my $chunkRequest = $result->chunkRequest;
-
-	if ( !$chunkRequest->{cursor} ) {
-		warning "Cursor not YET initialized!";
-	}
-
-	return $chunkRequest->{cursor};
-}
-
 =head2 	my $response=$result->getResponse;
 
 Return the content of $result as a HTTP::OAI::Response object. Either
@@ -304,25 +271,20 @@ Internally ->getResponse calls toListIdentifiers ro toListRecords, so it
 also applies requestURL those. Also applies resumptionToken (rt), if rt is
 saved in EOFChunk.
 
+TODO: Should also recognize getRecord!
+
+
 =cut
 
 sub getResponse {
 	my $result = shift;
-	my $response;
 
-	#debug "Enter getResponse";
+	#debug "Enter getResponse ".$result->{verb};
 
-	#which type?
-	my $cursor       = $result->countHeaders;
-	my $chunkRequest = $result->chunkRequest;
+	$result->{verb} eq 'ListIdentifiers'
+	  ? return $result->toListIdentifiers
+	  : return $result->toListRecords;
 
-	#will the type always be available already?
-	if ( $chunkRequest->{type} eq 'records' ) {
-		$response = $result->toListRecords;
-	} else {
-		$response = $result->toListIdentifiers;
-	}
-	return $response;
 }
 
 =head2 my $number_of_records=$result->countRecords;
@@ -350,42 +312,43 @@ sub returnRecords {
 	return @{ $result->{records} };
 }
 
-=head2 $result->saveRecord (params=>$params, header=>$header, md=>$md);
+=head2 $result->save (params=>$params, header=>$header, [md=>$md]);
 
-Hand over the parts for the result, construct a record form that and save
-it inside $result. Gets called in engine's queryRecord.
+Expects parts for the result, constructs a result and saves it into the result
+object.
+
+This is an abstracted version of saveRecord that automatically does the right
+thing whether being passed header or record information. It makes addHeader
+and addRecord private methods and saveRecord obsolete.
+
+Gets called in engine's queryChunk.
+
+How do I decide whether something is header or record? At first I thought I
+just check whether metadata info is there or not, but this would fail with
+deleted records, so now I check for the verb. That means I have to pass the
+verb to result->{verb} when result is born.
 
 =cut
 
-sub saveRecord {
+sub save {
 	my $result = shift;
-	my %args   = @_;      #contains $params, $header,$md
+	my %args   = @_;      #contains params, header, optional: $md
 
-	#Debug "Enter _saveRecords";
+	#debug "Enter save";
 
-	if ( !$result ) {
-		croak "Result is missing";
-	}
-
-	if ( ref $result ne 'HTTP::OAI::DataProvider::Result' ) {
-		croak "$result is wrong type" . ref $result;
-	}
-
-	if ( !$args{params} ) {
-		croak "Params are missing";
-	}
-
-	if ( !$args{header} ) {
-		croak "Header missing";
-	}
-
-	#use Data::Dumper qw/Dumper/;
-	#debug 'jjjjjjjjjjjjjjjjjj'.Dumper %args;
+	$result->requiredType('HTTP::OAI::DataProvider::Engine::Result');
+	$result->requiredFeatures( \%args, 'header' );
+	$result->requiredFeatures('params');
 
 	#md is optional, a deleted record wd have none
-	if ( $args{md} ) {
+	if ( $result->{verb} eq 'ListIdentifiers' ) {
+		$result->_addHeader( $args{header} );
+		return 0;         #success;
+	}
 
-		#debug "Metadata available";
+	#assume it is either GetRecord or ListRecords
+
+	if ( $args{md} ) {
 
 		#currently md is a string, possibly in a wrong encoding
 		$args{md} = decode( "utf8", $args{md} );
@@ -394,16 +357,27 @@ sub saveRecord {
 		my $dom = XML::LibXML->load_xml( string => $args{md} );
 
 		#Debug "----- dom's actual encoding: ".$dom->actualEncoding;
-
 		#load $dom from source file works perfectly
 		#my $dom = XML::LibXML->load_xml( location =>
 		#'/home/Mengel/projects/Salsa_OAI2/data/fs/objId-1305695.mpx' )
 		# or return "Salsa Error: Loading xml file failed for strange reason";
 		#now md should become appropriate metadata
-		if ( $result->{engine}->{transformer} ) {
-			$dom =
-			  $result->{engine}->{transformer}
-			  ->toTargetPrefix( $args{params}->{metadataPrefix}, $dom );
+
+		my $prefix;
+		$result->{params}->{metadataPrefix}
+		  ? $prefix = $result->{params}->{metadataPrefix}
+		  : $prefix = $result->{targetPrefix};
+
+		if ( !$prefix ) {
+			die "still no prefix?";
+		}
+		#debug "prefix:$prefix-----------------------";
+
+		my $transformer = $result->{transformer};
+		if ($transformer) {
+			$dom = $transformer->toTargetPrefix( $prefix, $dom );
+
+			#debug "transformed dom" . $dom;
 		} else {
 			warning "Transformer not available";
 		}
@@ -411,14 +385,14 @@ sub saveRecord {
 		#debug $dom->toString;
 		$args{metadata} = new HTTP::OAI::Metadata( dom => $dom );
 	} else {
-		warning "Metadata missing, but that might well be";
+		warning "metadata not available, but that might well be the case";
 	}
 
 	my $record = new HTTP::OAI::Record(%args);
-
-	#debug 'sdsdsdsds' . $record->metadata;
-	$result->addRecord($record);
+	$result->_addRecord($record);
+	return 0;    #success
 }
+
 
 =head2 my $getRecord=$result->toGetRecord;
 
@@ -468,11 +442,31 @@ sub toListRecords {
 		$listRecords->requestURL( $result->requestURL );
 	}
 
-	if ( $result->EOFChunk ) {
-		$listRecords->resumptionToken( $result->EOFChunk );
-	}
+	$listRecords->resumptionToken( $result->_resumptionToken );
 
 	return $listRecords;
+}
+
+=head2 $result->_resumptionToken;
+
+Returns the resumptionToken for the result.
+This is called in toListIdentifiers and toListRecords. It takes info saved in
+$result.
+
+=cut
+
+sub _resumptionToken {
+	my $result = shift;
+	#debug 'Enter _resumptionToken'.ref $result;
+
+	my $rt=new HTTP::OAI::ResumptionToken(
+		completeListSize => $result->{total},
+
+		#todo:cursor currently WRONG!
+		cursor          => $result->{chunkNo} * $result->{chunkSize} + 1,
+		resumptionToken => $result->{'next'},
+	);
+	return $rt
 }
 
 =head2 my $listIdentifiers=$result->toListIdentifiers;
@@ -485,26 +479,25 @@ it'll be applied to the ListRecord object.
 
 sub toListIdentifiers {
 	my $result          = shift;
-	my $listIdentifiers = new HTTP::OAI::ListIdentifiers;
+
+	#debug "Enter toListIdentifiers";
 
 	#not sure if we tested this before
 	if ( $result->countHeaders == 0 ) {
-
-		#can break dancer in post position
 		croak "toListIdentifiers: count doesn't fit";
 	}
 
+	my $listIdentifiers=$result->{headers};
+
 	if ( $result->{requestURL} ) {
-		$result->{headers}->requestURL( $result->requestURL );
+
+		#debug "requestURL:".$result->{requestURL};
+		$listIdentifiers->requestURL( $result->requestURL );
 	}
 
-	if ( $result->EOFChunk ) {
-
-		#debug "add resumptionToken". ref $result->EOFChunk;
-		$result->{headers}->resumptionToken( $result->EOFChunk );
-	}
-
-	return $listIdentifiers->identifier( $result->{headers} );
+	#todo
+	$listIdentifiers->resumptionToken( $result->_resumptionToken );
+	return $listIdentifiers;
 }
 
 =head2 my @err=$result->isError
@@ -524,16 +517,16 @@ sub isError {
 
 	#debug "HTTP::OAI::DataProvider::Result::isError";
 
-	if ( ref $result ne 'HTTP::OAI::DataProvider::Result' ) {
-		die "Wrong class in DataProvider::Result isError";
+	if ( ref $result ne 'HTTP::OAI::DataProvider::Engine::Result' ) {
+		die "isError: Wrong class ";
 	}
 
 	if ( $result->{errors} ) {
-
-		#Debug 'isError:' . Dumper $self->{errors};
 		return @{ $result->{errors} };
+	} else {
+		return ();    #fail
 	}
 }
 
-1;    #HTTP::OAI::DataProvider::Engine::Result
+1;                    #HTTP::OAI::DataProvider::Engine::Result
 

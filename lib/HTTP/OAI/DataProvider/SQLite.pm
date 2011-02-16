@@ -7,7 +7,8 @@ use YAML::Syck qw/Dump LoadFile/;
 #use XML::LibXML;
 use HTTP::OAI;
 use HTTP::OAI::Repository qw/validate_date/;
-use HTTP::OAI::DataProvider::Result;
+use HTTP::OAI::DataProvider::Engine::Result;
+
 use XML::LibXML;
 use XML::LibXML::XPathContext;
 use XML::SAX::Writer;
@@ -106,6 +107,7 @@ HTTP::OAI::DataProvider::ChunkCache:
 			maxChunkNo=>$maxChunkNo,
 			next=>$token,
 			sql=>$sql,
+			targetPrefix=>$prefix,
 			token=>$token,
 			total=>$total
 	};
@@ -114,10 +116,35 @@ HTTP::OAI::DataProvider::ChunkCache:
 
 sub queryChunk {
 	my $self   = shift;
-	my $chunk  = shift;
+	my $chunk  = shift; #actually a chunk description
 	my $params = shift;
+	my $request =shift; #optional?
 
-	my $result = new HTTP::DataProvider::Engine::Result($self);
+	$self->argumentExists($chunk);
+	$self->argumentExists($params);
+
+	#Debug "Enter queryChunk";
+	#use Data::Dumper qw/Dumper/;
+	#Debug Dumper $params;
+
+	my $result = new HTTP::OAI::DataProvider::Engine::Result(
+		requestURL  => $self->{requestURL},
+		transformer => $self->{transformer},
+		verb	    => $params->{verb},
+		params		=> $params,
+		#for resumptionToken
+		chunkSize	=> $self->{chunkSize},
+		chunkNo		=> $chunk->{chunkNo},
+		'next'		=> $chunk->{'next'},
+		targetPrefix=> $chunk->{targetPrefix},
+		token		=> $chunk->{token},
+		total		=> $chunk->{total},
+	);
+
+	if ($request) {
+		$result->{requestURL}=$request; #overwrites value from above!
+		#Debug ":requestURL:".$result->{requestURL};
+	}
 
 	my $dbh = $self->{connection}->dbh()     or die $DBI::errstr;
 	my $sth = $dbh->prepare( $chunk->{sql} ) or croak $dbh->errstr();
@@ -140,8 +167,7 @@ sub queryChunk {
 				#first time on the row which has the 2nd distinct id
 				#i.e. previous header should be ready for storing it away
 
-				$result->saveRecord(
-					params => $params,
+				$result->save(
 					header => $header,
 					md     => $md,
 				);
@@ -172,38 +198,37 @@ sub queryChunk {
 
 	#save the last record
 	#for every last distinct identifier, so call it here since no iteration
-	$result->saveRecord(
-		params => $params,
+	$result->save(
 		header => $header,
 		md     => $md,
 	);
 
-	my $chunk = $result->toListIdentifiers;
-	return $chunk;
+	# Check result
+	if ( $result->isError ) {
+		return $self->err2XML( $result->isError );
+	}
+
+	#todo
+	my $response=$result->getResponse;
+	return $response;
 }
 
 =head2 my $cache=HTTP::OAI::DataRepository::SQLite::new (@args);
 
-Not sure at the moment about the arguments:
-   dbfile=>$dbfile #for sqlite
-   chunkSize=>$chunkSize #no of results per chunk
+Am currently not sure about the arguments. Currently i accept everything,
+so invocation has to be selective.
 
 =cut
 
 sub new {
 	my $class = shift;
-	my $self  = {};
+	my %args  = @_;
+	my $self  = \%args;
 	bless $self, $class;
 
-	my $self->import( shift, 'chunkSize', 'dbfile', )
-	  or die 'Error importing to engine';
-
-	if ( !$self->{dbfile} ) {
-		carp "Error: need dbfile";
-	}
+	$self->checkRequired( 'dbfile', 'chunkSize' );
 
 	#Debug "Enter HTTP::OAI::DataProvider::Engine::_new";
-
 	#i could check if directory in $dbfile exists; if not provide
 	#intelligble warning that path is strange
 
@@ -233,7 +258,8 @@ sub earliestDate {
 	my $aref = $sth->fetch;
 
 	if ( !$aref->[0] ) {
-		croak "No date";
+		return '1970-01-01T01:01:01Z';
+		#croak "No date";
 	}
 
 	#$aref->[0] =~ /(^\d{4}-\d{2}-\d{2})/;
@@ -397,23 +423,24 @@ if ($result->isError) {
 sub query {
 	my $self    = shift;
 	my $params  = shift;
-	my $request = shift;
+	my $request = shift; #optional?
+
+	$self->argumentExists($params);
+	#$self->argumentExists($request);
+
 
 	#get here if called without resumptionToken
 	my $first = $self->planChunking($params);
 
 	if ( !$first ) {    #todo: not sure when this can be the case
-		die "I should not get here";
+		return (); #fail if no results
 	}
 
-	my $result = $self->queryChunk( $first, $params );
-
-	if ($request) {
-		$result->{requestURL} = $request;
-	}
-
+	my $response = $self->queryChunk( $first, $params, $request);
 	#todo: we still have to test if result has any result at all
-	return $result;
+	#Debug "mbira--------response:".ref $response;
+
+	return $response;
 }
 
 =head2 my $i=$self->parseHeaders ($result, $sth);
@@ -437,10 +464,14 @@ ListRecords).
 =cut
 
 sub querySQL {
-	my $params = shift;
-	my $limit  = shift;
-	my $offset = shift;
+	my $self=shift;
+	my %args = @_;
 
+	my $params = $args{params};
+	my $limit  = $args{limit};
+	my $offset = $args{offset};
+
+	#Debug "OFFSET: $offset LIMIT: $limit";
 	#md becomes modifier with values md and count?
 	# SELECT COUNT records.identifier FROM records WHERE
 	# records.identifier = ? AND
@@ -453,7 +484,9 @@ sub querySQL {
 
 	my $sql = q/SELECT records.identifier, datestamp, status, setSpec /;
 
-	if ( $params->verb eq 'GetRecord' or $params->verb eq 'ListRecords' ) {
+	if (   $params->{verb} eq 'GetRecord'
+		or $params->{verb} eq 'ListRecords' )
+	{
 		$sql .= q/, native_md /;
 	}
 
@@ -478,7 +511,7 @@ sub querySQL {
 		$sql .= qq/setSpec = '$params->{set}' AND /;
 	}
 
-	$sql .= q/LIMIT $limit OFFSET $offset/;
+	$sql .= qq/ 1=1 LIMIT $limit OFFSET $offset/;
 
 	#About order: I could add "ORDER BY records.identifier ASC" which gives us
 	#strict alphabetical order. Not want is expected. That wdn' t really be a
@@ -492,8 +525,6 @@ sub querySQL {
 	return $sql
 
 }
-
-
 
 #
 #
@@ -555,31 +586,54 @@ sub planChunking {
 
 	Debug "planChunking: total:$total, maxChunkNo:$maxChunkNo";
 
+	if ($total == 0) {
+		return ();
+	}
+
 	my $first;
 	my $chunkNo      = 1;
 	my $currentToken = $self->mkToken();
 	my $chunkSize    = $self->{chunkSize};
+	my $chunkCache =$self->{chunkCache};
 
 	while ( $chunkNo <= $maxChunkNo ) {
-		my $offset = ( ( $chunkNo - 1 ) * $chunkSize );    #or with +1?
-		my $sql = $self->querySQL( $params, $chunkSize, $offset );
+		my $offset = ( $chunkNo - 1 ) * $chunkSize;    #or with +1?
+		#Debug "OFFSET: $offset CHUNKSIZE: $chunkSize";
+		my $sql = $self->querySQL(
+			limit  => $chunkSize,
+			offset => $offset,
+			params => $params,
+		);
 		my $nextToken = $self->mkToken();
 
 		my $chunk = {
-			chunkNo    => $chunkNo,
+			chunkNo    => $chunkNo++,
 			maxChunkNo => $maxChunkNo,
 			'next'     => $nextToken,
 			sql        => $sql,
+			targetPrefix=> $params->{metadataPrefix},
 			token      => $currentToken,
 			total      => $total
 		};
 
-		Debug "planChunking: chunkNo:$chunkNo, token:$currentToken"
-		  . ", next:$nextToken, offset: $offset, limit ";
+		#Debug "planChunking: chunkNo:$chunkNo, token:$currentToken"
+		#  . ", next:$nextToken, offset: $offset, limit ";
 
 		$currentToken = $nextToken;
-		$first ? $self->{chunkCache}->add($chunk) : $first = $chunk;
+		$first ? $chunkCache->add($chunk) : $first = $chunk;
 	}
+
+	#sanity check: can I find the 2nd chunk in chunkCache
+	my $secondToken=$first->{next};
+	#Debug "secondToken:".$secondToken;
+	my $secondChunk=$chunkCache->get($secondToken);
+	if ($secondChunk) {
+		Debug "2nd CHUNK FOUND".$secondChunk->{token};
+	} else {
+		die "2nd chunk not found in cache";
+	}
+
+	#Debug "planChunking RESULT".$self->{chunkCache}->count;
 	return $first;
 }
 
@@ -602,7 +656,7 @@ sub _countTotals {
 	my $aref = $sth->fetch;
 
 	if ( !$aref->[0] ) {
-		croak "No count";
+		return 0;
 	}
 
 	#todo: ensure that it is integer!
@@ -662,7 +716,6 @@ sub _loadXML {
 	return $doc;
 }
 
-
 #hide that ugly code
 sub _mk_numbers {
 	my $self   = shift;
@@ -678,7 +731,14 @@ sub _mk_numbers {
 sub _queryCount {
 	my $self   = shift;
 	my $params = shift;
-	my $sql    = q/SELECT COUNT (DISTINCT records.identifier) FROM /;
+
+	#so far we were thinking in chunks numbered in real and unique records
+	#but now we apply LIMIT and OFFSET to cartesian product, so we should count
+	#the cartesian product! That can result in chunks which number
+	#significantly less records than the chunkSize if many sets are applied to
+	#one record. I don't think this is a real problem, but we should not forget
+	#that. Anyway, we remove DISTINCT from this query.
+	my $sql    = q/SELECT COUNT (records.identifier) FROM /;
 	$sql .= q/records JOIN sets ON records.identifier = sets.identifier WHERE
 	/;
 
@@ -690,7 +750,7 @@ sub _queryCount {
 		$sql .= qq/ datestamp > '$params->{from}' AND /;
 	}
 
-	if ( $params->{until} ) {
+	if ( $params->{'until'} ) {
 		$sql .= qq/ datestamp < '$params-> {until}' AND /;
 	}
 
@@ -701,7 +761,6 @@ sub _queryCount {
 	$sql .= q/1=1/;
 	return $sql;
 }
-
 
 sub _registerNS {
 	my $self = shift;
@@ -822,6 +881,15 @@ sub _storeRecord {
 			  q/INSERT INTO sets (setSpec, identifier) VALUES (?, ?)/;
 			$sth = $dbh->prepare($addSet) or croak $dbh->errstr();
 			$sth->execute( $set, $identifier ) or croak $dbh->errstr();
+		}
+	}
+}
+
+sub checkRequired {
+	my $self = shift;
+	foreach (@_) {
+		if ( !$self->{$_} ) {
+			carp "Error: need $_";
 		}
 	}
 }

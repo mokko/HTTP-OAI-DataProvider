@@ -71,7 +71,13 @@ sub toTargetPrefix {
 	my $targetPrefix = shift;
 	my $dom          = shift;
 
-	#we imply that prefix is always able to be a hash
+	if ( !$targetPrefix ) {
+		die "no targetPrefix";
+	}
+
+	if ( !$dom ) {
+		die "no dom";
+	}
 
 	#Debug "Enter toTargetPrefix ($targetPrefix)";
 	#Debug "self: " . ref $self;
@@ -80,25 +86,23 @@ sub toTargetPrefix {
 	#Debug "dom:" . ref $dom;
 
 	if ( $targetPrefix eq $self->{nativePrefix} ) {
+
 		#Debug "toTargetPrefix: native and target are eq";
 		return $dom;
 	}
 
 	#Debug "We need a transformation";
-	$self->_cache_stylesheet($targetPrefix);
-	my $stylesheet = $stylesheet_cache{$targetPrefix};
-
-	#my $results;
-	if ($stylesheet) {
-		$dom = $stylesheet->transform($dom) or carp "Problems";
-	}
-
-	return $dom;
+	my $stylesheet = $self->_cache_stylesheet($targetPrefix);
+	return $stylesheet->transform($dom) or carp "Problems with transformation";
 }
 
 sub _cache_stylesheet {
 	my $self         = shift;
 	my $targetPrefix = shift;
+
+	if ( !$self->{locateXSL} ) {
+		die "locateXSL missing";
+	}
 
 	my $style_doc;
 	my $xslt = XML::LibXSLT->new();
@@ -128,6 +132,12 @@ sub _cache_stylesheet {
 		$stylesheet_cache{$targetPrefix} = $stylesheet;
 
 	}
+
+	if ( !$stylesheet_cache{$targetPrefix} ) {
+		die "Stylesheet missing";
+	}
+	return $stylesheet_cache{$targetPrefix};
+
 }
 
 1;

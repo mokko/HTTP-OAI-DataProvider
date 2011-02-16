@@ -2,7 +2,10 @@ package HTTP::OAI::DataProvider::ChunkCache;
 
 use strict;
 use warnings;
+use Carp qw/carp croak/;
+
 our $chunkCache = {};
+
 
 #we assume that ordering the tokens alphabetically will show them in the order
 #we are supposed to delete them
@@ -50,7 +53,7 @@ sub new {
 	if ( $args{maxSize} ) {
 		$self->{maxSize} = $args{maxSize};
 	} else {
-		$self->{maxSize} = 0; # a weird default value
+		croak "Need maxSize for cache";
 	}
 
 	bless $self, $class;
@@ -70,17 +73,24 @@ sub add {
 	my $chunk = shift;
 
 	#ensure that necessary info is there
-	foreach (qw /chunkNo maxChunkNo next sql total token/) {
+	foreach (qw /chunkNo maxChunkNo next sql targetPrefix total token/) {
 		if ( !$chunk->{$_} ) {
-			$self->{error}= "$_ missing";
-			return 0;
+			croak "$_ missing";
+			$self->error++;
 		}
+	}
+
+	if ($chunk->{maxChunkNo} > $self->{maxSize}) {
+		croak "maxChunkNo greater than chunkCache maxSize";
+	}
+
+	if ($self->error) {
+		return 1;
 	}
 
 	#write into cache
 	$self->_cacheSize();
 	$chunkCache->{ $chunk->{token} } = $chunk;
-	return 1;
 }
 
 =head2 my $integer=$cache->count;
@@ -118,6 +128,7 @@ Structure of hashref:
 			maxChunkNo=>$maxChunkNo,
 			next=>$token,
 			sql=>$sql,
+			targetPrefix=>$prefix,
 			token=>$token,
 			total=>$total
 	};
@@ -132,12 +143,12 @@ sub get {
 
 	if ( !$token ) {
 		$self->{error} = "No token specified when \$cache->get() was called";
-		return;
+		return ();
 	}
 
 	if ( !$chunkCache->{$token} ) {
 		$self->{error} = "This token does not exist in cache";
-		return;
+		return();
 	}
 
 	return $chunkCache->{$token};

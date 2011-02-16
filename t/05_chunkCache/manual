@@ -1,0 +1,128 @@
+#!/bin/perl
+
+use strict;
+use warnings;
+use lib './lib';
+use HTTP::OAI::DataProvider::ChunkCache;    #better QueryCache
+use Time::HiRes qw(gettimeofday);           #to generate unique tokens
+
+my $cache = new HTTP::OAI::DataProvider::ChunkCache( maxSize => 10 );
+	if (!$cache) {
+		die "no cache";
+	}
+
+sub mk_token {
+	my ( $sec, $msec ) = gettimeofday;
+	return $msec;
+}
+
+
+my $token    = mk_token();
+my $chunkNo = 0;
+foreach my $count ( 1 .. 11 ) {
+	my $next = mk_token();
+	my $chunk = {
+		chunkNo=> ++$chunkNo,
+		token      => $token,
+		maxChunkNo => 10,
+		'next'     => $next,
+		sql        => 'SELECT X FROM Y',
+		token      => $token,
+		total      => '100'
+	};
+	if (!$chunk) {
+		die "no chunk";
+	}
+
+	$cache->add($chunk) or die "cannot add";
+	#my $nc=$cache->get('1212');
+	$token = $next;
+}
+
+print 'Count'.$cache->count."\n";
+
+exit;
+{
+
+	#just dies which is no good
+	my $chunk = {};
+	ok( $cache->add($chunk), 'fail on incomplete chunk' );
+
+	$chunk->{token} = '1234';
+	ok( $cache->add($chunk) ne 1, 'fail on incomplete chunk' );
+	$chunk->{chunkNo} = '1';
+	ok( $cache->add($chunk) ne 1, 'fail on incomplete chunk' );
+	$chunk->{maxChunkNo} = '10';
+	ok( $cache->add($chunk) ne 1, 'fail on incomplete chunk' );
+	$chunk->{next} = '1235';
+	ok( $cache->add($chunk) ne 1, 'fail on incomplete chunk' );
+	$chunk->{sql} = 'SELECT X FROM Y';
+	ok( $cache->add($chunk) ne 1, 'fail on incomplete chunk' );
+}
+
+{
+	my $chunk = {
+		token      => '1234',
+		maxChunkNo => 10,
+		'next'     => '1235',
+		sql        => 'SELECT X FROM Y',
+		total      => '100000'
+	};
+	ok( $cache->add($chunk) ne 1, 'fail on incomplete chunk' );
+}
+
+{
+	my $chunk = {
+		token      => '1234',
+		chunkNo    => 1,
+		maxChunkNo => 10,
+		'next'     => '1235',
+		sql        => 'SELECT X FROM Y',
+		total      => '100000'
+	};
+
+	$cache->add($chunk);
+	ok( $cache->add($chunk) eq 1, 'pass on complete chunk' );
+}
+
+{
+	my $chunk = $cache->get(1234);
+	ok( $chunk->{maxChunkNo} eq '10',              'test maxChunkNo' );
+	ok( $chunk->{'next'}     eq '1235',            'test next' );
+	ok( $chunk->{sql}        eq 'SELECT X FROM Y', 'test sql' );
+	ok( $chunk->{total}      eq '100000',          'test total' );
+}
+
+{
+	my $cur = $cache->count;
+	my $max = $cache->size;
+	print "cur:$cur // max:$max\n";
+
+}
+
+{
+	my $chunk = {
+		token      => '1235',
+		chunkNo    => 1,
+		maxChunkNo => 10,
+		'next'     => '1235',
+		sql        => 'SELECT X FROM Y',
+		total      => '100000'
+	};
+	$cache->add($chunk) or die "Cannot add chunk description";
+}
+
+#todo turn into a test
+{
+	my $max = $cache->size;
+	my $cur = $cache->count;
+	print "cur:$cur // max:$max\n";
+	foreach ( $cache->list ) {
+		print "list:$_\n";
+	}
+}
+
+#TODO
+#write a test that checks if old items are deleted if threshold is reached
+#TODO: Should I use error message @! instead of carp or what ?
+
