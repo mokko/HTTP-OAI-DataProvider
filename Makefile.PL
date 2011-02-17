@@ -13,6 +13,14 @@ WriteMakefile(
     PL_FILES            => {},
     PREREQ_PM => {
         'Test::More' => 0,
+        'HTTP::OAI' =>0,
+        'XML::LibXML'=>0,
+        'XML::LibXML'=>0,
+        'XML::SAX::Writer' =>0,
+        'DBI'=>0,
+        'DBIx::Connector'=>0,
+        'HTTP::OAI::Repository'=>0,
+		#todo: eliminate Dancer::CommandLine, YAML::Syck etc.		
     },
     test      => {TESTS => join( ' ', (glob( 't/*.t'), glob('t/*/*.t')))},
     dist                => { COMPRESS => 'gzip -9f', SUFFIX => 'gz', },

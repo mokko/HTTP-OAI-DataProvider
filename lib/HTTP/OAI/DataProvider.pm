@@ -780,7 +780,7 @@ sub err2XML {
 		my @errors;
 		foreach (@_) {
 			if ( ref $_ ne 'HTTP::OAI::Error' ) {
-				die "Internal Error: Error has wrong format!";
+				croak "Internal Error: Error has wrong format!";
 			}
 			$response->errors($_);
 			push @errors, $response;

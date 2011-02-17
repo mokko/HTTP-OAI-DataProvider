@@ -281,10 +281,16 @@ sub getResponse {
 
 	#debug "Enter getResponse ".$result->{verb};
 
-	$result->{verb} eq 'ListIdentifiers'
-	  ? return $result->toListIdentifiers
-	  : return $result->toListRecords;
-
+	if ($result->{verb} eq 'ListIdentifiers') {
+		return $result->toListIdentifiers;
+	}
+	if ($result->{verb} eq 'GetRecord') {
+		return $result->toGetRecord;
+	}
+	if ($result->{verb} eq 'ListRecords') {
+	return $result->toGetRecord;
+	}
+	warning "Strange Error!";
 }
 
 =head2 my $number_of_records=$result->countRecords;

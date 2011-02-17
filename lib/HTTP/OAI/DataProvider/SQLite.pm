@@ -115,10 +115,10 @@ HTTP::OAI::DataProvider::ChunkCache:
 =cut
 
 sub queryChunk {
-	my $self   = shift;
-	my $chunk  = shift; #actually a chunk description
-	my $params = shift;
-	my $request =shift; #optional?
+	my $self    = shift;
+	my $chunk   = shift;    #actually a chunk description
+	my $params  = shift;
+	my $request = shift;    #optional?
 
 	$self->argumentExists($chunk);
 	$self->argumentExists($params);
@@ -130,20 +130,21 @@ sub queryChunk {
 	my $result = new HTTP::OAI::DataProvider::Engine::Result(
 		requestURL  => $self->{requestURL},
 		transformer => $self->{transformer},
-		verb	    => $params->{verb},
-		params		=> $params,
+		verb        => $params->{verb},
+		params      => $params,
+
 		#for resumptionToken
-		chunkSize	=> $self->{chunkSize},
-		chunkNo		=> $chunk->{chunkNo},
-		'next'		=> $chunk->{'next'},
-		targetPrefix=> $chunk->{targetPrefix},
-		token		=> $chunk->{token},
-		total		=> $chunk->{total},
+		chunkSize    => $self->{chunkSize},
+		chunkNo      => $chunk->{chunkNo},
+		'next'       => $chunk->{'next'},
+		targetPrefix => $chunk->{targetPrefix},
+		token        => $chunk->{token},
+		total        => $chunk->{total},
 	);
 
 	if ($request) {
-		$result->{requestURL}=$request; #overwrites value from above!
-		#Debug ":requestURL:".$result->{requestURL};
+		$result->{requestURL} = $request;    #overwrites value from above!
+		     #Debug ":requestURL:".$result->{requestURL};
 	}
 
 	my $dbh = $self->{connection}->dbh()     or die $DBI::errstr;
@@ -209,7 +210,7 @@ sub queryChunk {
 	}
 
 	#todo
-	my $response=$result->getResponse;
+	my $response = $result->getResponse;
 	return $response;
 }
 
@@ -259,6 +260,7 @@ sub earliestDate {
 
 	if ( !$aref->[0] ) {
 		return '1970-01-01T01:01:01Z';
+
 		#croak "No date";
 	}
 
@@ -423,20 +425,21 @@ if ($result->isError) {
 sub query {
 	my $self    = shift;
 	my $params  = shift;
-	my $request = shift; #optional?
+	my $request = shift;    #optional?
 
 	$self->argumentExists($params);
-	#$self->argumentExists($request);
 
+	#$self->argumentExists($request);
 
 	#get here if called without resumptionToken
 	my $first = $self->planChunking($params);
 
-	if ( !$first ) {    #todo: not sure when this can be the case
-		return (); #fail if no results
+	if ( !$first ) {        #todo: not sure when this can be the case
+		return ();          #fail if no results
 	}
 
-	my $response = $self->queryChunk( $first, $params, $request);
+	my $response = $self->queryChunk( $first, $params, $request );
+
 	#todo: we still have to test if result has any result at all
 	#Debug "mbira--------response:".ref $response;
 
@@ -464,7 +467,7 @@ ListRecords).
 =cut
 
 sub querySQL {
-	my $self=shift;
+	my $self = shift;
 	my %args = @_;
 
 	my $params = $args{params};
@@ -586,7 +589,8 @@ sub planChunking {
 
 	Debug "planChunking: total:$total, maxChunkNo:$maxChunkNo";
 
-	if ($total == 0) {
+	#what about an empty database?
+	if ( $total == 0 ) {
 		return ();
 	}
 
@@ -594,11 +598,11 @@ sub planChunking {
 	my $chunkNo      = 1;
 	my $currentToken = $self->mkToken();
 	my $chunkSize    = $self->{chunkSize};
-	my $chunkCache =$self->{chunkCache};
+	my $chunkCache   = $self->{chunkCache};
 
 	while ( $chunkNo <= $maxChunkNo ) {
 		my $offset = ( $chunkNo - 1 ) * $chunkSize;    #or with +1?
-		#Debug "OFFSET: $offset CHUNKSIZE: $chunkSize";
+		     #Debug "OFFSET: $offset CHUNKSIZE: $chunkSize";
 		my $sql = $self->querySQL(
 			limit  => $chunkSize,
 			offset => $offset,
@@ -607,13 +611,13 @@ sub planChunking {
 		my $nextToken = $self->mkToken();
 
 		my $chunk = {
-			chunkNo    => $chunkNo++,
-			maxChunkNo => $maxChunkNo,
-			'next'     => $nextToken,
-			sql        => $sql,
-			targetPrefix=> $params->{metadataPrefix},
-			token      => $currentToken,
-			total      => $total
+			chunkNo      => $chunkNo++,
+			maxChunkNo   => $maxChunkNo,
+			'next'       => $nextToken,
+			sql          => $sql,
+			targetPrefix => $params->{metadataPrefix},
+			token        => $currentToken,
+			total        => $total
 		};
 
 		#Debug "planChunking: chunkNo:$chunkNo, token:$currentToken"
@@ -623,15 +627,20 @@ sub planChunking {
 		$first ? $chunkCache->add($chunk) : $first = $chunk;
 	}
 
-	#sanity check: can I find the 2nd chunk in chunkCache
-	my $secondToken=$first->{next};
-	#Debug "secondToken:".$secondToken;
-	my $secondChunk=$chunkCache->get($secondToken);
-	if ($secondChunk) {
-		Debug "2nd CHUNK FOUND".$secondChunk->{token};
-	} else {
-		die "2nd chunk not found in cache";
+	if ( $params->{verb} ne 'GetRecord' ) {
+
+		#sanity check: can I find the 2nd chunk in chunkCache
+		my $secondToken = $first->{next};
+
+		#Debug "secondToken:".$secondToken;
+		my $secondChunk = $chunkCache->get($secondToken);
+		if ($secondChunk) {
+			Debug "2nd CHUNK FOUND" . $secondChunk->{token};
+		} else {
+			die "2nd chunk not found in cache";
+		}
 	}
+
 
 	#Debug "planChunking RESULT".$self->{chunkCache}->count;
 	return $first;
@@ -738,7 +747,7 @@ sub _queryCount {
 	#significantly less records than the chunkSize if many sets are applied to
 	#one record. I don't think this is a real problem, but we should not forget
 	#that. Anyway, we remove DISTINCT from this query.
-	my $sql    = q/SELECT COUNT (records.identifier) FROM /;
+	my $sql = q/SELECT COUNT (records.identifier) FROM /;
 	$sql .= q/records JOIN sets ON records.identifier = sets.identifier WHERE
 	/;
 
