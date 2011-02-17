@@ -281,14 +281,14 @@ sub getResponse {
 
 	#debug "Enter getResponse ".$result->{verb};
 
-	if ($result->{verb} eq 'ListIdentifiers') {
+	if ( $result->{verb} eq 'ListIdentifiers' ) {
 		return $result->toListIdentifiers;
 	}
-	if ($result->{verb} eq 'GetRecord') {
+	if ( $result->{verb} eq 'GetRecord' ) {
 		return $result->toGetRecord;
 	}
-	if ($result->{verb} eq 'ListRecords') {
-	return $result->toGetRecord;
+	if ( $result->{verb} eq 'ListRecords' ) {
+		return $result->toListRecords;
 	}
 	warning "Strange Error!";
 }
@@ -377,6 +377,7 @@ sub save {
 		if ( !$prefix ) {
 			die "still no prefix?";
 		}
+
 		#debug "prefix:$prefix-----------------------";
 
 		my $transformer = $result->{transformer};
@@ -399,7 +400,6 @@ sub save {
 	return 0;    #success
 }
 
-
 =head2 my $getRecord=$result->toGetRecord;
 
 Wraps the record inside the result object in a HTTP::OAI::GetRecord and
@@ -413,7 +413,7 @@ sub toGetRecord {
 	my $getRecord = new HTTP::OAI::GetRecord;
 
 	if ( $result->countRecords != 1 ) {
-		croak "toGetRecord: count doesn't fit";
+		croak "toGetRecord: count doesn't fit". $result->countRecords;
 	}
 
 	$getRecord->record( $result->returnRecords );
@@ -463,16 +463,17 @@ $result.
 
 sub _resumptionToken {
 	my $result = shift;
+
 	#debug 'Enter _resumptionToken'.ref $result;
 
-	my $rt=new HTTP::OAI::ResumptionToken(
+	my $rt = new HTTP::OAI::ResumptionToken(
 		completeListSize => $result->{total},
 
 		#todo:cursor currently WRONG!
 		cursor          => $result->{chunkNo} * $result->{chunkSize} + 1,
 		resumptionToken => $result->{'next'},
 	);
-	return $rt
+	return $rt;
 }
 
 =head2 my $listIdentifiers=$result->toListIdentifiers;
@@ -484,7 +485,7 @@ it'll be applied to the ListRecord object.
 =cut
 
 sub toListIdentifiers {
-	my $result          = shift;
+	my $result = shift;
 
 	#debug "Enter toListIdentifiers";
 
@@ -493,7 +494,7 @@ sub toListIdentifiers {
 		croak "toListIdentifiers: count doesn't fit";
 	}
 
-	my $listIdentifiers=$result->{headers};
+	my $listIdentifiers = $result->{headers};
 
 	if ( $result->{requestURL} ) {
 
