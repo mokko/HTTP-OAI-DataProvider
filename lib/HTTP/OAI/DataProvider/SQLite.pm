@@ -777,15 +777,15 @@ sub _registerNS {
 
 	#Debug 'Enter _registerNS';
 
-	if ( $self->{ns_prefix} ) {
-		if ( !$self->{ns_uri} ) {
+	if ( $self->{nativePrefix} ) {
+		if ( !$self->{nativeURI} ) {
 			croak "ns_prefix specified, but ns_uri missing";
 		}
 
-		#Debug 'ns: ' . $self->{ns_prefix} . ':' . $self->{ns_uri};
+		#Debug 'ns: ' . $self->{nativePrefix} . ':' . $self->{nativeURI};
 
 		$doc = XML::LibXML::XPathContext->new($doc);
-		$doc->registerNs( $self->{ns_prefix}, $self->{ns_uri} );
+		$doc->registerNs( $self->{nativePrefix}, $self->{nativeURI} );
 	}
 	return $doc;
 }

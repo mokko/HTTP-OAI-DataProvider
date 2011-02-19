@@ -230,6 +230,8 @@ sub new {
 		dbfile      => $self->{dbfile},
 		chunkCache  => $self->{chunkCache},
 		chunkSize   => $self->{chunkSize},
+		nativePrefix=> $self->{nativePrefix},
+		nativeURI=>$self->{native_ns_uri},
 		transformer => new HTTP::OAI::DataProvider::Transformer(
 			nativePrefix => $self->{nativePrefix},
 			locateXSL    => $self->{locateXSL},
