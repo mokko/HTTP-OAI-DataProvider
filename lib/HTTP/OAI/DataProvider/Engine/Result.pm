@@ -11,14 +11,14 @@ use Dancer ':syntax';     #only for debug in development, warnings?
 
 =head1 HTTP::OAI::DataProvider::Result
 
-The objective is to make DataProvider::SQLite leaner.
+The objective is to make DataProvider::SQLite leaner. A result is an object
+that carries the db response before it is transformed to a HTTP::OAI::Response
+object.
 
 =head1 USAGE
 
 	#INIT
-	my $result=new HTTP::OAI::DataProvider::Engine (
-		engine=>$engine #necessary, has to have transformer
-	);
+	my $result=new HTTP::OAI::DataProvider::Engine (%opts);
 
 	#setter and getter for requestURL, will be applied in wrapper, see below
 	my $request=$result->requestURL ([$request]);
@@ -64,9 +64,24 @@ The objective is to make DataProvider::SQLite leaner.
 
 =cut
 
-=head2 new
+=head2 my $result=new HTTP::OAI::DataProvider::Engine (%opts);
 
-see Usage /TODO
+	my %opts = (
+		requestURL  => $self->{requestURL},
+		transformer => $self->{transformer},
+		verb        => $params->{verb},
+		params      => $params,
+
+		#for resumptionToken
+		chunkSize    => $self->{chunkSize},
+		chunkNo      => $chunkDesc->{chunkNo},
+		targetPrefix => $chunkDesc->{targetPrefix},
+		token        => $chunkDesc->{token},
+		total        => $chunkDesc->{total},
+	);
+
+$opts{last}
+$opts{next}
 
 =cut
 
@@ -413,7 +428,7 @@ sub toGetRecord {
 	my $getRecord = new HTTP::OAI::GetRecord;
 
 	if ( $result->countRecords != 1 ) {
-		croak "toGetRecord: count doesn't fit". $result->countRecords;
+		croak "toGetRecord: count doesn't fit" . $result->countRecords;
 	}
 
 	$getRecord->record( $result->returnRecords );
@@ -448,7 +463,9 @@ sub toListRecords {
 		$listRecords->requestURL( $result->requestURL );
 	}
 
-	$listRecords->resumptionToken( $result->_resumptionToken );
+	if ( !$result->lastChunk ) {
+		$listRecords->resumptionToken( $result->_resumptionToken );
+	}
 
 	return $listRecords;
 }
@@ -502,8 +519,9 @@ sub toListIdentifiers {
 		$listIdentifiers->requestURL( $result->requestURL );
 	}
 
-	#todo
-	$listIdentifiers->resumptionToken( $result->_resumptionToken );
+	if ( !$result->lastChunk ) {
+		$listIdentifiers->resumptionToken( $result->_resumptionToken );
+	}
 	return $listIdentifiers;
 }
 
@@ -533,6 +551,23 @@ sub isError {
 	} else {
 		return ();    #fail
 	}
+}
+
+
+=head2 my $ret=result->lastChunk;
+
+	Returns 1 if this is the last chunk, otherwise empty.
+
+	if ($result->lastChunk)
+
+=cut
+
+sub lastChunk {
+	my $result=shift;
+	if ($result->{last}) {
+		return 1;
+	}
+	return ();
 }
 
 1;                    #HTTP::OAI::DataProvider::Engine::Result

@@ -94,40 +94,45 @@ sub digest_single {
 	}
 }
 
-=head2 my $chunk=$engine->queryChunk($chunkDescription);
+=head2 my $response=$engine->queryChunk($chunkDescription);
 
-Expects a chunkDescription which refers to a chunk of a db query. It returns that
-chunk as a HTTP::OAI::Response object. (Either HTTP::OAI::ListIdentifiers or
-HTTP::OAI::ListRecords.)
+Takes a chunkDescription, queries the db with it, parses the answer in a result
+object and transforms the result to a response and returns to dancer.
+
+Expects a chunkDescription. (A chunkDesc is SQL statement and some other
+contextual info). It returns that chunk as a HTTP::OAI::Response object
+(either HTTP::OAI::ListIdentifiers or HTTP::OAI::ListRecords.)
 
 The chunkDescription is a hashref which is structured like this, see
 HTTP::OAI::DataProvider::ChunkCache:
 	$chunkDescription={
 			chunkNo=>$chunkNo,
 			maxChunkNo=>$maxChunkNo,
-			next=>$token,
+			[ next=>$tokenN, ]
 			sql=>$sql,
 			targetPrefix=>$prefix,
 			token=>$token,
 			total=>$total
 	};
 
+The last chunk doesn't have a next key. (?)
+
+Gets called in queryChunk and in (the badly named) data provider's chunkExist.
+
 =cut
 
 sub queryChunk {
-	my $self    = shift;
-	my $chunk   = shift;    #actually a chunk description
-	my $params  = shift;
-	my $request = shift;    #optional?
+	my $self      = shift;
+	my $chunkDesc = shift;
+	my $params    = shift;
+	my $request   = shift;    #optional
 
-	$self->argumentExists($chunk);
+	$self->argumentExists($chunkDesc);
 	$self->argumentExists($params);
 
 	#Debug "Enter queryChunk";
-	#use Data::Dumper qw/Dumper/;
-	#Debug Dumper $params;
 
-	my $result = new HTTP::OAI::DataProvider::Engine::Result(
+	my %opts = (
 		requestURL  => $self->{requestURL},
 		transformer => $self->{transformer},
 		verb        => $params->{verb},
@@ -135,20 +140,31 @@ sub queryChunk {
 
 		#for resumptionToken
 		chunkSize    => $self->{chunkSize},
-		chunkNo      => $chunk->{chunkNo},
-		'next'       => $chunk->{'next'},
-		targetPrefix => $chunk->{targetPrefix},
-		token        => $chunk->{token},
-		total        => $chunk->{total},
+		chunkNo      => $chunkDesc->{chunkNo},
+		targetPrefix => $chunkDesc->{targetPrefix},
+		token        => $chunkDesc->{token},
+		total        => $chunkDesc->{total},
 	);
+
+	#next is optional because last chunk has no next
+	if ( $chunkDesc->{'next'} ) {
+		$opts{'next'} = $chunkDesc->{'next'},;
+	} else {
+		Debug "queryChunk:this is the last chunk!";
+		$opts{'last'}=1;
+	}
+
+	my $result =
+	  new HTTP::OAI::DataProvider::Engine::Result(%opts);
 
 	if ($request) {
 		$result->{requestURL} = $request;    #overwrites value from above!
 		     #Debug ":requestURL:".$result->{requestURL};
 	}
 
-	my $dbh = $self->{connection}->dbh()     or die $DBI::errstr;
-	my $sth = $dbh->prepare( $chunk->{sql} ) or croak $dbh->errstr();
+	#SQL
+	my $dbh = $self->{connection}->dbh()         or die $DBI::errstr;
+	my $sth = $dbh->prepare( $chunkDesc->{sql} ) or croak $dbh->errstr();
 	$sth->execute() or croak $dbh->errstr();
 
 	my $header;
@@ -209,7 +225,7 @@ sub queryChunk {
 		return $self->err2XML( $result->isError );
 	}
 
-	#todo
+	#transform result to response
 	my $response = $result->getResponse;
 	return $response;
 }
@@ -429,19 +445,20 @@ sub query {
 
 	$self->argumentExists($params);
 
-	#$self->argumentExists($request);
-
 	#get here if called without resumptionToken
 	my $first = $self->planChunking($params);
 
-	if ( !$first ) {        #todo: not sure when this can be the case
-		return ();          #fail if no results
+	#this should never be the case: always one chunk
+	if ( !$first ) {
+
+		#fail if no results; not sure if this proper err msg
+		die "The impossible: no first chunk";
+		return ();
 	}
 
 	my $response = $self->queryChunk( $first, $params, $request );
 
 	#todo: we still have to test if result has any result at all
-	#Debug "mbira--------response:".ref $response;
 
 	return $response;
 }
@@ -565,17 +582,16 @@ sub _connect_db {
 
 =head2 my $first=$self->planChunking($params);
 
-Counts the results for this request, creates chunk descriptions which allow
-to ask for specific chunks of this result set and saves those chunk
-descriptions in the chunkCache.
+Counts the results for this request to split the response in chunks if
+necessary, e.g. 50 records per page. From the numbers it creates all chunk
+descriptions for this request and saves them in chunkCache.
 
-Expects params hashref. Tests if chunking is active. Returns the first chunk
-description or nothing. Saves the remaining chunk descriptions in
-chunkCache.
+A chunkDescription has an sql statement and other contextual info to to write
+the chunk (one page of results). Once the request comes in all chunks for this
+request are created and saved in chunkCache.
 
-	#a) find out how many total
-	#b) calculate maxChunkNo
-	#c) save chunk descriptions in chunkCache
+Expects the params hashref. Returns the first chunk description or nothing.
+(Saves the remaining chunk descriptions in chunkCache.)
 
 =cut
 
@@ -587,7 +603,7 @@ sub planChunking {
 
 	my ( $total, $maxChunkNo ) = $self->_mk_numbers($params);
 
-	Debug "planChunking: total:$total, maxChunkNo:$maxChunkNo";
+	Debug "planChunking: total records:$total, maxChunkNo:$maxChunkNo";
 
 	#what about an empty database?
 	if ( $total == 0 ) {
@@ -600,6 +616,7 @@ sub planChunking {
 	my $chunkSize    = $self->{chunkSize};
 	my $chunkCache   = $self->{chunkCache};
 
+	#create all chunkDescriptions in chunkCache
 	while ( $chunkNo <= $maxChunkNo ) {
 		my $offset = ( $chunkNo - 1 ) * $chunkSize;    #or with +1?
 		     #Debug "OFFSET: $offset CHUNKSIZE: $chunkSize";
@@ -611,23 +628,33 @@ sub planChunking {
 		my $nextToken = $self->mkToken();
 
 		my $chunk = {
-			chunkNo      => $chunkNo++,
+			chunkNo      => $chunkNo,
 			maxChunkNo   => $maxChunkNo,
-			'next'       => $nextToken,
 			sql          => $sql,
 			targetPrefix => $params->{metadataPrefix},
 			token        => $currentToken,
 			total        => $total
 		};
 
+		#the last chunk has no resumption token
+		if ( $chunkNo < $maxChunkNo ) {
+			$chunk->{'next'} = $nextToken;
+		}
+
 		#Debug "planChunking: chunkNo:$chunkNo, token:$currentToken"
 		#  . ", next:$nextToken, offset: $offset, limit ";
 
+		# LOOP stuff: prepare for next loop
+		$chunkNo++;    #now it's safe to increase
 		$currentToken = $nextToken;
+		#don't write the 1st chunk into cache, keep it in $first instead
 		$first ? $chunkCache->add($chunk) : $first = $chunk;
 	}
 
-	if ( $params->{verb} ne 'GetRecord' ) {
+	#TODO
+	#only check for 2nd chunk if there is more than 1
+	#i don't really need this sanity check
+	if ( $maxChunkNo > 1 && $params->{verb} ne 'GetRecord' ) {
 
 		#sanity check: can I find the 2nd chunk in chunkCache
 		my $secondToken = $first->{next};
@@ -637,10 +664,9 @@ sub planChunking {
 		if ($secondChunk) {
 			Debug "2nd CHUNK FOUND" . $secondChunk->{token};
 		} else {
-			die "2nd chunk not found in cache";
+			#die "2nd chunk not found in cache";
 		}
 	}
-
 
 	#Debug "planChunking RESULT".$self->{chunkCache}->count;
 	return $first;

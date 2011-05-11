@@ -176,8 +176,14 @@ sub check_format_supported {
 	my $self   = shift;
 	my $prefix = shift;
 
+	#this can happen in case of empty resumption token
+	#"verb=ListRecords&resumptionToken="
+	#this should not happen, but anybody could just enter it
 	if ( !$prefix ) {
-		return "No $prefix specified";
+		return new HTTP::OAI::Error(
+			code    => 'badArgument',
+			message => 'No prefix specified!',
+		);
 	}
 
 	#print "check_format_supported ($prefix)";

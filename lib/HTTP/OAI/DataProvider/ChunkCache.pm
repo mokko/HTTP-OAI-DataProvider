@@ -19,21 +19,22 @@ HTTP::OAI::DataProvider::ChunkCache - Store request info per resumptionToken
 	use HTTP::OAI::DataProvider::ChunkCache;
 	my $cache=new HTTP::OAI::DataProvider::ChunkCache (maxSize=>$integer);
 
-	#chunk is a description of a chunk not a chunk
-	my $chunk={
+	#chunkDesc is description of a chunk as hashref
+	#next is optional. Last token doesn't have a next
+	my $chunkDesc={
 		chunkNo=>$chunkNo,
 		maxChunkNo=>$maxChunkNo,
-		next=>$token,
+		[next=>$token,]
 		sql=>$sql,
 		token=>$token,
 		total=>$total,
 	};
 
-	#add a chunk to cache
-	$cache->add ($chunk) or die $cache->error;
+	#add a chunkDesc to cache
+	$cache->add ($chunkDesc) or die $cache->error;
 
 	#get a chunk from cache
-	my $chunk=$cache->get ($token); #chunk is hashref
+	my $chunkDesc=$cache->get ($token); #chunk is hashref
 
 	#size/maxSize
 	my $current_size=$cache->count;
@@ -70,17 +71,19 @@ Return 1 on success.
 
 sub add {
 	my $self  = shift;
-	my $chunk = shift;
+	my $chunkDesc = shift;
 
 	#ensure that necessary info is there
-	foreach (qw /chunkNo maxChunkNo next sql targetPrefix total token/) {
-		if ( !$chunk->{$_} ) {
+	#next is option since last chunk has no next
+	foreach (qw /chunkNo maxChunkNo sql targetPrefix total token/) {
+		if ( !$chunkDesc->{$_} ) {
 			croak "$_ missing";
 			$self->error++;
 		}
 	}
 
-	if ($chunk->{maxChunkNo} > $self->{maxSize}) {
+
+	if ($chunkDesc->{maxChunkNo} > $self->{maxSize}) {
 		croak "maxChunkNo greater than chunkCache maxSize";
 	}
 
@@ -90,7 +93,7 @@ sub add {
 
 	#write into cache
 	$self->_cacheSize();
-	$chunkCache->{ $chunk->{token} } = $chunk;
+	$chunkCache->{ $chunkDesc->{token} } = $chunkDesc;
 }
 
 =head2 my $integer=$cache->count;

@@ -535,7 +535,8 @@ sub ListIdentifiers {
 	}
 
 	if (@errors) {
-		return $self->err2xml(@errors);
+		Debug "@errors".@errors;
+		return $self->err2XML(@errors);
 	}
 
 	#Metadata handling: query returns response
@@ -844,14 +845,16 @@ sub _hashref {
 
 =head2 my $chunk=$self->chunkExists ($params, [$request]);
 
+TODO: should be called getChunkDesc
+
 Tests whether
 	a) whether a resumptionToken is in params and
-	b) there is a chunk with that token in the cache.
+	b) there is a chunkDesc with that token in the cache.
 
-It returns either a chunk or nothing.
+It returns either a chunkDesc or nothing.
 
 Usage:
-	my $chunk=$self->chunkExists
+	my $chunk=$self->chunkExists ($params)
 	if (!$chunk) {
 		return new HTTP::OAI::Error (code=>'badResumptionToken');
 	}
@@ -881,17 +884,17 @@ sub chunkExists {
 
 	#Debug "Query chunkCache for " . $token;
 
-	#ensure that it does return nothing on error! And not 0
-	my $chunk_desc = $self->{chunkCache}->get($token);
+	my $chunkDesc = $self->{chunkCache}->get($token);
 
-	if ( !$chunk_desc ) {
-		Debug "no chunk returned!";
+	if ( !$chunkDesc ) {
+		#ensure that it does return nothing on error! And not 0
+		Debug "no chunk description found!";
 		return ();
 	}
 
 	#chunk is a HTTP::OAI::Response object
 	my $response =
-	  $self->{engine}->queryChunk( $chunk_desc, $params, $request );
+	  $self->{engine}->queryChunk( $chunkDesc, $params, $request );
 	return $response;
 }
 
