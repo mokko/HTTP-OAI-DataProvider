@@ -227,12 +227,12 @@ sub new {
 
 	#init engine (todo: this is noT properly abstracted)
 	$self->{engine} = new HTTP::OAI::DataProvider::SQLite(
-		dbfile      => $self->{dbfile},
-		chunkCache  => $self->{chunkCache},
-		chunkSize   => $self->{chunkSize},
-		nativePrefix=> $self->{nativePrefix},
-		nativeURI=>$self->{native_ns_uri},
-		transformer => new HTTP::OAI::DataProvider::Transformer(
+		dbfile       => $self->{dbfile},
+		chunkCache   => $self->{chunkCache},
+		chunkSize    => $self->{chunkSize},
+		nativePrefix => $self->{nativePrefix},
+		nativeURI    => $self->{native_ns_uri},
+		transformer  => new HTTP::OAI::DataProvider::Transformer(
 			nativePrefix => $self->{nativePrefix},
 			locateXSL    => $self->{locateXSL},
 		),
@@ -302,7 +302,6 @@ sub GetRecord {
 	my $response = $engine->query( $params, $request );
 
 	#todo: we still have to test if result has any result at all
-
 	#mk sure we don't lose requestURL in Starman
 	#$result->requestURL($request);
 
@@ -535,7 +534,7 @@ sub ListIdentifiers {
 	}
 
 	if (@errors) {
-		Debug "@errors".@errors;
+		Debug "@errors" . @errors;
 		return $self->err2XML(@errors);
 	}
 
@@ -644,7 +643,6 @@ sub ListRecords {
 		return $self->err2XML(
 			new HTTP::OAI::Error( code => 'noRecordsMatch' ) );
 	}
-
 
 	#checkRecordsMatch is now done inside query
 	# Check result
@@ -887,14 +885,14 @@ sub chunkExists {
 	my $chunkDesc = $self->{chunkCache}->get($token);
 
 	if ( !$chunkDesc ) {
+
 		#ensure that it does return nothing on error! And not 0
 		Debug "no chunk description found!";
 		return ();
 	}
 
 	#chunk is a HTTP::OAI::Response object
-	my $response =
-	  $self->{engine}->queryChunk( $chunkDesc, $params, $request );
+	my $response = $self->{engine}->queryChunk( $chunkDesc, $params, $request );
 	return $response;
 }
 

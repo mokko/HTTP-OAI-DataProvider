@@ -150,12 +150,11 @@ sub queryChunk {
 	if ( $chunkDesc->{'next'} ) {
 		$opts{'next'} = $chunkDesc->{'next'},;
 	} else {
-		Debug "queryChunk:this is the last chunk!";
-		$opts{'last'}=1;
+		Debug "queryChunk: this is the last chunk!";
+		$opts{'last'} = 1;
 	}
 
-	my $result =
-	  new HTTP::OAI::DataProvider::Engine::Result(%opts);
+	my $result = new HTTP::OAI::DataProvider::Engine::Result(%opts);
 
 	if ($request) {
 		$result->{requestURL} = $request;    #overwrites value from above!
@@ -167,6 +166,8 @@ sub queryChunk {
 	my $sth = $dbh->prepare( $chunkDesc->{sql} ) or croak $dbh->errstr();
 	$sth->execute() or croak $dbh->errstr();
 
+	#Debug "chunkDesc SQL $chunkDesc->{sql}";
+
 	my $header;
 	my $md;
 	my $i       = 0;     #count the results to test if none
@@ -176,6 +177,8 @@ sub queryChunk {
 	#I keep track of identifiers: if known it is a repetitive row
 	#if header is already defined, have action before starting next header
 	while ( my $aref = $sth->fetch ) {
+
+		#$aref->[0] has identifier
 		if ( $last_id ne $aref->[0] ) {
 			$i++;        #count distinct identifiers
 			if ($header) {
@@ -183,7 +186,6 @@ sub queryChunk {
 				#a new distinct id where header has already been defined
 				#first time on the row which has the 2nd distinct id
 				#i.e. previous header should be ready for storing it away
-
 				$result->save(
 					header => $header,
 					md     => $md,
@@ -202,6 +204,10 @@ sub queryChunk {
 			}
 			if ( $aref->[4] ) {
 				$md = $aref->[4];
+			} else {
+
+				#not all records also have md, e.g. deleted records
+				$md = '';
 			}
 		}
 
@@ -214,7 +220,7 @@ sub queryChunk {
 	}
 
 	#save the last record
-	#for every last distinct identifier, so call it here since no iteration
+	#in case there is only one record we get here!
 	$result->save(
 		header => $header,
 		md     => $md,
@@ -448,11 +454,8 @@ sub query {
 	#get here if called without resumptionToken
 	my $first = $self->planChunking($params);
 
-	#this should never be the case: always one chunk
+	#if there are no results there is no first chunk
 	if ( !$first ) {
-
-		#fail if no results; not sure if this proper err msg
-		die "The impossible: no first chunk";
 		return ();
 	}
 
@@ -510,10 +513,8 @@ sub querySQL {
 		$sql .= q/, native_md /;
 	}
 
-	$sql .= q/FROM records JOIN sets ON records.identifier = sets.identifier
-	/;
-
-	$sql .= q/ WHERE /;
+	$sql .= q/FROM records LEFT JOIN sets ON records.identifier =
+	sets.identifier WHERE /;
 
 	if ( $params->{identifier} ) {
 		$sql .= qq/records.identifier = '$params->{identifier}' AND /;
@@ -587,8 +588,7 @@ necessary, e.g. 50 records per page. From the numbers it creates all chunk
 descriptions for this request and saves them in chunkCache.
 
 A chunkDescription has an sql statement and other contextual info to to write
-the chunk (one page of results). Once the request comes in all chunks for this
-request are created and saved in chunkCache.
+the chunk (one page of results).
 
 Expects the params hashref. Returns the first chunk description or nothing.
 (Saves the remaining chunk descriptions in chunkCache.)
@@ -600,7 +600,7 @@ sub planChunking {
 	my $params = shift;
 
 	#do NOT test if provider was born with chunking ability on intention!
-
+	#total: total # of responses
 	my ( $total, $maxChunkNo ) = $self->_mk_numbers($params);
 
 	Debug "planChunking: total records:$total, maxChunkNo:$maxChunkNo";
@@ -647,6 +647,7 @@ sub planChunking {
 		# LOOP stuff: prepare for next loop
 		$chunkNo++;    #now it's safe to increase
 		$currentToken = $nextToken;
+
 		#don't write the 1st chunk into cache, keep it in $first instead
 		$first ? $chunkCache->add($chunk) : $first = $chunk;
 	}
@@ -664,6 +665,7 @@ sub planChunking {
 		if ($secondChunk) {
 			Debug "2nd CHUNK FOUND" . $secondChunk->{token};
 		} else {
+
 			#die "2nd chunk not found in cache";
 		}
 	}
@@ -684,8 +686,9 @@ sub _countTotals {
 	my $params = shift;
 
 	my $sql = $self->_queryCount($params);
+	Debug "_countTotals: $sql";
 	my $dbh = $self->{connection}->dbh() or die $DBI::errstr;
-	my $sth = $dbh->prepare($sql) or croak $dbh->errstr();
+	my $sth = $dbh->prepare($sql)        or croak $dbh->errstr();
 	$sth->execute() or croak $dbh->errstr();
 
 	my $aref = $sth->fetch;
@@ -693,6 +696,8 @@ sub _countTotals {
 	if ( !$aref->[0] ) {
 		return 0;
 	}
+
+	#Debug "_____countTotals: $aref->[0]";
 
 	#todo: ensure that it is integer!
 	return $aref->[0];
@@ -773,9 +778,12 @@ sub _queryCount {
 	#significantly less records than the chunkSize if many sets are applied to
 	#one record. I don't think this is a real problem, but we should not forget
 	#that. Anyway, we remove DISTINCT from this query.
+	#
+	#records may have no set, but should still be counted, so this has to be a
+	#left join
 	my $sql = q/SELECT COUNT (records.identifier) FROM /;
-	$sql .= q/records JOIN sets ON records.identifier = sets.identifier WHERE
-	/;
+	$sql .= q/records LEFT JOIN sets ON records.identifier = sets.identifier
+	WHERE /;
 
 	if ( $params->{identifier} ) {
 		$sql .= qq/records.identifier = '$params->{identifier}' AND /;
