@@ -74,68 +74,6 @@ use Dancer::CommandLine qw/Debug Warning/;
 
 =back
 
-=head1 COMPONENTS
-
-Currently, the data provider is split in three components which are introduced
-in this section: the backend, the frontend and the engine.
-
-BACKEND/FRONTEND
-
-This module attempts to provide a neutral backend for your data provider. It is
-not a complete data provider. You will need a simple frontend which handles
-HTTP requests and triggers this backend. I use Dancer as frontend, see
-Salsa_OAI for an example:
-
-Apart from configuration and callbacks your frontend could look like this:
-
-	any [ 'get', 'post' ] => '/oai' => sub {
-		if ( my $verb = params->{verb} ) {
-			no strict "refs";
-			my $response=$provider->$verb( params() );
-			return $response->toXML;
-		}
-	};
-	dance;
-	true;
-
-OVERVIEW
-
-The engine
-
-=over
-
-=item - provides a data store,
-
-=item - the means to digest source data and to
-
-=item - query both header information and data store
-
-=item - public functions/methods are those which aremeant to be called by the
-backend.
-
-The backend is
-=item - should not depend on Dancer (or any other web framework)
-
-=item - should not depend on a specific metadata format
-
-=item - should perform most error checks prescribed by the OAI specification.
-
-=item - public functions/methods are those which are meant to be called from the
-frontend.
-
-The frontend
-
-=item - potentially employs a web framework (like Dancer)
-
-=item - parses configuration data and hands it over to backend
-
-=item - includes most or all callbacks
-
-=item - provides ways to work with specific metadata formats (internal format,
-mappings)
-
-=back
-
 =head1 METHODS
 
 =head2 my $provider->new (%options);

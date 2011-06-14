@@ -1,1 +1,3 @@
-test
+RELEASE HISTORY
+0.06 with dist::zilla
+0.05 with query cache and chunking
