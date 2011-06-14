@@ -623,15 +623,14 @@ version 0.006
 
 =head1 SYNOPSIS
 
-=head2 Init for use as provider (see below for more details)
+=head2 Init
 
 	use HTTP::OAI::DataProvider;
 	my $provider = HTTP::OAI::DataProvider->new(%options);
 
-=head2 Verbs
+=head2 Verbs: GetRecord, Identify, ListSets, ListRecords ...
 
-	my $response=$provider->$verb($params)
-	$response=$engine->GetRecord(%params);
+	my $response=$provider->$verb($request, %params)
 	#response is xml ready for print/return
 
 =head2 Error checking
@@ -646,97 +645,6 @@ version 0.006
 	Debug "message";
 	Warning "message";
 
-=head1 OAI DATA PROVIDER FEATURES
-
-=over 2
-
-=item SUPPORTED
-
-=over 4
-
-=item - the six OAI verbs (getRecord, identify, listRecords, listMetadataFormats,
- listIdentifiers, listSets) and all errors from OAI-PMH v2 specification
-
-=item - resumptionToken
-
-=item - sets
-
-=item - deletedRecords (only transiently?)
-
-=back
-
-=item NOT SUPPORTED
-
-=over 4
-
-=item - hierarchical sets
-
-=back
-
-=back
-
-=head1 COMPONENTS
-
-Currently, the data provider is split in three components which are introduced
-in this section: the backend, the frontend and the engine.
-
-BACKEND/FRONTEND
-
-This module attempts to provide a neutral backend for your data provider. It is
-not a complete data provider. You will need a simple frontend which handles
-HTTP requests and triggers this backend. I use Dancer as frontend, see
-Salsa_OAI for an example:
-
-Apart from configuration and callbacks your frontend could look like this:
-
-	any [ 'get', 'post' ] => '/oai' => sub {
-		if ( my $verb = params->{verb} ) {
-			no strict "refs";
-			my $response=$provider->$verb( params() );
-			return $response->toXML;
-		}
-	};
-	dance;
-	true;
-
-OVERVIEW
-
-The engine
-
-=over
-
-=item - provides a data store,
-
-=item - the means to digest source data and to
-
-=item - query both header information and data store
-
-=item - public functions/methods are those which aremeant to be called by the
-backend.
-
-The backend is
-=item - should not depend on Dancer (or any other web framework)
-
-=item - should not depend on a specific metadata format
-
-=item - should perform most error checks prescribed by the OAI specification.
-
-=item - public functions/methods are those which are meant to be called from the
-frontend.
-
-The frontend
-
-=item - potentially employs a web framework (like Dancer)
-
-=item - parses configuration data and hands it over to backend
-
-=item - includes most or all callbacks
-
-=item - provides ways to work with specific metadata formats (internal format,
-mappings)
-
-=back
-
 =head1 METHODS
 
 =head2 my $provider->new (%options);
@@ -750,16 +658,23 @@ development and not during runtime it may also croak.
 
 List here only options not otherwise explained?
 
+=over 4
+
+=item *
+
 debug=>callback (TODO)
+
 	If a callback is supplied use this callback for debug output
 
-isMetadaFormatSupported=>callback, TODO
+=back
+
+* isMetadaFormatSupported=>callback, TODO
 	The callback expects a single prefix and returns 1 if true and nothing
 	when not supported. Currently only global metadataFormats, i.e. for all
 	items in repository. This one seems to be obligatory, so croak when
 	missing.
 
-xslt=>'path/to/style.xslt',
+* xslt=>'path/to/style.xslt',
 	Adds this path to HTTP::OAI::Repsonse objects to modify output in browser.
 	See also _init_xslt for more info.
 
@@ -767,7 +682,7 @@ xslt=>'path/to/style.xslt',
 	still uncertain, maybe even unlikely if engine will be option at all.
 	(Alternative would be to just to use the engine.)
 
-requestURL
+* requestURL
 	Overwrite normal requestURL, e.g. when using a reverse proxy cache etc.
 	Note that
 	a) requestURL specified during new is only the http://domain.com:port
@@ -779,26 +694,44 @@ requestURL
 	Currently, requestURL evaporates if Salsa_OAI is run under anything else
 	than HTTP::Server::Simple.
 
-warning =>callback (Todo)
+* warning =>callback (Todo)
 	If a callback is supplied use this callback for warning output
-
-=head1 METHODS - VERBS
 
 =head2 my $result=$provider->GetRecord(%params);
 
 Arguments
--identifier (required)
--metadataPrefix (required)
+
+=over 4
+
+=item *
+
+identifier (required)
+
+=item *
+
+metadataPrefix (required)
+
+=back
 
 Errors
--badArgument: already tested
--cannotDisseminateFormat: gets checked here
--idDoesNotExist: gets checked here
+
+=over 4
+
+=item *
+
+DbadArgument: already tested
+
+=item *
+
+cannotDisseminateFormat: gets checked here
+
+=item *
+
+idDoesNotExist: gets checked here
+
+=back
 
 =head2 my $response=$provider->Identify();
-
-Simply a callback. It could be located in the frontend and return Identify
-information from a configuration file.
 
 Callback should be passed over to HTTP::OAI::DataProvider during
 initialization with option Identify, e.g.
@@ -821,12 +754,32 @@ HTTP::OAI::DataProvider only knows global metadata formats, i.e. it assumes
 that every record is available in every format supported by the repository.
 
 ARGUMENTS
--identifier (optional)
+
+=over 4
+
+=item *
+
+identifier (optional)
+
+=back
 
 ERRORS
--badArgument - in validate_request()
--idDoesNotExist - here
--noMetadataFormats - here
+
+=over 4
+
+=item *
+
+badArgument - in validate_request()
+
+=item *
+
+idDoesNotExist - here
+
+=item *
+
+noMetadataFormats - here
+
+=back
 
 =head2 my $xml=$provider->ListIdentifiers ($params);
 
@@ -842,18 +795,56 @@ a status attribute of "deleted" if a record matching the arguments specified in
 the request has been deleted.
 
 ARGUMENTS
--from (optional, UTCdatetime value)
--until (optional, UTCdatetime value)
--metadataPrefix (required)
--set (optional)
--resumptionToken (exclusive) [NOT IMPLEMENTED!]
+
+=over 4
+
+=item *
+
+from (optional, UTCdatetime value)
+
+=item *
+
+until (optional, UTCdatetime value)
+
+=item *
+
+metadataPrefix (required)
+
+=item *
+
+set (optional)
+
+=item *
+
+resumptionToken (exclusive) [NOT IMPLEMENTED!]
+
+=back
 
 ERRORS
--badArgument: already checked in validate_request
--badResumptionToken: here
--cannotDisseminateFormat: here
--noRecordsMatch:here
--noSetHierarchy: here. Can only appear if query has set
+
+=over 4
+
+=item *
+
+badArgument: already checked in validate_request
+
+=item *
+
+badResumptionToken: here
+
+=item *
+
+cannotDisseminateFormat: here
+
+=item *
+
+noRecordsMatch:here
+
+=item *
+
+noSetHierarchy: here. Can only appear if query has set
+
+=back
 
 LIMITATIONS
 By making the metadataPrefix required, the specification suggests that
@@ -863,7 +854,14 @@ only global metadata formats, so it will return the same set for all supported
 metadataFormats.
 
 TODO
-Hierarchical sets!
+
+=over 4
+
+=item *
+
+Hierarchical sets
+
+=back
 
 =head2 ListRecords
 
@@ -874,35 +872,98 @@ In its capacity to return full records (incl. header), ListRecords is similar
 to GetRecord.
 
 ARGUMENTS
--from (optional, UTCdatetime value) TODO: Check if it works
--until (optional, UTCdatetime value)  TODO: Check if it works
--metadataPrefix (required unless resumptionToken)
--set (optional)
--resumptionToken (exclusive)
+
+=over 4
+
+=item *
+
+from (optional, UTCdatetime value) TODO: Check if it works
+
+=item *
+
+until (optional, UTCdatetime value)  TODO: Check if it works
+
+=item *
+
+metadataPrefix (required unless resumptionToken)
+
+=item *
+
+set (optional)
+
+=item *
+
+resumptionToken (exclusive)
+
+=back
 
 ERRORS
--badArgument: checked for before you get here
--badResumptionToken - TODO
--cannotDisseminateFormat - TODO
--noRecordsMatch - here
--noSetHierarchy - TODO
+
+=over 4
+
+=item *
+
+badArgument: checked for before you get here
+
+=item *
+
+badResumptionToken - TODO
+
+=item *
+
+cannotDisseminateFormat - TODO
+
+=item *
+
+noRecordsMatch - here
+
+=item *
+
+noSetHierarchy - TODO
+
+=back
 
 TODO
--Check if error appears as excepted when non-supported metadataFormat
+
+=over 4
+
+=item *
+
+Check if error appears as excepted when non-supported metadataFormat
+
+=back
 
 =head2 ListSets
 
-	ARGUMENTS
-	resumptionToken (optional)
+ARGUMENTS
 
-	ERRORS
-	badArgument -> HTTP::OAI::Repository
-	badResumptionToken  -> here
-	noSetHierarchy --> here
+=over 4
 
-TODO
+=item *
 
-=head1 METHODS - VARIOUS PUBLIC UTILITY FUNCTIONS / METHODS
+resumptionToken (optional)
+
+=back
+
+ERRORS
+
+=over 4
+
+=item *
+
+badArgument -> HTTP::OAI::Repository
+
+=item *
+
+badResumptionToken  -> here
+
+=item *
+
+noSetHierarchy --> here
+
+=back
+
+=head1 PUBLIC UTILITY FUNCTIONS / METHODS
 
 check error, display error, warning, debug etc.
 
@@ -927,8 +988,13 @@ Little function that transforms array of parameters to hashref and returns it.
 TODO: should be called getChunkDesc
 
 Tests whether
-	a) whether a resumptionToken is in params and
+
+=over 4
+
+a) whether a resumptionToken is in params and
 	b) there is a chunkDesc with that token in the cache.
+
+=back
 
 It returns either a chunkDesc or nothing.
 
@@ -938,7 +1004,7 @@ Usage:
 		return new HTTP::OAI::Error (code=>'badResumptionToken');
 	}
 
-=head2 return $self->_output($response);
+=head2 $self->_output($response);
 
 Expects a HTTP::OAI::Response object and returns it as xml string. It applies
 $self->{xslt} if set.
@@ -959,6 +1025,42 @@ specified during init. This assume that there is only one stylesheet.
 
 This may be a bad name, since not specific enough. This xslt is responsible
 for a nicer look and added on the top of reponse headers.
+
+=head1 OAI DATA PROVIDER FEATURES
+
+SUPPORTED
+
+=over 4
+
+=item *
+
+the six OAI verbs (getRecord, identify, listRecords, listMetadataFormats,
+
+ listIdentifiers, listSets) and all errors from OAI-PMH v2 specification
+
+=item *
+
+resumptionToken
+
+=item *
+
+sets
+
+=item *
+
+deletedRecords (only transiently?)
+
+=back
+
+NOT SUPPORTED
+
+=over 4
+
+=item *
+
+hierarchical sets
+
+=back
 
 =head1 TODO
 

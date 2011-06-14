@@ -1,4 +1,5 @@
 Changes
+INSTALL
 LICENSE
 MANIFEST
 META.json
@@ -8,6 +9,7 @@ README
 lib/HTTP/OAI/DataProvider.pm
 lib/HTTP/OAI/DataProvider/ChunkCache.pm
 lib/HTTP/OAI/DataProvider/CommandLine.pm
+lib/HTTP/OAI/DataProvider/Components.pod
 lib/HTTP/OAI/DataProvider/Engine.pm
 lib/HTTP/OAI/DataProvider/Engine/Result.pm
 lib/HTTP/OAI/DataProvider/GlobalFormats.pm
@@ -22,6 +24,9 @@ t/05_chunkCache/00-load.t
 t/05_chunkCache/01-test.t
 t/05_chunkCache/manual
 t/author-critic.t
+t/release-eol.t
+t/release-kwalitee.t
 t/release-pod-coverage.t
 t/release-pod-syntax.t
 t/release-test-version.t
+weaver.ini

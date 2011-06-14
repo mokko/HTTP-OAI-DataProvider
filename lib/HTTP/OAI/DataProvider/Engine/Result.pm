@@ -360,8 +360,6 @@ sub lastChunk {
 }
 
 1;                    #HTTP::OAI::DataProvider::Engine::Result
-
-
 __END__
 =pod
 
@@ -373,56 +371,9 @@ HTTP::OAI::DataProvider::Engine::Result - Result object for engine
 
 version 0.006
 
-=head1 USAGE
+=head1 METHODS
 
-A result is an object that carries the db response before it is transformed to
-a HTTP::OAI::Response object.
-
-	#INIT
-	my $result=new HTTP::OAI::DataProvider::Engine (%opts);
-
-	#setter and getter for requestURL, will be applied in wrapper, see below
-	my $request=$result->requestURL ([$request]);
-
-	#RECORDS
-	#write records to result
-	$result->saveRecord ($params, $header,$md);
-
-	# makes a record from parts, also transforms md
-	$result->_addRecord ($record); #prefer saveRecord if possible
-
-	#simple count
-	print $result->countRecords. ' results';
-
-	#access to record data
-	my @records=$result->returnRecords;
-
-	#HEADERS
-	print $result->countHeaders. 'headers';
-
-	#WRAPPERS
-	#return records/headers as a HTTP::OAI::Response
-	my $getRecord=$result->toGetRecord;
-	my $listIdentifiers=$result->toListIdentifiers;
-	my $listRecords=$result->toListRecords;
-
-	#depending on $result will return listIdentifiers or listRecords
-	my $response=$result->getResponse
-
-	#CHUNKING
-	$bool=$result->chunking; #test if chunking is turned on or off
-	$result->chunk; #figures out maxChunkNo and sets
-	$result->chunkRequest([bla=>$bla]); #getter & setter for chunkRequest data
-	$result->EOFChunk ($rt); #tester, getter & setter for EOFChunk signal
-
-	$result->chunkSize; #getter for chunk_size configuration data
-	$result->writeChunk; #write chunk to disk
-
-	#for resumptionToken
-	$result->expirationDate; #create an expiration date
-	$result->mkToken; #make a token using current micro second
-
-=head2 my $result=new HTTP::OAI::DataProvider::Engine (%opts);
+=head2 my $result=HTTP::OAI::DataProvider::Engine->new (%opts);
 
 	my %opts = (
 		requestURL  => $self->{requestURL},
@@ -534,12 +485,6 @@ Wraps the records inside the result object in a HTTP::OAI::ListRecord and
 returns it. If $result has a requestURL defined, it'll be applied to the
 ListRecord object.
 
-=head2 $result->_resumptionToken;
-
-Returns the resumptionToken for the result.
-This is called in toListIdentifiers and toListRecords. It takes info saved in
-$result.
-
 =head2 my $listIdentifiers=$result->toListIdentifiers;
 
 Wraps the headers (not records) inside the result object in a
@@ -561,6 +506,61 @@ Is _actually_ called in DataProvider.
 	Returns 1 if this is the last chunk, otherwise empty.
 
 	if ($result->lastChunk)
+
+=head1 USAGE
+
+A result is an object that carries the db response before it is transformed to
+a HTTP::OAI::Response object.
+
+	#INIT
+	my $result=new HTTP::OAI::DataProvider::Engine (%opts);
+
+	#setter and getter for requestURL, will be applied in wrapper, see below
+	my $request=$result->requestURL ([$request]);
+
+	#RECORDS
+	#write records to result
+	$result->saveRecord ($params, $header,$md);
+
+	# makes a record from parts, also transforms md
+	$result->_addRecord ($record); #prefer saveRecord if possible
+
+	#simple count
+	print $result->countRecords. ' results';
+
+	#access to record data
+	my @records=$result->returnRecords;
+
+	#HEADERS
+	print $result->countHeaders. 'headers';
+
+	#WRAPPERS
+	#return records/headers as a HTTP::OAI::Response
+	my $getRecord=$result->toGetRecord;
+	my $listIdentifiers=$result->toListIdentifiers;
+	my $listRecords=$result->toListRecords;
+
+	#depending on $result will return listIdentifiers or listRecords
+	my $response=$result->getResponse
+
+	#CHUNKING
+	$bool=$result->chunking; #test if chunking is turned on or off
+	$result->chunk; #figures out maxChunkNo and sets
+	$result->chunkRequest([bla=>$bla]); #getter & setter for chunkRequest data
+	$result->EOFChunk ($rt); #tester, getter & setter for EOFChunk signal
+
+	$result->chunkSize; #getter for chunk_size configuration data
+	$result->writeChunk; #write chunk to disk
+
+	#for resumptionToken
+	$result->expirationDate; #create an expiration date
+	$result->mkToken; #make a token using current micro second
+
+=head2 $result->_resumptionToken;
+
+Returns the resumptionToken for the result.
+This is called in toListIdentifiers and toListRecords. It takes info saved in
+$result.
 
 =head1 AUTHOR
 
