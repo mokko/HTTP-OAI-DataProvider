@@ -8,3 +8,4 @@ pm_to_blib
 db
 *.stackdump
 HTTP-*
+bak/*
