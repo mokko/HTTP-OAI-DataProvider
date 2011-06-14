@@ -22,52 +22,57 @@ use Dancer::CommandLine qw/Debug Warning/;
 
 =head1 SYNOPSIS
 
-Initialize a data provider (detailed configuration requirements not shown here)
+=head2 Init for use as provider (see below for more details)
 
-Init for use as provider
-    use HTTP::OAI::DataProvider;
-    my $provider = HTTP::OAI::DataProvider->new(%options);
+	use HTTP::OAI::DataProvider;
+	my $provider = HTTP::OAI::DataProvider->new(%options);
 
-Verbs
+=head2 Verbs
+
 	my $response=$provider->$verb($params)
 	$response=$engine->GetRecord(%params);
 	#response is xml ready for print/return
 
-Error checking/TODO
+=head2 Error checking
+
 	my $e=$response->isError
 	if ($response->isError) {
 		#in case of error do this
 	}
 
-Debugging
-	Currently, I use Dancer::CommandLine. Maybe I should build such a mechanism
-	into DataProvider which would also allow to choose a Debug and Warning
-	routine via config, something like
-
-    my $provider = HTTP::OAI::DataProvider->new(
-    	debug=>'SalsaOAI::Debug',
-    	warning=>'SalsaOAI::Warning'
-    );
+=head2 Debugging (TODO)
 
 	Debug "message";
 	Warning "message";
 
-	TODO
-	use HTTP::OAI::DataProvider::Message qw/Debug Warning/;
-	new HTTP::OAI::DataProvider::Message (
-		Debug =>'&callback',
-		Warning=>'&callback'
-	);
-
-
 =head1 OAI DATA PROVIDER FEATURES
 
-supported
-- all OAI verbs and all errors in version 2
+=over 2
 
-not supported
-- resumptionTokens (working on it)
-- hierarchical sets
+=item SUPPORTED
+
+=over 4
+
+=item - the six OAI verbs (getRecord, identify, listRecords, listMetadataFormats,
+ listIdentifiers, listSets) and all errors from OAI-PMH v2 specification
+
+=item - resumptionToken
+
+=item - sets
+
+=item - deletedRecords (only transiently?)
+
+=back
+
+=item NOT SUPPORTED
+
+=over 4
+
+=item - hierarchical sets
+
+=back
+
+=back
 
 =head1 COMPONENTS
 
@@ -83,62 +88,55 @@ Salsa_OAI for an example:
 
 Apart from configuration and callbacks your frontend could look like this:
 
-any [ 'get', 'post' ] => '/oai' => sub {
-	if ( my $verb = params->{verb} ) {
-		no strict "refs";
-		my $response=$provider->$verb( params() );
-		return $response->toXML;
-	}
-};
-dance;
-true;
+	any [ 'get', 'post' ] => '/oai' => sub {
+		if ( my $verb = params->{verb} ) {
+			no strict "refs";
+			my $response=$provider->$verb( params() );
+			return $response->toXML;
+		}
+	};
+	dance;
+	true;
 
 OVERVIEW
 
 The engine
--provides a data store,
--a header store and
--the means to digest source data and to
--query both header and data store
--public functions/methods are those which aremeant to be called by the backend.
+
+=over
+
+=item - provides a data store,
+
+=item - the means to digest source data and to
+
+=item - query both header information and data store
+
+=item - public functions/methods are those which aremeant to be called by the
+backend.
 
 The backend is
--should not depend on Dancer or any other web framework
--should not depend on a specific metadata format
--should perform most error checks prescribed by the OAI specification.
--public functions/methods are those which are meant to be called from the frontend.
+=item - should not depend on Dancer (or any other web framework)
+
+=item - should not depend on a specific metadata format
+
+=item - should perform most error checks prescribed by the OAI specification.
+
+=item - public functions/methods are those which are meant to be called from the
+frontend.
 
 The frontend
--potentially employs a web framework like Dancer
--provides ways to work with specific metadata formats (mappings)
--parses configuration data and hands it over to backend
--includes most or all callbacks
 
-=head1 MORE TERMINOLOGY
+=item - potentially employs a web framework (like Dancer)
 
-I differentiate between SOURCE DATA, DATA STORE and a HEADER STORE.
-(For historically reasons, I sometimes refer to the header store as header cache).
+=item - parses configuration data and hands it over to backend
 
-"Header" always refers to OAI Headers as specified in the OAI PMH. Sometimes, I
-add the letters OAI, sometimes not without indicating any difference in
-meaning.
+=item - includes most or all callbacks
 
-There has to be a way to obtain header information. Typically you will want to
-specify rules (using callbacks) which extract OAI header info from the source
-data. You might also want to create header information, e.g. when it is
-missing, but for simplicity I just call any generation of header data
-EXTRACTION.
+=item - provides ways to work with specific metadata formats (internal format,
+mappings)
 
-You could say that the callbacks which extract header data implement some kind
-of a mapping. But potentially, you could have many different mappings, so I
-avoid this term here. I treat this mapping like configuration data. Therefore,
-I locate it in the front end; the backend only has to document these callbacks.
+=back
 
-Global MetadataFormats: A metadataFormat is global if any item in the
-repository is available in this format. Currently HTTP::OAI::DataProvider
-supports only global metadata formats.
-
-=head1 METHODS - INITIALIZATION
+=head1 METHODS
 
 =head2 my $provider->new (%options);
 
@@ -791,37 +789,9 @@ sub err2XML {
 HTTP::OAI::DataProvider is to be used by frontend developers. What is not meant
 for them, is private.
 
-=cut
-
-#=head2 $provider->_countResponse($response);
-#
-#We should be able to count HTTP::OAI::ListIdentifiers and HTTP::OAI::ListRecords
-#objects.
-#
-#=cut
-#
-#sub _countResponse {
-#	my $provider=shift;
-#	my $response=shift;
-#	my $count=0;
-#
-#	my $type=ref $response;
-#	my $new=new $type;
-#
-#	while(my $item = $r->next) {
-#		$count++;
-#		if ($type eq 'HTTP::OAI::ListIdentifers') {
-#			$new->identifier ($item)
-#		}
-#		$new->identifier ($item)
-#	}
-#
-#	return $count;
-#}
-
 =head2 my $params=_hashref (@_);
 
-Little thingy that transforms array of parameters to hashref and returns it.
+Little function that transforms array of parameters to hashref and returns it.
 
 =cut
 
@@ -962,11 +932,11 @@ sub overwriteRequestURL {
 
 =head2 $obj= $self->_init_xslt($obj)
 
-  For an HTTP::OAI::Response object ($obj), sets the stylesheet to the value
-  specified during init. This assume that there is only one stylesheet.
+For an HTTP::OAI::Response object ($obj), sets the stylesheet to the value
+specified during init. This assume that there is only one stylesheet.
 
-  This may be a bad name, since not specific enough. This xslt is responsible
-  for a nicer look and added on the top of reponse headers.
+This may be a bad name, since not specific enough. This xslt is responsible
+for a nicer look and added on the top of reponse headers.
 
 =cut
 
@@ -986,36 +956,22 @@ sub _init_xslt {
 	}
 }
 
-=head1 AUTHOR
+=head1 TODO
 
-Maurice Mengel, C<< <mauricemengel at gmail.com> >>
+Currently, I use Dancer::CommandLine. Maybe I should build such a mechanism
+into DataProvider which would also allow to choose a Debug and Warning
+routine via config, something like
 
-=head1 BUGS
+	my $provider = HTTP::OAI::DataProvider->new(
+		debug=>'SalsaOAI::Debug',
+		warning=>'SalsaOAI::Warning'
+	);
 
-Please use Github.com Issue queue to report bugs
-Todo: Link
-
-=head1 SUPPORT
-
-You can find documentation for this module with the perldoc command.
-
-    perldoc HTTP::OAI::DataProvider
-
-
-Look on GitHub.
-
-
-=head1 ACKNOWLEDGEMENTS
-
-=head1 LICENSE AND COPYRIGHT
-
-Copyright 2010 Maurice Mengel.
-
-This program is free software; you can redistribute it and/or modify it
-under the terms of either: the GNU General Public License as published
-by the Free Software Foundation; or the Artistic License.
-
-See http://dev.perl.org/licenses/ for more information.
+	use HTTP::OAI::DataProvider::Message qw/Debug Warning/;
+	new HTTP::OAI::DataProvider::Message (
+		Debug =>'&callback',
+		Warning=>'&callback'
+	);
 
 =cut
 
