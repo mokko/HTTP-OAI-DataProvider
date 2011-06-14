@@ -1,4 +1,5 @@
 package HTTP::OAI::DataProvider;
+# ABSTRACT: A simple OAI data provider
 
 use warnings;
 use strict;
@@ -18,18 +19,6 @@ use Dancer::CommandLine qw/Debug Warning/;
 
 #for debugging
 #use Data::Dumper qw/Dumper/;
-
-=head1 NAME
-
-HTTP::OAI::DataProvider - Simple perl OAI data provider
-
-=head1 VERSION
-
-Version 0.05
-
-=cut
-
-our $VERSION = '0.05';    #with query cache and chunking
 
 =head1 SYNOPSIS
 

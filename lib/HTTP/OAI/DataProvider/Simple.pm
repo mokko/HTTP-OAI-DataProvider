@@ -1,4 +1,6 @@
 package HTTP::OAI::DataProvider::Simple;
+# ABSTRACT: Create/query a file based OAI header cache
+
 use Dancer ':syntax';
 
 use warnings;
@@ -12,9 +14,6 @@ use Exporter;
 # our requires at least perl56
 our @EXPORT_OK = qw(import_single import_dir load_cache write_cache);
 
-=head1 NAME
-
-HTTP::OAI::DataProvider::Simple - Create/query a file based OAI header cache
 
 =head1 SYNOPSIS
 

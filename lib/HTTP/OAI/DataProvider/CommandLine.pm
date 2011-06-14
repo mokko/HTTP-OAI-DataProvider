@@ -2,17 +2,7 @@ package Dancer::CommandLine;
 use strict;
 use warnings;
 
-=head1 NAME
-
-Dancer::CommandLine - Warning and Debug for Dancer and non-dancing scripts
-
-=head1 VERSION
-
-Version 0.01
-
-=cut
-
-our $VERSION = '0.01';
+# ABSTRACT: Warning and Debug for Dancer and non-dancing scripts
 
 =head1 SYNOPSIS
 

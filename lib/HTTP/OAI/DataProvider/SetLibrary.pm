@@ -1,4 +1,5 @@
 package HTTP::OAI::DataProvider::SetLibrary;
+# ABSTRACT: Handle set definitions
 
 #use Dancer ':syntax';    #not absolutely necessary, only for debugging
 use Dancer::CommandLine qw/Debug Warning/;
@@ -12,10 +13,11 @@ our $VERSION = '0.01';    #don't forget to change below
 
 =head1 NAME
 
-HTTP::OAI::SetLibrary - Separate sets and their definition and show only Sets
-that are actually present in your repository.
 
 =head1 SYNOPSIS
+
+Separate sets and their definition. Access only sets that are actually present
+in your repository.
 
     use HTTP::OAI::Set;
     use HTTP::OAI::Repository::SetLibrary;

@@ -1,14 +1,12 @@
 package HTTP::OAI::DataProvider::Engine;
-
+# ABSTRACT: interface between data store and data provider
 use strict;
 use warnings;
 use Time::HiRes qw(gettimeofday);    #to generate unique tokens
 use Dancer ':syntax';
 use Carp qw/croak/;
 
-=head2 Engine Requirements
-
-Engine interfaces the data store on the one side and data provider on the side.
+=head2 SYNOPSIS
 
 What does the engine need?
 
@@ -19,12 +17,6 @@ What does the engine need?
 
 	my $result=$engine->queryHeaders ($params);
 	my $result=$engine->queryRecords ($params);
-
-=cut
-
-=head2 my $cache=new HTTP::OAI::DataRepository::Result (
-);
-=cut
 
 =head2 my $token=$engine->mkToken;
 
@@ -105,6 +97,13 @@ sub requiredFeatures {
 
 	}
 }
+
+=method $self->argumentExists ($arg);
+
+	Returns nothing is argument exists, croaks if no argument,
+
+=cut
+
 
 sub argumentExists {
 	my $self = shift;

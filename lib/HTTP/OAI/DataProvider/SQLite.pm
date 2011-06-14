@@ -1,10 +1,10 @@
 package HTTP::OAI::DataProvider::SQLite;
+# ABSTRACT: A sqlite engine for HTTP::OAI::DataProvider
 
 use warnings;
 use strict;
 use YAML::Syck qw/Dump LoadFile/;
 
-#use XML::LibXML;
 use HTTP::OAI;
 use HTTP::OAI::Repository qw/validate_date/;
 use HTTP::OAI::DataProvider::Engine::Result;
@@ -18,14 +18,6 @@ use DBI qw(:sql_types);    #new
 use DBIx::Connector;
 use parent qw(HTTP::OAI::DataProvider::Engine);
 
-#only for debug during development
-#use Data::Dumper;
-
-#TODO: See if I want to use base or parent?
-
-=head1 NAME
-
-HTTP::OAI::DataProvider::SQLite - A sqlite engine for HTTP::OAI::DataProvider
 
 =head1 SYNOPSIS
 
@@ -62,6 +54,8 @@ module which the actual engine inherits. That would serve the purpose. Then
 it would be
 	HTTP::OAI::DataProvider::Engine
 
+TODO: See if I want to use base or parent?
+only for debug during development
 
 =head2 	my $err=$engine->digest_single (source=>$xml_fn, mapping=>&mapping);
 =cut
@@ -927,6 +921,12 @@ sub _storeRecord {
 		}
 	}
 }
+
+=method $self->checkRequired ('a','b');
+
+	Carps if 'a' or 'b' are not exist (as $self->{a} and $self->{b}).
+
+=cut
 
 sub checkRequired {
 	my $self = shift;

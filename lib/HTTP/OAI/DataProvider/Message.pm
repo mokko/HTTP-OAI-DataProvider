@@ -1,4 +1,5 @@
 package HTTP::OAI::DataProvider::Message;
+# ABSTRACT: Debug and warning messages for the data provider
 
 use strict;
 use warnings;
@@ -9,10 +10,6 @@ our @ISA       = qw(Exporter);
 our @EXPORT_OK = qw(Debug Warning);    # symbols to export on request
 our $Debug;
 our $Warning;
-
-=head1 NAME
-
-HTTP::OAI::DataProvider::Debug
 
 =head2 SYNOPSIS
 

@@ -1,4 +1,5 @@
 package HTTP::OAI::DataProvider::ChunkCache;
+# ABSTRACT: Store request info per resumptionToken
 
 use strict;
 use warnings;
@@ -6,13 +7,6 @@ use Carp qw/carp croak/;
 
 our $chunkCache = {};
 
-
-#we assume that ordering the tokens alphabetically will show them in the order
-#we are supposed to delete them
-
-=head1 NAME
-
-HTTP::OAI::DataProvider::ChunkCache - Store request info per resumptionToken
 
 =head1 SYNOPSIS
 

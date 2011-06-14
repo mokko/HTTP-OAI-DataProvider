@@ -1,19 +1,15 @@
 package HTTP::OAI::DataProvider::Transformer;
+# ABSTRACT: Apply XSLT mapping within data provider
 
 use warnings;
 use strict;
 
-#use HTTP::OAI;
 use Carp qw/croak carp/;
 use Dancer::CommandLine qw/Debug Warning/;
 use XML::LibXSLT;
 
 #the currently compiled xsl, see _cache_stylesheet
 our %stylesheet_cache;
-
-=head1 NAME
-
-HTTP::OAI::DataProvider::Transformer
 
 =head1 SYNOPSIS
 
@@ -23,10 +19,6 @@ HTTP::OAI::DataProvider::Transformer
 		locateXSL=>'Salsa_OAI::salsa_locateXSL', #callback
 	);
 	my $dom=$t->toTargetPrefix ($targetPrefix,$dom);
-
-=head1 DESCRIPTION
-
-Little helper that applies an xslt on a $dom
 
 =head1 METHODS
 

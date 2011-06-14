@@ -1,2 +1,13 @@
-This is work in progress
-currently not usable
+
+
+This archive contains the distribution HTTP-OAI-DataProvider,
+version 0.006:
+
+  A simple OAI data provider
+
+This software is copyright (c) 2011 by Maurice Mengel.
+
+This is free software; you can redistribute it and/or modify it under
+the same terms as the Perl 5 programming language system itself.
+
+

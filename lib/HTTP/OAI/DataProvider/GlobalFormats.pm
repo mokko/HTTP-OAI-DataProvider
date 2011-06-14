@@ -1,13 +1,10 @@
 package HTTP::OAI::DataProvider::GlobalFormats;
+# ABSTRACT: Handle global metadata formats
 
 use warnings;
 use strict;
 use HTTP::OAI;
 use Carp qw/croak carp/;
-
-=head1 NAME
-
-HTTP::OAI::DataProvider::GlobalFormats - Handle global metadata formats!
 
 =head1 SYNOPSIS
 

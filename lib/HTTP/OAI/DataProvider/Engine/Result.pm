@@ -1,4 +1,5 @@
 package HTTP::OAI::DataProvider::Engine::Result;
+# ABSTRACT: Result object for engine
 
 use Carp qw/croak/;
 use HTTP::OAI;
@@ -7,22 +8,16 @@ use parent qw(HTTP::OAI::DataProvider::Engine);
 
 use Dancer ':syntax';     #only for debug in development, warnings?
 
-#use XML::SAX::Writer; #still necessary?
-
-=head1 HTTP::OAI::DataProvider::Result
-
-The objective is to make DataProvider::SQLite leaner. A result is an object
-that carries the db response before it is transformed to a HTTP::OAI::Response
-object.
-
 =head1 USAGE
+
+A result is an object that carries the db response before it is transformed to
+a HTTP::OAI::Response object.
 
 	#INIT
 	my $result=new HTTP::OAI::DataProvider::Engine (%opts);
 
 	#setter and getter for requestURL, will be applied in wrapper, see below
 	my $request=$result->requestURL ([$request]);
-
 
 	#RECORDS
 	#write records to result
