@@ -59,7 +59,7 @@ a HTTP::OAI::Response object.
 
 =cut
 
-=head2 my $result=new HTTP::OAI::DataProvider::Engine (%opts);
+=method my $result=HTTP::OAI::DataProvider::Engine->new (%opts);
 
 	my %opts = (
 		requestURL  => $self->{requestURL},
@@ -97,7 +97,7 @@ sub new {
 	return $result;
 }
 
-=head2 my $request=$result->requestURL ([$request]);
+=method my $request=$result->requestURL ([$request]);
 
 Getter and setter. Either expects a $request (complete requestURL including
 http:// part and parameters). Or returns it (as string).
@@ -123,7 +123,7 @@ sub requestURL {
 	}
 }
 
-=head2 $result->addError($code[, $message]);
+=method $result->addError($code[, $message]);
 
 Adds an HTTP::OAI::Error error to a result object. Test with
 	#untested
@@ -154,7 +154,7 @@ sub addError {
 	}
 }
 
-=head2 $result->_addHeader ($header);
+=method $result->_addHeader ($header);
 
 Adds a header to the result object.
 
@@ -180,7 +180,7 @@ sub _addHeader {
 	$result->{headers}->identifier($header);
 }
 
-=head2 $result->_addRecord ($record);
+=method $result->_addRecord ($record);
 
 Adds a record to the result object. Gets called by saveRecord.
 
@@ -205,9 +205,10 @@ sub _addRecord {
 	push @{ $result->{records} }, $record;
 }
 
-=head2 my $number=$result->countHeaders;
+=method my $number=$result->countHeaders;
 
 Return number (scalar) of Headers so far.
+
 =cut
 
 sub countHeaders {
@@ -215,7 +216,7 @@ sub countHeaders {
 	$result->{headCount} ? return $result->{headCount} : return 0;
 }
 
-=head2 my $result->responseCount
+=method my $result->responseCount
 
 Triggers debug output!
 
@@ -235,7 +236,7 @@ sub responseCount {
 	}
 }
 
-=head2 my $chunkSize=$result->chunkSize;
+=method my $chunkSize=$result->chunkSize;
 
 Return chunk_size if defined or empty. Chunk size is a config value that
 determines how big (number of records per chunk) the chunks are.
@@ -250,7 +251,7 @@ sub chunkSize {
 	return ();    #fail
 }
 
-=head2 $result->getType();
+=method $result->getType();
 
 getType sets internal type in $result to either headers or records, depending
 on content of $result.
@@ -272,7 +273,7 @@ sub getType {
 	}
 }
 
-=head2 	my $response=$result->getResponse;
+=method my $response=$result->getResponse;
 
 Return the content of $result as a HTTP::OAI::Response object. Either
 HTTP::OAI::ListIdentifiers or HTTP::OAI::ListRecords, depending on content.
@@ -303,7 +304,7 @@ sub getResponse {
 	warning "Strange Error!";
 }
 
-=head2 my $number_of_records=$result->countRecords;
+=method my $number_of_records=$result->countRecords;
 
 In scalar context, returns the number of records.
 
@@ -315,7 +316,7 @@ sub countRecords {
 	$no ? return $no : return 0;
 }
 
-=head2 my @records=$result->returnRecords;
+=method my @records=$result->returnRecords;
 
 In list context, returns the record array.
 
@@ -328,7 +329,7 @@ sub returnRecords {
 	return @{ $result->{records} };
 }
 
-=head2 $result->save (params=>$params, header=>$header, [md=>$md]);
+=method $result->save (params=>$params, header=>$header, [md=>$md]);
 
 Expects parts for the result, constructs a result and saves it into the result
 object.
@@ -410,7 +411,7 @@ sub save {
 	return 0;    #success
 }
 
-=head2 my $getRecord=$result->toGetRecord;
+=method my $getRecord=$result->toGetRecord;
 
 Wraps the record inside the result object in a HTTP::OAI::GetRecord and
 returns it. If $result has a requestURL defined, it'll be applied to
@@ -434,7 +435,7 @@ sub toGetRecord {
 	return $getRecord;
 }
 
-=head2 my $listRecord=$result->toListRecords;
+=method my $listRecord=$result->toListRecords;
 
 Wraps the records inside the result object in a HTTP::OAI::ListRecord and
 returns it. If $result has a requestURL defined, it'll be applied to the
@@ -488,7 +489,7 @@ sub _resumptionToken {
 	return $rt;
 }
 
-=head2 my $listIdentifiers=$result->toListIdentifiers;
+=method my $listIdentifiers=$result->toListIdentifiers;
 
 Wraps the headers (not records) inside the result object in a
 HTTP::OAI::ListIdentifiers and returns it. If $result has a requestURL defined,
@@ -520,7 +521,7 @@ sub toListIdentifiers {
 	return $listIdentifiers;
 }
 
-=head2 my @err=$result->isError
+=method my @err=$result->isError
 
 Returns a list of HTTP::OAI::Error objects if any.
 
@@ -549,7 +550,7 @@ sub isError {
 }
 
 
-=head2 my $ret=result->lastChunk;
+=method my $ret=result->lastChunk;
 
 	Returns 1 if this is the last chunk, otherwise empty.
 
@@ -566,4 +567,3 @@ sub lastChunk {
 }
 
 1;                    #HTTP::OAI::DataProvider::Engine::Result
-
