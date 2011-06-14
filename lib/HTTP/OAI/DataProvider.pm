@@ -22,15 +22,14 @@ use Dancer::CommandLine qw/Debug Warning/;
 
 =head1 SYNOPSIS
 
-=head2 Init for use as provider (see below for more details)
+=head2 Init
 
 	use HTTP::OAI::DataProvider;
 	my $provider = HTTP::OAI::DataProvider->new(%options);
 
-=head2 Verbs
+=head2 Verbs: GetRecord, Identify, ListSets, ListRecords ...
 
-	my $response=$provider->$verb($params)
-	$response=$engine->GetRecord(%params);
+	my $response=$provider->$verb($request, %params)
 	#response is xml ready for print/return
 
 =head2 Error checking
@@ -45,38 +44,7 @@ use Dancer::CommandLine qw/Debug Warning/;
 	Debug "message";
 	Warning "message";
 
-=head1 OAI DATA PROVIDER FEATURES
-
-=over 2
-
-=item SUPPORTED
-
-=over 4
-
-=item - the six OAI verbs (getRecord, identify, listRecords, listMetadataFormats,
- listIdentifiers, listSets) and all errors from OAI-PMH v2 specification
-
-=item - resumptionToken
-
-=item - sets
-
-=item - deletedRecords (only transiently?)
-
-=back
-
-=item NOT SUPPORTED
-
-=over 4
-
-=item - hierarchical sets
-
-=back
-
-=back
-
-=head1 METHODS
-
-=head2 my $provider->new (%options);
+=method my $provider->new (%options);
 
 Initialize the HTTP::OAI::DataProvider object with the options of your choice.
 
@@ -87,16 +55,17 @@ development and not during runtime it may also croak.
 
 List here only options not otherwise explained?
 
-debug=>callback (TODO)
+=for :list
+* debug=>callback (TODO)
 	If a callback is supplied use this callback for debug output
 
-isMetadaFormatSupported=>callback, TODO
+* isMetadaFormatSupported=>callback, TODO
 	The callback expects a single prefix and returns 1 if true and nothing
 	when not supported. Currently only global metadataFormats, i.e. for all
 	items in repository. This one seems to be obligatory, so croak when
 	missing.
 
-xslt=>'path/to/style.xslt',
+* xslt=>'path/to/style.xslt',
 	Adds this path to HTTP::OAI::Repsonse objects to modify output in browser.
 	See also _init_xslt for more info.
 
@@ -104,7 +73,7 @@ xslt=>'path/to/style.xslt',
 	still uncertain, maybe even unlikely if engine will be option at all.
 	(Alternative would be to just to use the engine.)
 
-requestURL
+* requestURL
 	Overwrite normal requestURL, e.g. when using a reverse proxy cache etc.
 	Note that
 	a) requestURL specified during new is only the http://domain.com:port
@@ -116,9 +85,8 @@ requestURL
 	Currently, requestURL evaporates if Salsa_OAI is run under anything else
 	than HTTP::Server::Simple.
 
-warning =>callback (Todo)
+* warning =>callback (Todo)
 	If a callback is supplied use this callback for warning output
-
 
 =cut
 
@@ -165,18 +133,20 @@ sub new {
 	return $self;
 }
 
-=head1 METHODS - VERBS
-
-=head2 my $result=$provider->GetRecord(%params);
+=method my $result=$provider->GetRecord(%params);
 
 Arguments
--identifier (required)
--metadataPrefix (required)
+
+=for :list
+* identifier (required)
+* metadataPrefix (required)
 
 Errors
--badArgument: already tested
--cannotDisseminateFormat: gets checked here
--idDoesNotExist: gets checked here
+
+=for :list
+* DbadArgument: already tested
+* cannotDisseminateFormat: gets checked here
+* idDoesNotExist: gets checked here
 
 =cut
 
@@ -240,10 +210,7 @@ sub GetRecord {
 
 }
 
-=head2 my $response=$provider->Identify();
-
-Simply a callback. It could be located in the frontend and return Identify
-information from a configuration file.
+=method my $response=$provider->Identify();
 
 Callback should be passed over to HTTP::OAI::DataProvider during
 initialization with option Identify, e.g.
@@ -282,7 +249,7 @@ sub Identify {
 	return $self->_output($obj);
 }
 
-=head2 ListMetadataFormats (identifier);
+=method ListMetadataFormats (identifier);
 
 "This verb is used to retrieve the metadata formats available from a
 repository. An optional argument restricts the request to the formats available
@@ -292,12 +259,16 @@ HTTP::OAI::DataProvider only knows global metadata formats, i.e. it assumes
 that every record is available in every format supported by the repository.
 
 ARGUMENTS
--identifier (optional)
+
+=for :list
+* identifier (optional)
 
 ERRORS
--badArgument - in validate_request()
--idDoesNotExist - here
--noMetadataFormats - here
+
+=for :list
+* badArgument - in validate_request()
+* idDoesNotExist - here
+* noMetadataFormats - here
 
 =cut
 
@@ -357,7 +328,7 @@ sub ListMetadataFormats {
 	return $self->_output($lmfs);
 }
 
-=head2 my $xml=$provider->ListIdentifiers ($params);
+=method my $xml=$provider->ListIdentifiers ($params);
 
 Returns xml as string, either one or multiple errors or a ListIdentifiers verb.
 
@@ -371,18 +342,22 @@ a status attribute of "deleted" if a record matching the arguments specified in
 the request has been deleted.
 
 ARGUMENTS
--from (optional, UTCdatetime value)
--until (optional, UTCdatetime value)
--metadataPrefix (required)
--set (optional)
--resumptionToken (exclusive) [NOT IMPLEMENTED!]
+
+=for :list
+* from (optional, UTCdatetime value)
+* until (optional, UTCdatetime value)
+* metadataPrefix (required)
+* set (optional)
+* resumptionToken (exclusive) [NOT IMPLEMENTED!]
 
 ERRORS
--badArgument: already checked in validate_request
--badResumptionToken: here
--cannotDisseminateFormat: here
--noRecordsMatch:here
--noSetHierarchy: here. Can only appear if query has set
+
+=for :list
+* badArgument: already checked in validate_request
+* badResumptionToken: here
+* cannotDisseminateFormat: here
+* noRecordsMatch:here
+* noSetHierarchy: here. Can only appear if query has set
 
 LIMITATIONS
 By making the metadataPrefix required, the specification suggests that
@@ -392,7 +367,9 @@ only global metadata formats, so it will return the same set for all supported
 metadataFormats.
 
 TODO
-Hierarchical sets!
+
+=for :list
+* Hierarchical sets
 
 =cut
 
@@ -487,7 +464,7 @@ sub _badResumptionToken {
 		new HTTP::OAI::Error( code => 'badResumptionToken' ) );
 }
 
-=head2 ListRecords
+=method ListRecords
 
 returns multiple items (headers plus records) at once. In its capacity to
 return multiple objects it is similar to the other list verbs
@@ -496,21 +473,27 @@ In its capacity to return full records (incl. header), ListRecords is similar
 to GetRecord.
 
 ARGUMENTS
--from (optional, UTCdatetime value) TODO: Check if it works
--until (optional, UTCdatetime value)  TODO: Check if it works
--metadataPrefix (required unless resumptionToken)
--set (optional)
--resumptionToken (exclusive)
+
+=for :list
+* from (optional, UTCdatetime value) TODO: Check if it works
+* until (optional, UTCdatetime value)  TODO: Check if it works
+* metadataPrefix (required unless resumptionToken)
+* set (optional)
+* resumptionToken (exclusive)
 
 ERRORS
--badArgument: checked for before you get here
--badResumptionToken - TODO
--cannotDisseminateFormat - TODO
--noRecordsMatch - here
--noSetHierarchy - TODO
+
+=for :list
+* badArgument: checked for before you get here
+* badResumptionToken - TODO
+* cannotDisseminateFormat - TODO
+* noRecordsMatch - here
+* noSetHierarchy - TODO
 
 TODO
--Check if error appears as excepted when non-supported metadataFormat
+
+=for :list
+* Check if error appears as excepted when non-supported metadataFormat
 
 =cut
 
@@ -579,17 +562,20 @@ sub ListRecords {
 	return $self->_output($response);
 }
 
-=head2 ListSets
+=method ListSets
 
-	ARGUMENTS
-	resumptionToken (optional)
+ARGUMENTS
 
-	ERRORS
-	badArgument -> HTTP::OAI::Repository
-	badResumptionToken  -> here
-	noSetHierarchy --> here
+=for :list
+* resumptionToken (optional)
 
-TODO
+ERRORS
+
+=for :list
+* badArgument -> HTTP::OAI::Repository
+* badResumptionToken  -> here
+* noSetHierarchy --> here
+
 =cut
 
 sub ListSets {
@@ -685,7 +671,7 @@ sub ListSets {
 #
 #
 
-=head1 METHODS - VARIOUS PUBLIC UTILITY FUNCTIONS / METHODS
+=head1 PUBLIC UTILITY FUNCTIONS / METHODS
 
 check error, display error, warning, debug etc.
 
@@ -743,6 +729,8 @@ sub _hashref {
 TODO: should be called getChunkDesc
 
 Tests whether
+
+=for :list
 	a) whether a resumptionToken is in params and
 	b) there is a chunkDesc with that token in the cache.
 
@@ -793,7 +781,7 @@ sub chunkExists {
 	return $response;
 }
 
-=head2 return $self->_output($response);
+=head2 $self->_output($response);
 
 Expects a HTTP::OAI::Response object and returns it as xml string. It applies
 $self->{xslt} if set.
@@ -893,6 +881,28 @@ sub _init_xslt {
 		Warning "No beautify-xslt loaded!";
 	}
 }
+
+=head1 OAI DATA PROVIDER FEATURES
+
+SUPPORTED
+
+=begin :list
+
+* the six OAI verbs (getRecord, identify, listRecords, listMetadataFormats,
+ listIdentifiers, listSets) and all errors from OAI-PMH v2 specification
+* resumptionToken
+* sets
+* deletedRecords (only transiently?)
+
+=end :list
+
+NOT SUPPORTED
+
+=begin :list
+
+* hierarchical sets
+
+=end :list
 
 =head1 TODO
 
