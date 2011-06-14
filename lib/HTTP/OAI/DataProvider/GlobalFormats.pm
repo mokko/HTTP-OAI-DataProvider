@@ -1,54 +1,14 @@
 package HTTP::OAI::DataProvider::GlobalFormats;
+BEGIN {
+  $HTTP::OAI::DataProvider::GlobalFormats::VERSION = '0.006';
+}
+# ABSTRACT: Handle global metadata formats
 
 use warnings;
 use strict;
 use HTTP::OAI;
 use Carp qw/croak carp/;
 
-=head1 NAME
-
-HTTP::OAI::DataProvider::GlobalFormats - Handle global metadata formats!
-
-=head1 SYNOPSIS
-
-    use HTTP::OAI::DataProvider::GlobalFormats;
-
-    my $globalFormats = HTTP::OAI::DataProvider::GlobalFormats->new();
-
-	my $err=$globalFormats->register ( ns_prefix => $prefix,
-		ns_uri => $uri, ns_schema => $location
-	);
-
-	if ($err) {
-		#there is an error
-		return $err;
-	}
-
-	my $err=check_format_supported ($prefix);
-
-	if ($err) {
-		#error is HTTP::OAI::Error with code CannotDisseminateFormat
-		return $err;
-	}
-
-	#TODO test
-	my $err=$globalFormats->unregister ($prefix);
-	my $format=$globalFormats->get ($prefix);
-	my @formats=$globalFormats->get ();
-	my $lmdf=$globalFormats->get_list ();
-
-
-=head1 DESCRIPTION
-
-A format is global if each and every record in a repository is available in it.
-HTTP::OAI::Repository::Simple assumes that all formats are global, i.e. all
-records available in all supported formats.
-
-=head1 METHODS
-
-=head2 my $globalFormats = HTTP::OAI::Repository::Simple::GlobalFormats->new();
-
-=cut
 
 sub new {
 	my $class = shift;
@@ -58,11 +18,6 @@ sub new {
 	return $self;
 }
 
-=head2	my $err= $globalFormats->register ( ns_prefix => $prefix,
-		ns_uri    => $uri,
-		ns_schema => $location
-	);
-=cut
 
 sub register {
 	my $self = shift;
@@ -84,12 +39,6 @@ sub register {
 	return ();
 }
 
-=head2	my $err=$globalFormats->unregister ($prefix);
-
-Delete a format from global formats. On success, returns nothing or error on
-failure.
-
-=cut
 
 sub unregister {
 	my $self   = shift;
@@ -107,19 +56,6 @@ sub unregister {
 	return ();
 }
 
-=head2 my $format=$globalFormats->get ($prefix);
-
-Returns the HTTP::OAI::MetadataFormat in tone or more metadata formats which have been registered before.
-
-If prefix, returns one format as HTTP::OAI::MetadataFormat. If no
-prefix, it returns all defined as list of HTTP::OAI::MetadataFormat.
-
-On failure or if no metadata format with that prefix is defined, returns
-nothing.
-
-Todo: Test. Is it possible that there are several formats of the same prefix?
-
-=cut
 
 sub get {
 	my $self   = shift;
@@ -138,13 +74,6 @@ sub get {
 	return ();
 }
 
-=head2 my $l=$globalFormats->get_list
-
-returns the HTTP::OAI::ListMetadataFormats object saved inside of the
-HTTP::OAI::DataProvider::Simple::GlobalFormats.
-
-
-=cut
 
 sub get_list {
 	my $self = shift;
@@ -155,22 +84,6 @@ sub get_list {
 	return ();
 }
 
-=head2 check_format_supported ($prefix);
-
-my $e=check_format_supported ($prefix);
-
-Check if metadataFormat $prefix is supported by this repository.
-
-my $e=check_format_supported ($prefix);
-
-if ($e) {
-	#error
-}
-
-It's good to retrun the HTTP::OAI::Error object (and not a XML string)
-so several errors can be returned.
-
-=cut
 
 sub check_format_supported {
 	my $self   = shift;
@@ -201,6 +114,100 @@ sub check_format_supported {
 
 }
 
+
+1;    # End of HTTP::OAI::Repository::GlobalMetadataFormats
+
+__END__
+=pod
+
+=head1 NAME
+
+HTTP::OAI::DataProvider::GlobalFormats - Handle global metadata formats
+
+=head1 VERSION
+
+version 0.006
+
+=head1 SYNOPSIS
+
+    use HTTP::OAI::DataProvider::GlobalFormats;
+
+    my $globalFormats = HTTP::OAI::DataProvider::GlobalFormats->new();
+
+	my $err=$globalFormats->register ( ns_prefix => $prefix,
+		ns_uri => $uri, ns_schema => $location
+	);
+
+	if ($err) {
+		#there is an error
+		return $err;
+	}
+
+	my $err=check_format_supported ($prefix);
+
+	if ($err) {
+		#error is HTTP::OAI::Error with code CannotDisseminateFormat
+		return $err;
+	}
+
+	#TODO test
+	my $err=$globalFormats->unregister ($prefix);
+	my $format=$globalFormats->get ($prefix);
+	my @formats=$globalFormats->get ();
+	my $lmdf=$globalFormats->get_list ();
+
+=head1 DESCRIPTION
+
+A format is global if each and every record in a repository is available in it.
+HTTP::OAI::Repository::Simple assumes that all formats are global, i.e. all
+records available in all supported formats.
+
+=head1 METHODS
+
+=head2 my $globalFormats = HTTP::OAI::Repository::Simple::GlobalFormats->new();
+
+=head2 my $err= $globalFormats->register ( ns_prefix => $prefix,
+		ns_uri    => $uri,
+		ns_schema => $location
+	);
+
+=head2 my $err=$globalFormats->unregister ($prefix);
+
+Delete a format from global formats. On success, returns nothing or error on
+failure.
+
+=head2 my $format=$globalFormats->get ($prefix);
+
+Returns the HTTP::OAI::MetadataFormat in tone or more metadata formats which have been registered before.
+
+If prefix, returns one format as HTTP::OAI::MetadataFormat. If no
+prefix, it returns all defined as list of HTTP::OAI::MetadataFormat.
+
+On failure or if no metadata format with that prefix is defined, returns
+nothing.
+
+Todo: Test. Is it possible that there are several formats of the same prefix?
+
+=head2 my $l=$globalFormats->get_list
+
+returns the HTTP::OAI::ListMetadataFormats object saved inside of the
+HTTP::OAI::DataProvider::Simple::GlobalFormats.
+
+=head2 check_format_supported ($prefix);
+
+my $e=check_format_supported ($prefix);
+
+Check if metadataFormat $prefix is supported by this repository.
+
+my $e=check_format_supported ($prefix);
+
+if ($e) {
+	#error
+}
+
+It's good to retrun the HTTP::OAI::Error object (and not a XML string)
+so several errors can be returned.
+
 =head1 AUTHOR
 
 Maurice Mengel, C<< <mauricemengel at gmail.com> >>
@@ -216,7 +223,6 @@ automatically be notified of progress on your bug as I make changes.
 You can find documentation for this module with the perldoc command.
 
     perldoc HTTP::OAI::Repository::Simple::GlobalMetadataFormats
-
 
 You can also look for information at:
 
@@ -240,9 +246,7 @@ L<http://search.cpan.org/dist/HTTP-OAI-Repository-Simple-GlobalMetadataFormats/>
 
 =back
 
-
 =head1 ACKNOWLEDGEMENTS
-
 
 =head1 LICENSE AND COPYRIGHT
 
@@ -254,7 +258,16 @@ by the Free Software Foundation; or the Artistic License.
 
 See http://dev.perl.org/licenses/ for more information.
 
+=head1 AUTHOR
+
+Maurice Mengel <mauricemengel@gmail.com>
+
+=head1 COPYRIGHT AND LICENSE
+
+This software is copyright (c) 2011 by Maurice Mengel.
+
+This is free software; you can redistribute it and/or modify it under
+the same terms as the Perl 5 programming language system itself.
 
 =cut
 
-1;    # End of HTTP::OAI::Repository::GlobalMetadataFormats

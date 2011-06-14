@@ -1,4 +1,8 @@
 package HTTP::OAI::DataProvider::SetLibrary;
+BEGIN {
+  $HTTP::OAI::DataProvider::SetLibrary::VERSION = '0.006';
+}
+# ABSTRACT: Handle set definitions
 
 #use Dancer ':syntax';    #not absolutely necessary, only for debugging
 use Dancer::CommandLine qw/Debug Warning/;
@@ -6,16 +10,171 @@ use warnings;
 use strict;
 use HTTP::OAI;
 use Carp qw/croak/;
-
 #use Data::Dumper qw/Dumper/;
-our $VERSION = '0.01';    #don't forget to change below
+
+
+sub new {
+
+	#Debug "enter HTTP::OAI::DataProvider::SetLibrary new";
+	my $self  = {};
+	my $class = shift;
+
+	$self->{ListSets} = new HTTP::OAI::ListSets;
+	return bless( $self, $class );
+
+	#I guess there are two possibilities
+	#a) a hash with setSpec as key and HTTP::OAI::Set objects as values
+	#b) HTTP::OAI::ListIdentifier with sets wrapped inside
+	#in a)looping seems to be easier,but  code will be more cryptic
+	#that's what encapsulation is for, right?
+
+}
+
+
+sub addSet {
+	my $self = shift;    #a library object
+	my $set  = shift;
+
+	if ( !$set ) {
+		return ();       #return empty handed without doing anything
+	}
+
+	#TODO: test if $set is HTTP::OAI::Set using ref
+
+	if ( ref $set !~ /HTTP::OAI::Set/ ) {
+		Warning "no HTTP::OAI::Set object";
+		return ();       #return empty handed without doing anything
+	}
+
+	#add the new set to the ListSets object
+	$self->{ListSets}->set($set);
+
+	#Debug "return successfully";
+	return 1;            #indicating success
+
+}
+
+
+sub addListSets {
+	my $self     = shift;    #a library object
+	my $ListSets = shift;    #new
+
+	if ( !$ListSets ) {
+		Warning "no listSet. Nothing to do!";
+		return ();
+	}
+
+	if ( ref $ListSets !~ /HTTP::OAI::ListSets/ ) {
+		Warning "no HTTP::OAI::ListSet object";
+		return ();           #return empty handed without doing anything
+	}
+
+	#Debug "Enter addListSet ($ListSets)";
+
+	if ( !$self->{ListSets} ) {
+		die "This is strange. There should be an ListSets";
+	}
+
+	#alternatively I could also call addSet, but this can hardly be faster...
+	while ( my $set = $ListSets->next ) {
+		$self->{ListSets}->set($set);
+	}
+	return 1;    #successful;
+}
+
+
+sub expand {
+	my $self     = shift;
+	my @setSpecs = @_;      #naked setSpecs from store
+
+	Debug "Enter setLibrary::expand";
+
+	my $library_LS = $self->{ListSets};    #library sets
+
+	#test if any ListSets in library at defined
+	#wd be very strange if this test does not pass
+	if ( !$library_LS ) {
+		die "Very strange error";          #not initialized right
+	}
+
+	my $result_LS = new HTTP::OAI::ListSets;
+
+	my %libraryTracker;
+	while ( my $library_set = $library_LS->next ) {
+		foreach my $setSpec (@setSpecs) {
+			if ( $library_set->setSpec eq $setSpec ) {
+				$result_LS->set($library_set);
+				$libraryTracker{$setSpec} = 1;
+			}
+		}
+	}
+
+	#If a setSpec is not defined in the library, it should still be in result
+	#i.e. it is not enough to identify common elements in both sets.
+	#We also want to find naked setSpecs (specific records, but not in library)
+
+	foreach my $setSpec (@setSpecs) {
+		if (!$libraryTracker{$setSpec}) {
+			#if this setSpec is not yet in the response then it will have to go
+			#naked
+			my $s=new HTTP::OAI::Set;
+			$s->setSpec ($setSpec);
+			$result_LS->set($s);
+		}
+
+	}
+
+	return $result_LS;
+}
+
+
+sub show {
+	my $self     = shift;
+	my $ListSets = $self->{ListSets};
+	my $out;
+
+	while ( my $set = $ListSets->next ) {
+		if ( $set->setSpec ) {
+			$out = $set->setSpec . ":\n";
+		}
+		if ( $set->setName ) {
+			$out .= " setName: '" . $set->setName . "'\n";
+		}
+		foreach my $setDescription ( $set->setDescription ) {
+			$out .= " setDescription: '" . $setDescription . "'\n";
+		}
+	}
+
+	return $out;
+}
+
+
+sub toListSets {
+	my $self = shift;
+	Debug "Enter toListSets\n";
+
+	return $self->{ListSets};
+}
+
+
+1;    # End of HTTP::OAI::SetLibrary. Perl Dancer is still cool!
+
+
+__END__
+=pod
 
 =head1 NAME
 
-HTTP::OAI::SetLibrary - Separate sets and their definition and show only Sets
-that are actually present in your repository.
+HTTP::OAI::DataProvider::SetLibrary - Handle set definitions
+
+=head1 VERSION
+
+version 0.006
 
 =head1 SYNOPSIS
+
+Separate sets and their definition. Access only sets that are actually present
+in your repository.
 
     use HTTP::OAI::Set;
     use HTTP::OAI::Repository::SetLibrary;
@@ -81,7 +240,7 @@ HTTP::OAI::ListSets object which can be easily turned into output.
 
 =head1 METHODS
 
-=head2 	my $s=new HTTP::OAI::SetLibrary->new();
+=head2 my $s=new HTTP::OAI::SetLibrary->new();
 
 Creates a new HTTP::OAI::SetLibrary object. You can optionally specify a hashref
 containing initial set info for the library. At the moment, I use setSpec for key
@@ -96,90 +255,19 @@ my %library={
 
 new HTTP::OAI::SetLibrary->new(\%library);
 
-=cut
-
-sub new {
-
-	#Debug "enter HTTP::OAI::DataProvider::SetLibrary new";
-	my $self  = {};
-	my $class = shift;
-
-	$self->{ListSets} = new HTTP::OAI::ListSets;
-	return bless( $self, $class );
-
-	#I guess there are two possibilities
-	#a) a hash with setSpec as key and HTTP::OAI::Set objects as values
-	#b) HTTP::OAI::ListIdentifier with sets wrapped inside
-	#in a)looping seems to be easier,but  code will be more cryptic
-	#that's what encapsulation is for, right?
-
-}
-
-=head2 	$library->addSet($s);
+=head2 $library->addSet($s);
 Add a single HTTP::OAI::Set object to a library
 
 Logic-wise I could also add a listSets object, but I don't do this here.
 
 TODO: On failure return something or not?
-=cut
 
-sub addSet {
-	my $self = shift;    #a library object
-	my $set  = shift;
-
-	if ( !$set ) {
-		return ();       #return empty handed without doing anything
-	}
-
-	#TODO: test if $set is HTTP::OAI::Set using ref
-
-	if ( ref $set !~ /HTTP::OAI::Set/ ) {
-		Warning "no HTTP::OAI::Set object";
-		return ();       #return empty handed without doing anything
-	}
-
-	#add the new set to the ListSets object
-	$self->{ListSets}->set($set);
-
-	#Debug "return successfully";
-	return 1;            #indicating success
-
-}
-
-=head2 	$library->addListSets($s);
+=head2 $library->addListSets($s);
 Adds a HTTP::OAI::ListSet object (possibly containing multiple sets) to a Set
 library.
 
 TODO: Test
 TODO: On failure return something or not?
-=cut
-
-sub addListSets {
-	my $self     = shift;    #a library object
-	my $ListSets = shift;    #new
-
-	if ( !$ListSets ) {
-		Warning "no listSet. Nothing to do!";
-		return ();
-	}
-
-	if ( ref $ListSets !~ /HTTP::OAI::ListSets/ ) {
-		Warning "no HTTP::OAI::ListSet object";
-		return ();           #return empty handed without doing anything
-	}
-
-	#Debug "Enter addListSet ($ListSets)";
-
-	if ( !$self->{ListSets} ) {
-		die "This is strange. There should be an ListSets";
-	}
-
-	#alternatively I could also call addSet, but this can hardly be faster...
-	while ( my $set = $ListSets->next ) {
-		$self->{ListSets}->set($set);
-	}
-	return 1;    #successful;
-}
 
 =head3 my $ListSets=$library->expand(@setSpecs)
 
@@ -199,52 +287,6 @@ set will simply have no name and description. No error will be raised.
 
 TODO: What to do with errors?
 
-=cut
-
-sub expand {
-	my $self     = shift;
-	my @setSpecs = @_;      #naked setSpecs from store
-
-	Debug "Enter setLibrary::expand";
-
-	my $library_LS = $self->{ListSets};    #library sets
-
-	#test if any ListSets in library at defined
-	#wd be very strange if this test does not pass
-	if ( !$library_LS ) {
-		die "Very strange error";          #not initialized right
-	}
-
-	my $result_LS = new HTTP::OAI::ListSets;
-
-	my %libraryTracker;
-	while ( my $library_set = $library_LS->next ) {
-		foreach my $setSpec (@setSpecs) {
-			if ( $library_set->setSpec eq $setSpec ) {
-				$result_LS->set($library_set);
-				$libraryTracker{$setSpec} = 1;
-			}
-		}
-	}
-
-	#If a setSpec is not defined in the library, it should still be in result
-	#i.e. it is not enough to identify common elements in both sets.
-	#We also want to find naked setSpecs (specific records, but not in library)
-
-	foreach my $setSpec (@setSpecs) {
-		if (!$libraryTracker{$setSpec}) {
-			#if this setSpec is not yet in the response then it will have to go
-			#naked
-			my $s=new HTTP::OAI::Set;
-			$s->setSpec ($setSpec);
-			$result_LS->set($s);
-		}
-
-	}
-
-	return $result_LS;
-}
-
 =head2 my $string=$library->show();
 
 Output library information as string. For example for debugging.
@@ -253,40 +295,9 @@ setSpec:
  setName: 'abc'
  setDescription: 'edf'
 
-=cut
-
-sub show {
-	my $self     = shift;
-	my $ListSets = $self->{ListSets};
-	my $out;
-
-	while ( my $set = $ListSets->next ) {
-		if ( $set->setSpec ) {
-			$out = $set->setSpec . ":\n";
-		}
-		if ( $set->setName ) {
-			$out .= " setName: '" . $set->setName . "'\n";
-		}
-		foreach my $setDescription ( $set->setDescription ) {
-			$out .= " setDescription: '" . $setDescription . "'\n";
-		}
-	}
-
-	return $out;
-}
-
 =head2 my $listSets=$library->toListSets;
 
 Just returns the whole library as a HTTP::OAI::ListSets object.
-
-=cut
-
-sub toListSets {
-	my $self = shift;
-	Debug "Enter toListSets\n";
-
-	return $self->{ListSets};
-}
 
 =head1 SEE ALSO
 
@@ -311,7 +322,6 @@ You can find documentation for this module with the perldoc command.
 
     perldoc HTTP::OAI::SetLibrary
 
-
 You can also look for information at:
 
 =over 4
@@ -334,9 +344,7 @@ L<http://search.cpan.org/dist/HTTP-OAI-SetLibrary/>
 
 =back
 
-
 =head1 ACKNOWLEDGEMENTS
-
 
 =head1 LICENSE AND COPYRIGHT
 
@@ -348,8 +356,16 @@ by the Free Software Foundation; or the Artistic License.
 
 See http://dev.perl.org/licenses/ for more information.
 
+=head1 AUTHOR
+
+Maurice Mengel <mauricemengel@gmail.com>
+
+=head1 COPYRIGHT AND LICENSE
+
+This software is copyright (c) 2011 by Maurice Mengel.
+
+This is free software; you can redistribute it and/or modify it under
+the same terms as the Perl 5 programming language system itself.
 
 =cut
-
-1;    # End of HTTP::OAI::SetLibrary. Perl Dancer is still cool!
 

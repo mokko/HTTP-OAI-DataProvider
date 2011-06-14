@@ -1,10 +1,13 @@
 package HTTP::OAI::DataProvider::SQLite;
+BEGIN {
+  $HTTP::OAI::DataProvider::SQLite::VERSION = '0.006';
+}
+# ABSTRACT: A sqlite engine for HTTP::OAI::DataProvider
 
 use warnings;
 use strict;
 use YAML::Syck qw/Dump LoadFile/;
 
-#use XML::LibXML;
 use HTTP::OAI;
 use HTTP::OAI::Repository qw/validate_date/;
 use HTTP::OAI::DataProvider::Engine::Result;
@@ -18,53 +21,7 @@ use DBI qw(:sql_types);    #new
 use DBIx::Connector;
 use parent qw(HTTP::OAI::DataProvider::Engine);
 
-#only for debug during development
-#use Data::Dumper;
 
-#TODO: See if I want to use base or parent?
-
-=head1 NAME
-
-HTTP::OAI::DataProvider::SQLite - A sqlite engine for HTTP::OAI::DataProvider
-
-=head1 SYNOPSIS
-
-1) Fill db
-	use HTTP::OAI::DataProvider::SQLite;
-	my $engine=new HTTP::OAI::DataProvider::SQLite (ns_prefix=>$prefix,
-		ns_uri=$uri);
-	my $err=$engine->digest_single (...);
-
-2) Use engine
-	use HTTP::OAI::DataProvider::SQLite;
-	my $engine=new HTTP::OAI::DataProvider::SQLite(
-		ns_prefix=>$prefix, ns_uri=$uri,
-		transformer=>$transformer,
-		);
-
-	my $header=$engine->findByIdentifier($identifier);
-	my $result=$engine->queryHeaders($params);
-	my $result=$engine->queryRecords($params);
-
-	TODO
-
-=head1 DESCRIPTION
-
-Provide a sqlite for HTTP::OAI::DataProvider and abstract all the database
-action to store, modify and access header and metadata information.
-
-=head1 TODO
-
-Separate out everything that is not sql-related engine work, so that writing
-another engine is MUCH less work. I will probably take out all the stuff to
-create results. That looks like another module. Maybe it could be a base
-module which the actual engine inherits. That would serve the purpose. Then
-it would be
-	HTTP::OAI::DataProvider::Engine
-
-
-=head2 	my $err=$engine->digest_single (source=>$xml_fn, mapping=>&mapping);
-=cut
 
 sub digest_single {
 	my $self = shift;
@@ -94,32 +51,6 @@ sub digest_single {
 	}
 }
 
-=head2 my $response=$engine->queryChunk($chunkDescription);
-
-Takes a chunkDescription, queries the db with it, parses the answer in a result
-object and transforms the result to a response and returns to dancer.
-
-Expects a chunkDescription. (A chunkDesc is SQL statement and some other
-contextual info). It returns that chunk as a HTTP::OAI::Response object
-(either HTTP::OAI::ListIdentifiers or HTTP::OAI::ListRecords.)
-
-The chunkDescription is a hashref which is structured like this, see
-HTTP::OAI::DataProvider::ChunkCache:
-	$chunkDescription={
-			chunkNo=>$chunkNo,
-			maxChunkNo=>$maxChunkNo,
-			[ next=>$tokenN, ]
-			sql=>$sql,
-			targetPrefix=>$prefix,
-			token=>$token,
-			total=>$total
-	};
-
-The last chunk doesn't have a next key. (?)
-
-Gets called in queryChunk and in (the badly named) data provider's chunkExist.
-
-=cut
 
 sub queryChunk {
 	my $self      = shift;
@@ -236,12 +167,6 @@ sub queryChunk {
 	return $response;
 }
 
-=head2 my $cache=HTTP::OAI::DataRepository::SQLite::new (@args);
-
-Am currently not sure about the arguments. Currently i accept everything,
-so invocation has to be selective.
-
-=cut
 
 sub new {
 	my $class = shift;
@@ -264,12 +189,6 @@ sub new {
 	return $self;
 }
 
-=head2 my $date=$engine->earliestDate();
-
-Maybe your Identify callback wants to call this to get the earliest date for
-the Identify verb.
-
-=cut
 
 sub earliestDate {
 	my $self = shift;
@@ -292,17 +211,6 @@ sub earliestDate {
 
 }
 
-=head2 $engine->granularity();
-
-Returns either "YYYY-MM-DDThh:mm:ssZ" or "YYYY-MM-DD" depending of granularity
-of datestamps in the store.
-
-Question is how much trouble I go to check weather all values comply with this
-definition?
-
-TODO: Check weather all datestamps comply with format
-
-=cut
 
 sub granularity {
 
@@ -340,15 +248,6 @@ sub granularity {
 	Warning "datestamp doesn't match requirements. I assume $short";
 }
 
-=head2	$header=$engine->findByIdentifier($identifier)
-	Finds and return a specific header (HTTP::OAI::Header) by identifier.
-
-	If no header with this identifier found, this method returns nothing. Who
-	had expected otherwise? If called with identifier, should I croak? I guess
-	so since it indicates a mistake of the frontend developer. And we want her
-	alert!
-
-=cut
 
 sub findByIdentifier {
 	my $self       = shift;
@@ -397,12 +296,6 @@ sub findByIdentifier {
 	}
 }
 
-=head2 my @setSpecs=$provider->listSets();
-
-Return those setSpecs which are actually used in the store. Expects nothing,
-returns an array of setSpecs as string. Called from DataProvider::ListSets.
-
-=cut
 
 sub listSets {
 	my $self = shift;
@@ -424,25 +317,6 @@ sub listSets {
 	return @setSpecs;
 }
 
-=head2 $result=$provider->query ($params);
-
-Gets called from GetRecord, ListRecords, ListIdentifiers. Possible parameters
-are metadataPrefix, from, until and Set. (Queries including a resumptionToken
-should not get here.)
-
-Plans chunking, save request chunks in cache and returns the first chunk as
-HTTP::OAI::DataProvider::Result object.
-
-TODO: What to do on failure?
-TODO: Deal with a GetRecord request. Should this take place in planChunking?
-
-TODO: do i still need isError?
-Test for failure:
-if ($result->isError) {
-	#do this
-}
-
-=cut
 
 sub query {
 	my $self    = shift;
@@ -466,25 +340,7 @@ sub query {
 	return $response;
 }
 
-=head2 my $i=$self->parseHeaders ($result, $sth);
 
-Expects an empty result object and a statement handle. Returns number of
-records parsed. This is the loop that essentially turns queryHeaders into
-HTTP::OAI::Headers.
-
-Chunking:
-Among others its loop contains a condition to break the loop if chunking is
-activated and the first chunk is completed. To access the remaining chunks we
-will re-enter this loop at a later point in time.
-
-=cut
-
-=head2 my $sql=$self->querySQL ($params,$limit, $offset);
-
-Returns the sql for the query (includes metadata for GetRecord and
-ListRecords).
-
-=cut
 
 sub querySQL {
 	my $self = shift;
@@ -551,15 +407,6 @@ sub querySQL {
 #
 #
 
-=head1 Internal Methods - to be called from other inside this module
-
-=head2 my $connection=_connect_db ($dbfile);
-
-Now uses DBIx::Connector
-
-my $dbh=$connection->dbh;
-
-=cut
 
 sub _connect_db {
 	my $self   = shift;
@@ -581,19 +428,6 @@ sub _connect_db {
 	) or die "Problems with DBIx::connector";
 }
 
-=head2 my $first=$self->planChunking($params);
-
-Counts the results for this request to split the response in chunks if
-necessary, e.g. 50 records per page. From the numbers it creates all chunk
-descriptions for this request and saves them in chunkCache.
-
-A chunkDescription has an sql statement and other contextual info to to write
-the chunk (one page of results).
-
-Expects the params hashref. Returns the first chunk description or nothing.
-(Saves the remaining chunk descriptions in chunkCache.)
-
-=cut
 
 sub planChunking {
 	my $self   = shift;
@@ -674,12 +508,6 @@ sub planChunking {
 	return $first;
 }
 
-=head2 my $count=$self->_countTotals ($params);
-
-For chunking I need to know the total number of results (headers or records)
-before I start chunking. This method performs a query and returns that number.
-
-=cut
 
 sub _countTotals {
 	my $self   = shift;    #an engine, SQLite object
@@ -928,6 +756,7 @@ sub _storeRecord {
 	}
 }
 
+
 sub checkRequired {
 	my $self = shift;
 	foreach (@_) {
@@ -938,4 +767,192 @@ sub checkRequired {
 }
 
 1;
+
+
+__END__
+=pod
+
+=head1 NAME
+
+HTTP::OAI::DataProvider::SQLite - A sqlite engine for HTTP::OAI::DataProvider
+
+=head1 VERSION
+
+version 0.006
+
+=head1 SYNOPSIS
+
+1) Fill db
+	use HTTP::OAI::DataProvider::SQLite;
+	my $engine=new HTTP::OAI::DataProvider::SQLite (ns_prefix=>$prefix,
+		ns_uri=$uri);
+	my $err=$engine->digest_single (...);
+
+2) Use engine
+	use HTTP::OAI::DataProvider::SQLite;
+	my $engine=new HTTP::OAI::DataProvider::SQLite(
+		ns_prefix=>$prefix, ns_uri=$uri,
+		transformer=>$transformer,
+		);
+
+	my $header=$engine->findByIdentifier($identifier);
+	my $result=$engine->queryHeaders($params);
+	my $result=$engine->queryRecords($params);
+
+	TODO
+
+=head1 DESCRIPTION
+
+Provide a sqlite for HTTP::OAI::DataProvider and abstract all the database
+action to store, modify and access header and metadata information.
+
+=head1 METHODS
+
+=head2 $self->checkRequired ('a','b');
+
+	Carps if 'a' or 'b' are not exist (as $self->{a} and $self->{b}).
+
+=head1 TODO
+
+Separate out everything that is not sql-related engine work, so that writing
+another engine is MUCH less work. I will probably take out all the stuff to
+create results. That looks like another module. Maybe it could be a base
+module which the actual engine inherits. That would serve the purpose. Then
+it would be
+	HTTP::OAI::DataProvider::Engine
+
+TODO: See if I want to use base or parent?
+only for debug during development
+
+=head2 my $err=$engine->digest_single (source=>$xml_fn, mapping=>&mapping);
+
+=head2 my $response=$engine->queryChunk($chunkDescription);
+
+Takes a chunkDescription, queries the db with it, parses the answer in a result
+object and transforms the result to a response and returns to dancer.
+
+Expects a chunkDescription. (A chunkDesc is SQL statement and some other
+contextual info). It returns that chunk as a HTTP::OAI::Response object
+(either HTTP::OAI::ListIdentifiers or HTTP::OAI::ListRecords.)
+
+The chunkDescription is a hashref which is structured like this, see
+HTTP::OAI::DataProvider::ChunkCache:
+	$chunkDescription={
+			chunkNo=>$chunkNo,
+			maxChunkNo=>$maxChunkNo,
+			[ next=>$tokenN, ]
+			sql=>$sql,
+			targetPrefix=>$prefix,
+			token=>$token,
+			total=>$total
+	};
+
+The last chunk doesn't have a next key. (?)
+
+Gets called in queryChunk and in (the badly named) data provider's chunkExist.
+
+=head2 my $cache=HTTP::OAI::DataRepository::SQLite::new (@args);
+
+Am currently not sure about the arguments. Currently i accept everything,
+so invocation has to be selective.
+
+=head2 my $date=$engine->earliestDate();
+
+Maybe your Identify callback wants to call this to get the earliest date for
+the Identify verb.
+
+=head2 $engine->granularity();
+
+Returns either "YYYY-MM-DDThh:mm:ssZ" or "YYYY-MM-DD" depending of granularity
+of datestamps in the store.
+
+Question is how much trouble I go to check weather all values comply with this
+definition?
+
+TODO: Check weather all datestamps comply with format
+
+=head2 $header=$engine->findByIdentifier($identifier)
+	Finds and return a specific header (HTTP::OAI::Header) by identifier.
+
+	If no header with this identifier found, this method returns nothing. Who
+	had expected otherwise? If called with identifier, should I croak? I guess
+	so since it indicates a mistake of the frontend developer. And we want her
+	alert!
+
+=head2 my @setSpecs=$provider->listSets();
+
+Return those setSpecs which are actually used in the store. Expects nothing,
+returns an array of setSpecs as string. Called from DataProvider::ListSets.
+
+=head2 $result=$provider->query ($params);
+
+Gets called from GetRecord, ListRecords, ListIdentifiers. Possible parameters
+are metadataPrefix, from, until and Set. (Queries including a resumptionToken
+should not get here.)
+
+Plans chunking, save request chunks in cache and returns the first chunk as
+HTTP::OAI::DataProvider::Result object.
+
+TODO: What to do on failure?
+TODO: Deal with a GetRecord request. Should this take place in planChunking?
+
+TODO: do i still need isError?
+Test for failure:
+if ($result->isError) {
+	#do this
+}
+
+=head2 my $i=$self->parseHeaders ($result, $sth);
+
+Expects an empty result object and a statement handle. Returns number of
+records parsed. This is the loop that essentially turns queryHeaders into
+HTTP::OAI::Headers.
+
+Chunking:
+Among others its loop contains a condition to break the loop if chunking is
+activated and the first chunk is completed. To access the remaining chunks we
+will re-enter this loop at a later point in time.
+
+=head2 my $sql=$self->querySQL ($params,$limit, $offset);
+
+Returns the sql for the query (includes metadata for GetRecord and
+ListRecords).
+
+=head1 Internal Methods - to be called from other inside this module
+
+=head2 my $connection=_connect_db ($dbfile);
+
+Now uses DBIx::Connector
+
+my $dbh=$connection->dbh;
+
+=head2 my $first=$self->planChunking($params);
+
+Counts the results for this request to split the response in chunks if
+necessary, e.g. 50 records per page. From the numbers it creates all chunk
+descriptions for this request and saves them in chunkCache.
+
+A chunkDescription has an sql statement and other contextual info to to write
+the chunk (one page of results).
+
+Expects the params hashref. Returns the first chunk description or nothing.
+(Saves the remaining chunk descriptions in chunkCache.)
+
+=head2 my $count=$self->_countTotals ($params);
+
+For chunking I need to know the total number of results (headers or records)
+before I start chunking. This method performs a query and returns that number.
+
+=head1 AUTHOR
+
+Maurice Mengel <mauricemengel@gmail.com>
+
+=head1 COPYRIGHT AND LICENSE
+
+This software is copyright (c) 2011 by Maurice Mengel.
+
+This is free software; you can redistribute it and/or modify it under
+the same terms as the Perl 5 programming language system itself.
+
+=cut
 

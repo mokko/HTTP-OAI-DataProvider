@@ -1,4 +1,8 @@
 package HTTP::OAI::DataProvider::ChunkCache;
+BEGIN {
+  $HTTP::OAI::DataProvider::ChunkCache::VERSION = '0.006';
+}
+# ABSTRACT: Store request info per resumptionToken
 
 use strict;
 use warnings;
@@ -7,44 +11,6 @@ use Carp qw/carp croak/;
 our $chunkCache = {};
 
 
-#we assume that ordering the tokens alphabetically will show them in the order
-#we are supposed to delete them
-
-=head1 NAME
-
-HTTP::OAI::DataProvider::ChunkCache - Store request info per resumptionToken
-
-=head1 SYNOPSIS
-
-	use HTTP::OAI::DataProvider::ChunkCache;
-	my $cache=new HTTP::OAI::DataProvider::ChunkCache (maxSize=>$integer);
-
-	#chunkDesc is description of a chunk as hashref
-	#next is optional. Last token doesn't have a next
-	my $chunkDesc={
-		chunkNo=>$chunkNo,
-		maxChunkNo=>$maxChunkNo,
-		[next=>$token,]
-		sql=>$sql,
-		token=>$token,
-		total=>$total,
-	};
-
-	#add a chunkDesc to cache
-	$cache->add ($chunkDesc) or die $cache->error;
-
-	#get a chunk from cache
-	my $chunkDesc=$cache->get ($token); #chunk is hashref
-
-	#size/maxSize
-	my $current_size=$cache->count;
-	my $max=$cache->size;
-
-	my @tokens=$cache->list;	#list tokens
-
-=head2 my $chunkCache=HTTP::OAI::DataProvider::ChunkCache::new (maxSize=>1000);
-
-=cut
 
 sub new {
 	my $class = shift;
@@ -61,13 +27,6 @@ sub new {
 	return $self;
 }
 
-=head2 $chunkCache->add(%chunk);
-
-Add chunk information to the cache. Add will delete old chunks if no of cached
-chunks would exceed maxSize after adding it. On error: carps and returns 0.
-Return 1 on success.
-
-=cut
 
 sub add {
 	my $self  = shift;
@@ -96,23 +55,11 @@ sub add {
 	$chunkCache->{ $chunkDesc->{token} } = $chunkDesc;
 }
 
-=head2 my $integer=$cache->count;
-
-Returns the number of items in cache. See also $cache->size
-
-=cut
 
 sub count {
 	return scalar keys %{$chunkCache};
 }
 
-=head2 my $msg=$cache->error;
-
-Returns last error message. Usage example:
-
-	$cache->add($chunk_descr) or die $cache->error;
-
-=cut
 
 sub error {
 	my $self = shift;
@@ -121,24 +68,6 @@ sub error {
 	}
 }
 
-=head2 my $chunk=$chunkCache->get($token);
-
-Returns a chunk description as hashref or nothing on error.
-
-Structure of hashref:
-	$chunk={
-			chunkNo=>$chunkNo,
-			maxChunkNo=>$maxChunkNo,
-			next=>$token,
-			sql=>$sql,
-			targetPrefix=>$prefix,
-			token=>$token,
-			total=>$total
-	};
-
-Of course, it is not a chunk (i.e. results), but the description of a chunk.
-
-=cut
 
 sub get {
 	my $self  = shift;
@@ -158,24 +87,12 @@ sub get {
 
 }
 
-=head2 my @tokens=$cache->list;
-
-Returns an array of tokens in the cache (in no particular order).
-
-Todo: What do on error?
-
-=cut
 
 sub list {
 	my $self = shift;
 	return ( keys %{$chunkCache} );
 }
 
-=head2 my $maxSize=$cache->size;
-
-Gets or sets maximum size of cache.
-
-=cut
 
 sub size {
 	my $self = shift;
@@ -223,3 +140,101 @@ sub _rmFromCache {
 }
 
 1;
+
+__END__
+=pod
+
+=head1 NAME
+
+HTTP::OAI::DataProvider::ChunkCache - Store request info per resumptionToken
+
+=head1 VERSION
+
+version 0.006
+
+=head1 SYNOPSIS
+
+	use HTTP::OAI::DataProvider::ChunkCache;
+	my $cache=new HTTP::OAI::DataProvider::ChunkCache (maxSize=>$integer);
+
+	#chunkDesc is description of a chunk as hashref
+	#next is optional. Last token doesn't have a next
+	my $chunkDesc={
+		chunkNo=>$chunkNo,
+		maxChunkNo=>$maxChunkNo,
+		[next=>$token,]
+		sql=>$sql,
+		token=>$token,
+		total=>$total,
+	};
+
+	#add a chunkDesc to cache
+	$cache->add ($chunkDesc) or die $cache->error;
+
+	#get a chunk from cache
+	my $chunkDesc=$cache->get ($token); #chunk is hashref
+
+	#size/maxSize
+	my $current_size=$cache->count;
+	my $max=$cache->size;
+
+	my @tokens=$cache->list;	#list tokens
+
+=head2 my $chunkCache=HTTP::OAI::DataProvider::ChunkCache::new (maxSize=>1000);
+
+=head2 $chunkCache->add(%chunk);
+
+Add chunk information to the cache. Add will delete old chunks if no of cached
+chunks would exceed maxSize after adding it. On error: carps and returns 0.
+Return 1 on success.
+
+=head2 my $integer=$cache->count;
+
+Returns the number of items in cache. See also $cache->size
+
+=head2 my $msg=$cache->error;
+
+Returns last error message. Usage example:
+
+	$cache->add($chunk_descr) or die $cache->error;
+
+=head2 my $chunk=$chunkCache->get($token);
+
+Returns a chunk description as hashref or nothing on error.
+
+Structure of hashref:
+	$chunk={
+			chunkNo=>$chunkNo,
+			maxChunkNo=>$maxChunkNo,
+			next=>$token,
+			sql=>$sql,
+			targetPrefix=>$prefix,
+			token=>$token,
+			total=>$total
+	};
+
+Of course, it is not a chunk (i.e. results), but the description of a chunk.
+
+=head2 my @tokens=$cache->list;
+
+Returns an array of tokens in the cache (in no particular order).
+
+Todo: What do on error?
+
+=head2 my $maxSize=$cache->size;
+
+Gets or sets maximum size of cache.
+
+=head1 AUTHOR
+
+Maurice Mengel <mauricemengel@gmail.com>
+
+=head1 COPYRIGHT AND LICENSE
+
+This software is copyright (c) 2011 by Maurice Mengel.
+
+This is free software; you can redistribute it and/or modify it under
+the same terms as the Perl 5 programming language system itself.
+
+=cut
+

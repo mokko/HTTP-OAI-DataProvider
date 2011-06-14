@@ -1,4 +1,8 @@
 package HTTP::OAI::DataProvider::Engine::Result;
+BEGIN {
+  $HTTP::OAI::DataProvider::Engine::Result::VERSION = '0.006';
+}
+# ABSTRACT: Result object for engine
 
 use Carp qw/croak/;
 use HTTP::OAI;
@@ -7,83 +11,7 @@ use parent qw(HTTP::OAI::DataProvider::Engine);
 
 use Dancer ':syntax';     #only for debug in development, warnings?
 
-#use XML::SAX::Writer; #still necessary?
 
-=head1 HTTP::OAI::DataProvider::Result
-
-The objective is to make DataProvider::SQLite leaner. A result is an object
-that carries the db response before it is transformed to a HTTP::OAI::Response
-object.
-
-=head1 USAGE
-
-	#INIT
-	my $result=new HTTP::OAI::DataProvider::Engine (%opts);
-
-	#setter and getter for requestURL, will be applied in wrapper, see below
-	my $request=$result->requestURL ([$request]);
-
-
-	#RECORDS
-	#write records to result
-	$result->saveRecord ($params, $header,$md);
-
-	# makes a record from parts, also transforms md
-	$result->_addRecord ($record); #prefer saveRecord if possible
-
-	#simple count
-	print $result->countRecords. ' results';
-
-	#access to record data
-	my @records=$result->returnRecords;
-
-	#HEADERS
-	print $result->countHeaders. 'headers';
-
-	#WRAPPERS
-	#return records/headers as a HTTP::OAI::Response
-	my $getRecord=$result->toGetRecord;
-	my $listIdentifiers=$result->toListIdentifiers;
-	my $listRecords=$result->toListRecords;
-
-	#depending on $result will return listIdentifiers or listRecords
-	my $response=$result->getResponse
-
-	#CHUNKING
-	$bool=$result->chunking; #test if chunking is turned on or off
-	$result->chunk; #figures out maxChunkNo and sets
-	$result->chunkRequest([bla=>$bla]); #getter & setter for chunkRequest data
-	$result->EOFChunk ($rt); #tester, getter & setter for EOFChunk signal
-
-	$result->chunkSize; #getter for chunk_size configuration data
-	$result->writeChunk; #write chunk to disk
-
-	#for resumptionToken
-	$result->expirationDate; #create an expiration date
-	$result->mkToken; #make a token using current micro second
-
-=cut
-
-=head2 my $result=new HTTP::OAI::DataProvider::Engine (%opts);
-
-	my %opts = (
-		requestURL  => $self->{requestURL},
-		transformer => $self->{transformer},
-		verb        => $params->{verb},
-		params      => $params,
-
-		#for resumptionToken
-		chunkSize    => $self->{chunkSize},
-		chunkNo      => $chunkDesc->{chunkNo},
-		targetPrefix => $chunkDesc->{targetPrefix},
-		token        => $chunkDesc->{token},
-		total        => $chunkDesc->{total},
-	);
-
-$opts{last}
-$opts{next}
-
-=cut
 
 sub new {
 	my $class  = shift;
@@ -102,19 +30,6 @@ sub new {
 	return $result;
 }
 
-=head2 my $request=$result->requestURL ([$request]);
-
-Getter and setter. Either expects a $request (complete requestURL including
-http:// part and parameters). Or returns it (as string).
-
-requestURL is applied in toGetRecord, toListIdentifiers and to ListRecords to
-corresponding HTTP:OAI::Response object.
-
-Note: Naturally, requestURL can change with every request, in contrast to much
-of the other stuff like chunk size or Identify info. That's why a separate setter
-is convenient.
-
-=cut
 
 #don't think this is necessary anymore, should be done by DataProvider::_output
 sub requestURL {
@@ -128,15 +43,6 @@ sub requestURL {
 	}
 }
 
-=head2 $result->addError($code[, $message]);
-
-Adds an HTTP::OAI::Error error to a result object. Test with
-	#untested
-	if ($result->isError) {
-		$provider->err2XML ($result->isError);
-	}
-
-=cut
 
 sub addError {
 	my $self = shift;
@@ -159,11 +65,6 @@ sub addError {
 	}
 }
 
-=head2 $result->_addHeader ($header);
-
-Adds a header to the result object.
-
-=cut
 
 sub _addHeader {
 	my $result = shift;
@@ -185,11 +86,6 @@ sub _addHeader {
 	$result->{headers}->identifier($header);
 }
 
-=head2 $result->_addRecord ($record);
-
-Adds a record to the result object. Gets called by saveRecord.
-
-=cut
 
 sub _addRecord {
 	my $result = shift;
@@ -210,21 +106,12 @@ sub _addRecord {
 	push @{ $result->{records} }, $record;
 }
 
-=head2 my $number=$result->countHeaders;
-
-Return number (scalar) of Headers so far.
-=cut
 
 sub countHeaders {
 	my $result = shift;
 	$result->{headCount} ? return $result->{headCount} : return 0;
 }
 
-=head2 my $result->responseCount
-
-Triggers debug output!
-
-=cut
 
 sub responseCount {
 	my $result   = shift;
@@ -240,12 +127,6 @@ sub responseCount {
 	}
 }
 
-=head2 my $chunkSize=$result->chunkSize;
-
-Return chunk_size if defined or empty. Chunk size is a config value that
-determines how big (number of records per chunk) the chunks are.
-
-=cut
 
 sub chunkSize {
 	my $result = shift;
@@ -255,12 +136,6 @@ sub chunkSize {
 	return ();    #fail
 }
 
-=head2 $result->getType();
-
-getType sets internal type in $result to either headers or records, depending
-on content of $result.
-
-=cut
 
 sub getType {
 	my $result       = shift;
@@ -277,19 +152,6 @@ sub getType {
 	}
 }
 
-=head2 	my $response=$result->getResponse;
-
-Return the content of $result as a HTTP::OAI::Response object. Either
-HTTP::OAI::ListIdentifiers or HTTP::OAI::ListRecords, depending on content.
-
-Internally ->getResponse calls toListIdentifiers ro toListRecords, so it
-also applies requestURL those. Also applies resumptionToken (rt), if rt is
-saved in EOFChunk.
-
-TODO: Should also recognize getRecord!
-
-
-=cut
 
 sub getResponse {
 	my $result = shift;
@@ -308,11 +170,6 @@ sub getResponse {
 	warning "Strange Error!";
 }
 
-=head2 my $number_of_records=$result->countRecords;
-
-In scalar context, returns the number of records.
-
-=cut
 
 sub countRecords {
 	my $result = shift;
@@ -320,11 +177,6 @@ sub countRecords {
 	$no ? return $no : return 0;
 }
 
-=head2 my @records=$result->returnRecords;
-
-In list context, returns the record array.
-
-=cut
 
 sub returnRecords {
 
@@ -333,23 +185,6 @@ sub returnRecords {
 	return @{ $result->{records} };
 }
 
-=head2 $result->save (params=>$params, header=>$header, [md=>$md]);
-
-Expects parts for the result, constructs a result and saves it into the result
-object.
-
-This is an abstracted version of saveRecord that automatically does the right
-thing whether being passed header or record information. It makes addHeader
-and addRecord private methods and saveRecord obsolete.
-
-Gets called in engine's queryChunk.
-
-How do I decide whether something is header or record? At first I thought I
-just check whether metadata info is there or not, but this would fail with
-deleted records, so now I check for the verb. That means I have to pass the
-verb to result->{verb} when result is born.
-
-=cut
 
 sub save {
 	my $result = shift;
@@ -415,13 +250,6 @@ sub save {
 	return 0;    #success
 }
 
-=head2 my $getRecord=$result->toGetRecord;
-
-Wraps the record inside the result object in a HTTP::OAI::GetRecord and
-returns it. If $result has a requestURL defined, it'll be applied to
-GetRecord object.
-
-=cut
 
 sub toGetRecord {
 	my $result    = shift;
@@ -439,13 +267,6 @@ sub toGetRecord {
 	return $getRecord;
 }
 
-=head2 my $listRecord=$result->toListRecords;
-
-Wraps the records inside the result object in a HTTP::OAI::ListRecord and
-returns it. If $result has a requestURL defined, it'll be applied to the
-ListRecord object.
-
-=cut
 
 sub toListRecords {
 
@@ -470,13 +291,6 @@ sub toListRecords {
 	return $listRecords;
 }
 
-=head2 $result->_resumptionToken;
-
-Returns the resumptionToken for the result.
-This is called in toListIdentifiers and toListRecords. It takes info saved in
-$result.
-
-=cut
 
 sub _resumptionToken {
 	my $result = shift;
@@ -493,13 +307,6 @@ sub _resumptionToken {
 	return $rt;
 }
 
-=head2 my $listIdentifiers=$result->toListIdentifiers;
-
-Wraps the headers (not records) inside the result object in a
-HTTP::OAI::ListIdentifiers and returns it. If $result has a requestURL defined,
-it'll be applied to the ListRecord object.
-
-=cut
 
 sub toListIdentifiers {
 	my $result = shift;
@@ -525,17 +332,6 @@ sub toListIdentifiers {
 	return $listIdentifiers;
 }
 
-=head2 my @err=$result->isError
-
-Returns a list of HTTP::OAI::Error objects if any.
-
-	if ( $result->isError ) {
-		return $self->err2XML($result->isError);
-	}
-
-Is _actually_ called in DataProvider.
-
-=cut
 
 sub isError {
 	my $result = shift;
@@ -554,13 +350,6 @@ sub isError {
 }
 
 
-=head2 my $ret=result->lastChunk;
-
-	Returns 1 if this is the last chunk, otherwise empty.
-
-	if ($result->lastChunk)
-
-=cut
 
 sub lastChunk {
 	my $result=shift;
@@ -571,4 +360,218 @@ sub lastChunk {
 }
 
 1;                    #HTTP::OAI::DataProvider::Engine::Result
+
+
+__END__
+=pod
+
+=head1 NAME
+
+HTTP::OAI::DataProvider::Engine::Result - Result object for engine
+
+=head1 VERSION
+
+version 0.006
+
+=head1 USAGE
+
+A result is an object that carries the db response before it is transformed to
+a HTTP::OAI::Response object.
+
+	#INIT
+	my $result=new HTTP::OAI::DataProvider::Engine (%opts);
+
+	#setter and getter for requestURL, will be applied in wrapper, see below
+	my $request=$result->requestURL ([$request]);
+
+	#RECORDS
+	#write records to result
+	$result->saveRecord ($params, $header,$md);
+
+	# makes a record from parts, also transforms md
+	$result->_addRecord ($record); #prefer saveRecord if possible
+
+	#simple count
+	print $result->countRecords. ' results';
+
+	#access to record data
+	my @records=$result->returnRecords;
+
+	#HEADERS
+	print $result->countHeaders. 'headers';
+
+	#WRAPPERS
+	#return records/headers as a HTTP::OAI::Response
+	my $getRecord=$result->toGetRecord;
+	my $listIdentifiers=$result->toListIdentifiers;
+	my $listRecords=$result->toListRecords;
+
+	#depending on $result will return listIdentifiers or listRecords
+	my $response=$result->getResponse
+
+	#CHUNKING
+	$bool=$result->chunking; #test if chunking is turned on or off
+	$result->chunk; #figures out maxChunkNo and sets
+	$result->chunkRequest([bla=>$bla]); #getter & setter for chunkRequest data
+	$result->EOFChunk ($rt); #tester, getter & setter for EOFChunk signal
+
+	$result->chunkSize; #getter for chunk_size configuration data
+	$result->writeChunk; #write chunk to disk
+
+	#for resumptionToken
+	$result->expirationDate; #create an expiration date
+	$result->mkToken; #make a token using current micro second
+
+=head2 my $result=new HTTP::OAI::DataProvider::Engine (%opts);
+
+	my %opts = (
+		requestURL  => $self->{requestURL},
+		transformer => $self->{transformer},
+		verb        => $params->{verb},
+		params      => $params,
+
+		#for resumptionToken
+		chunkSize    => $self->{chunkSize},
+		chunkNo      => $chunkDesc->{chunkNo},
+		targetPrefix => $chunkDesc->{targetPrefix},
+		token        => $chunkDesc->{token},
+		total        => $chunkDesc->{total},
+	);
+
+$opts{last}
+$opts{next}
+
+=head2 my $request=$result->requestURL ([$request]);
+
+Getter and setter. Either expects a $request (complete requestURL including
+http:// part and parameters). Or returns it (as string).
+
+requestURL is applied in toGetRecord, toListIdentifiers and to ListRecords to
+corresponding HTTP:OAI::Response object.
+
+Note: Naturally, requestURL can change with every request, in contrast to much
+of the other stuff like chunk size or Identify info. That's why a separate setter
+is convenient.
+
+=head2 $result->addError($code[, $message]);
+
+Adds an HTTP::OAI::Error error to a result object. Test with
+	#untested
+	if ($result->isError) {
+		$provider->err2XML ($result->isError);
+	}
+
+=head2 $result->_addHeader ($header);
+
+Adds a header to the result object.
+
+=head2 $result->_addRecord ($record);
+
+Adds a record to the result object. Gets called by saveRecord.
+
+=head2 my $number=$result->countHeaders;
+
+Return number (scalar) of Headers so far.
+
+=head2 my $result->responseCount
+
+Triggers debug output!
+
+=head2 my $chunkSize=$result->chunkSize;
+
+Return chunk_size if defined or empty. Chunk size is a config value that
+determines how big (number of records per chunk) the chunks are.
+
+=head2 $result->getType();
+
+getType sets internal type in $result to either headers or records, depending
+on content of $result.
+
+=head2 my $response=$result->getResponse;
+
+Return the content of $result as a HTTP::OAI::Response object. Either
+HTTP::OAI::ListIdentifiers or HTTP::OAI::ListRecords, depending on content.
+
+Internally ->getResponse calls toListIdentifiers ro toListRecords, so it
+also applies requestURL those. Also applies resumptionToken (rt), if rt is
+saved in EOFChunk.
+
+TODO: Should also recognize getRecord!
+
+=head2 my $number_of_records=$result->countRecords;
+
+In scalar context, returns the number of records.
+
+=head2 my @records=$result->returnRecords;
+
+In list context, returns the record array.
+
+=head2 $result->save (params=>$params, header=>$header, [md=>$md]);
+
+Expects parts for the result, constructs a result and saves it into the result
+object.
+
+This is an abstracted version of saveRecord that automatically does the right
+thing whether being passed header or record information. It makes addHeader
+and addRecord private methods and saveRecord obsolete.
+
+Gets called in engine's queryChunk.
+
+How do I decide whether something is header or record? At first I thought I
+just check whether metadata info is there or not, but this would fail with
+deleted records, so now I check for the verb. That means I have to pass the
+verb to result->{verb} when result is born.
+
+=head2 my $getRecord=$result->toGetRecord;
+
+Wraps the record inside the result object in a HTTP::OAI::GetRecord and
+returns it. If $result has a requestURL defined, it'll be applied to
+GetRecord object.
+
+=head2 my $listRecord=$result->toListRecords;
+
+Wraps the records inside the result object in a HTTP::OAI::ListRecord and
+returns it. If $result has a requestURL defined, it'll be applied to the
+ListRecord object.
+
+=head2 $result->_resumptionToken;
+
+Returns the resumptionToken for the result.
+This is called in toListIdentifiers and toListRecords. It takes info saved in
+$result.
+
+=head2 my $listIdentifiers=$result->toListIdentifiers;
+
+Wraps the headers (not records) inside the result object in a
+HTTP::OAI::ListIdentifiers and returns it. If $result has a requestURL defined,
+it'll be applied to the ListRecord object.
+
+=head2 my @err=$result->isError
+
+Returns a list of HTTP::OAI::Error objects if any.
+
+	if ( $result->isError ) {
+		return $self->err2XML($result->isError);
+	}
+
+Is _actually_ called in DataProvider.
+
+=head2 my $ret=result->lastChunk;
+
+	Returns 1 if this is the last chunk, otherwise empty.
+
+	if ($result->lastChunk)
+
+=head1 AUTHOR
+
+Maurice Mengel <mauricemengel@gmail.com>
+
+=head1 COPYRIGHT AND LICENSE
+
+This software is copyright (c) 2011 by Maurice Mengel.
+
+This is free software; you can redistribute it and/or modify it under
+the same terms as the Perl 5 programming language system itself.
+
+=cut
 

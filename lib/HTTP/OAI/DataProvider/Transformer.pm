@@ -1,9 +1,12 @@
 package HTTP::OAI::DataProvider::Transformer;
+BEGIN {
+  $HTTP::OAI::DataProvider::Transformer::VERSION = '0.006';
+}
+# ABSTRACT: Apply XSLT mapping within data provider
 
 use warnings;
 use strict;
 
-#use HTTP::OAI;
 use Carp qw/croak carp/;
 use Dancer::CommandLine qw/Debug Warning/;
 use XML::LibXSLT;
@@ -11,33 +14,6 @@ use XML::LibXSLT;
 #the currently compiled xsl, see _cache_stylesheet
 our %stylesheet_cache;
 
-=head1 NAME
-
-HTTP::OAI::DataProvider::Transformer
-
-=head1 SYNOPSIS
-
-	use HTTP::OAI::DataProvider::Transformer;
-	my $t=new HTTP::OAI::DataProvider::Transformer (
-		nativePrefix=> 'mpx',
-		locateXSL=>'Salsa_OAI::salsa_locateXSL', #callback
-	);
-	my $dom=$t->toTargetPrefix ($targetPrefix,$dom);
-
-=head1 DESCRIPTION
-
-Little helper that applies an xslt on a $dom
-
-=head1 METHODS
-
-=head2 new
-
-	my $t=new HTTP::OAI::DataProvider::Transformer (
-		nativePrefix=> 'mpx',
-		locateXSL=>'Salsa_OAI::salsa_locateXSL', #callback
-	);
-
-=cut
 
 sub new {
 	my $class = shift;
@@ -62,9 +38,6 @@ sub new {
 	return ( bless $self, $class );
 }
 
-=head2 	my $dom=$t->toTargetPrefix ($targetPrefix,$dom);
-
-=cut
 
 sub toTargetPrefix {
 	my $self         = shift;    #transformer
@@ -141,4 +114,49 @@ sub _cache_stylesheet {
 }
 
 1;
+
+
+__END__
+=pod
+
+=head1 NAME
+
+HTTP::OAI::DataProvider::Transformer - Apply XSLT mapping within data provider
+
+=head1 VERSION
+
+version 0.006
+
+=head1 SYNOPSIS
+
+	use HTTP::OAI::DataProvider::Transformer;
+	my $t=new HTTP::OAI::DataProvider::Transformer (
+		nativePrefix=> 'mpx',
+		locateXSL=>'Salsa_OAI::salsa_locateXSL', #callback
+	);
+	my $dom=$t->toTargetPrefix ($targetPrefix,$dom);
+
+=head1 METHODS
+
+=head2 new
+
+	my $t=new HTTP::OAI::DataProvider::Transformer (
+		nativePrefix=> 'mpx',
+		locateXSL=>'Salsa_OAI::salsa_locateXSL', #callback
+	);
+
+=head2 my $dom=$t->toTargetPrefix ($targetPrefix,$dom);
+
+=head1 AUTHOR
+
+Maurice Mengel <mauricemengel@gmail.com>
+
+=head1 COPYRIGHT AND LICENSE
+
+This software is copyright (c) 2011 by Maurice Mengel.
+
+This is free software; you can redistribute it and/or modify it under
+the same terms as the Perl 5 programming language system itself.
+
+=cut
 
