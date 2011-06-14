@@ -7,12 +7,7 @@ use warnings;
 use strict;
 use HTTP::OAI;
 use Carp qw/croak/;
-
 #use Data::Dumper qw/Dumper/;
-our $VERSION = '0.01';    #don't forget to change below
-
-=head1 NAME
-
 
 =head1 SYNOPSIS
 
