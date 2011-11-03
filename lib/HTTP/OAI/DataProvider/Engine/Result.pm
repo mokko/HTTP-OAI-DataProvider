@@ -566,4 +566,4 @@ sub lastChunk {
 	return ();
 }
 
-1;                    #HTTP::OAI::DataProvider::Engine::Result
+1; #HTTP::OAI::DataProvider::Engine::Result

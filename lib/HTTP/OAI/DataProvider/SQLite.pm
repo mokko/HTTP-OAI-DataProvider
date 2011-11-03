@@ -80,7 +80,6 @@ sub digest_single {
 	}
 
 	#Debug "test: " . $args{mapping};
-
 	my $mapping = $args{mapping};
 	no strict "refs";
 	while ( my $record = $self->$mapping($doc) ) {
