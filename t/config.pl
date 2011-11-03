@@ -7,7 +7,7 @@ $options = {
 	chunkSize         => 10,
 
 	#dbfile value for test is not good...
-	dbfile        => '/home/maurice/projects/Salsa_OAI2/data/db',
+	dbfile        => "$FindBin::Bin/db",
 	deletedRecord => 'transient',
 
 	#capital letter important: GlobalFormats
