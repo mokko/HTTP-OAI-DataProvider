@@ -3,8 +3,8 @@
 use Test::More tests => 1;
 
 BEGIN {
-    use_ok( 'HTTP::OAI::DataProvider::SQLite' ) || print "Bail out!
+    use_ok( 'HTTP::OAI::DataProvider' ) || print "Bail out!
 ";
 }
 
-diag( "Testing HTTP::OAI::DataProvider::SQLite $HTTP::OAI::DataProvider::SQLite::VERSION, Perl $], $^X" );
+diag( "Testing HTTP::OAI::DataProvider $HTTP::OAI::DataProvider::VERSION, Perl $], $^X" );

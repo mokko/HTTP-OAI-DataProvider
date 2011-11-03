@@ -1,4 +1,5 @@
 package HTTP::OAI::DataProvider;
+
 # ABSTRACT: A simple OAI data provider
 
 use warnings;
@@ -25,7 +26,7 @@ use Dancer::CommandLine qw/Debug Warning/;
 =head2 Init
 
 	use HTTP::OAI::DataProvider;
-	my $provider = HTTP::OAI::DataProvider->new(%options);
+	my $provider = HTTP::OAI::DataProvider->new($options);
 
 =head2 Verbs: GetRecord, Identify, ListSets, ListRecords ...
 
@@ -44,7 +45,7 @@ use Dancer::CommandLine qw/Debug Warning/;
 	Debug "message";
 	Warning "message";
 
-=method my $provider->new (%options);
+=method my $provider->new ($options);
 
 Initialize the HTTP::OAI::DataProvider object with the options of your choice.
 
@@ -95,8 +96,18 @@ sub new {
 	my $self  = shift;    #has Dancer's complete config, not secure
 	bless( $self, $class );
 
+	#check various required values
+	my @required = qw(adminEmail baseURL deletedRecord repositoryName);
+
+	foreach my $value (@required) {
+		if ( !$self->{$value} ) {
+			die "new: config value missing $value";
+		}
+	}
+
 	#init chunker
-	$self->{chunkCache} = new HTTP::OAI::DataProvider::ChunkCache(
+	$self->{chunkCache} =
+	  new HTTP::OAI::DataProvider::ChunkCache(
 		maxSize => $self->{chunkCacheMaxSize} )
 	  or die "Cannot init chunkCache";
 
@@ -104,7 +115,11 @@ sub new {
 	#small camel is object, big camel is its description
 	$self->{globalFormats} = new HTTP::OAI::DataProvider::GlobalFormats;
 
+	if ( !exists $self->{GlobalFormats} ) {
+		die 'GlobalFormats missing from $config';
+	}
 	my %cnf = %{ $self->{GlobalFormats} };
+
 	foreach my $prefix ( keys %cnf ) {
 
 		#debug " Registering global format $prefix";
@@ -210,18 +225,8 @@ sub GetRecord {
 
 }
 
-=method my $response=$provider->Identify();
+=method my $response=$provider->Identify($requestURL,$params);
 
-Callback should be passed over to HTTP::OAI::DataProvider during
-initialization with option Identify, e.g.
-	my $provider = HTTP::OAI::DataProvider->new(
-		#other options
-		#...
-		Identify      => 'Salsa_OAI::salsa_Identify',
-	);
-
-This method expects HTTP::OAI::Identify object from the callback and will
-prompty return a xml string.
 
 =cut
 
@@ -243,7 +248,8 @@ sub Identify {
 		granularity       => $self->{engine}->granularity(),
 		repositoryName    => $self->{repositoryName},
 		requestURL        => $requestURL,
-	) or return "Cannot create new HTTP::OAI::Identify";
+	  )
+	  or return "Cannot create new HTTP::OAI::Identify";
 
 	# Output
 	return $self->_output($obj);
@@ -348,7 +354,7 @@ ARGUMENTS
 * until (optional, UTCdatetime value)
 * metadataPrefix (required)
 * set (optional)
-* resumptionToken (exclusive) [NOT IMPLEMENTED!]
+* resumptionToken (exclusive) 
 
 ERRORS
 
@@ -413,7 +419,8 @@ sub ListIdentifiers {
 
 			#Debug "Get here";
 			return $self->_output($chunk);
-		} else {
+		}
+		else {
 			return $self->err2XML(
 				new HTTP::OAI::Error( code => 'badResumptionToken' ) );
 		}
@@ -451,7 +458,6 @@ sub ListIdentifiers {
 
 	#Debug "RESPONSE:".$response;
 	#todo: check if at least one record. On which level?
-
 	# Return
 	return $self->_output($response);
 }
@@ -523,7 +529,8 @@ sub ListRecords {
 		my $chunk = $self->chunkExists( $params, $request );
 		if ($chunk) {
 			return $self->_output($chunk);
-		} else {
+		}
+		else {
 			return $self->err2XML(
 				new HTTP::OAI::Error( code => 'badResumptionToken' ) );
 		}
@@ -654,7 +661,8 @@ sub ListSets {
 			$s->setSpec($_);
 			$listSets->set($s);
 		}
-	} else {
+	}
+	else {
 		$listSets = $library->expand(@used_sets);
 	}
 
@@ -692,6 +700,7 @@ sub err2XML {
 		my @errors;
 		foreach (@_) {
 			if ( ref $_ ne 'HTTP::OAI::Error' ) {
+				croak ref $_;
 				croak "Internal Error: Error has wrong format!";
 			}
 			$response->errors($_);
@@ -701,6 +710,7 @@ sub err2XML {
 		$self->overwriteRequestURL($response);
 		$self->_init_xslt($response);
 		return $response->toDOM->toString;
+		#return _output($response);
 	}
 }
 
@@ -800,12 +810,12 @@ sub _output {
 
 	#overwrites real requestURL with config value
 	$self->overwriteRequestURL($response);
-	return $response->toDOM->toString;
+	#return $dom=$response->toDOM->toString;
 
-	#my $xml;
-	#$response->set_handler( XML::SAX::Writer->new( Output => \$xml ) );
-	#$response->generate;
-	#return $xml;
+	my $xml;
+	$response->set_handler( XML::SAX::Writer->new( Output => \$xml ) );
+	$response->generate;
+	return $xml;
 }
 
 =head2 $obj= $self->overwriteRequestURL($obj)
@@ -838,7 +848,8 @@ sub overwriteRequestURL {
 				#very dirty
 				if ( $new =~ /verb=/ ) {
 					$self->{engine}->{chunkRequest}->{_requestURI} = $new;
-				} else {
+				}
+				else {
 					$new = $self->{engine}->{chunkRequest}->{_requestURI};
 				}
 
@@ -847,7 +858,8 @@ sub overwriteRequestURL {
 				#Debug "overwriteRequestURL: "
 				#  . $response->requestURL . '->'
 				#  . $new;
-			} else {
+			}
+			else {
 
 				#requestURL has no ? in case of an badVerb
 				$response->requestURL( $self->{requestURL} );
@@ -877,7 +889,8 @@ sub _init_xslt {
 	#Debug "Enter _init_xslt obj:$obj"; #beautify
 	if ( $self->{xslt} ) {
 		$obj->xslt( $self->{xslt} );
-	} else {
+	}
+	else {
 		Warning "No beautify-xslt loaded!";
 	}
 }
