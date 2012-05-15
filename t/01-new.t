@@ -1,21 +1,21 @@
 #just test new with options, dont test any of the functionality
+use strict;
+use warnings;
 use HTTP::OAI::DataProvider;
-use FindBin;
+use HTTP::OAI::DataProvider::Test;
 use Test::More;
 
-#only for debugging tests
-#use Data::Dumper qw(Dumper);
+#use Data::Dumper qw(Dumper); #only for debugging tests
+
 
 #load a working standard test config which should have ONLY required values
-my $config_file = "$FindBin::Bin/test_config";
-die "Error: no config file! " if !-f $config_file;
-my $config = do $config_file or die "Error: Options not loaded";
+my $config=HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
 
 plan tests => 1 + keys( %{$config} ) + 4;
 
 # 1. Does it work? Return value right?
 #
-my $provider = HTTP::OAI::DataProvider->new($options);
+my $provider = HTTP::OAI::DataProvider->new($config);
 
 ok(
 	ref $provider eq 'HTTP::OAI::DataProvider',
@@ -41,9 +41,9 @@ my @required = qw(
 );
 
 foreach my $value (@required) {
-	my $config = do $config_file or die "Error: Options not loaded";
-	undef $options->{$value};
-	eval { my $provider = HTTP::OAI::DataProvider->new($options) };
+	my $config=HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
+	undef $config->{$value};
+	eval { my $provider = HTTP::OAI::DataProvider->new($config) };
 	ok( $@, "should fail without $value" );
 }
 
@@ -53,10 +53,10 @@ foreach my $value (@required) {
 my @options = qw(debug xslt requestURL warning);
 
 foreach my $value (@options) {
-	my $config = do $config_file or die "Error: Options not loaded";
-	undef $options->{$value};
+	my $config=HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
+	undef $config->{$value};
 	my $provider;
-	eval { $provider = HTTP::OAI::DataProvider->new($options) };
+	eval { $provider = HTTP::OAI::DataProvider->new($config) };
 
 	ok(
 		ref $provider eq 'HTTP::OAI::DataProvider',
