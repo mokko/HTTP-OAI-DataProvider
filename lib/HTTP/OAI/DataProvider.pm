@@ -52,29 +52,73 @@ Initialize the HTTP::OAI::DataProvider object with the options of your choice.
 On failure return nothing; in case this the error is likely to occur during
 development and not during runtime it may also croak.
 
-=head3 OPTIONS
-
-List here only options not otherwise explained?
+=head3 PARAMETERS (mandatory)
 
 =for :list
-* debug=>callback (TODO)
+* adminEmail =>'bla@email.com'
+	see OAI specification for details
+
+* baseURL =>'http://base.url'
+	see OAI specification for details
+
+* chunkCacheMaxSize => 4000
+	What is the maximum number of chunks I should store in memory before 
+	beginning to delete old chunks? chunkSize * chunkCacheMaxSize = the 
+	maximum number of records the data provider can return in one request.
+	
+* chunkSize         => 10
+	How many records make up one chunk? See chunkCacheMaxSize.
+
+* dbfile => 'path/to/dbfile'
+	TODO: DB stuff needs better abstraction
+
+* deletedRecord => 'transient'
+	TODO: deletedRecord should not be mandatory. It should default to a meaningful default instead.
+	see OAI specification for details
+
+* GlobalFormats => {
+		oai_dc => {
+			ns_uri    => "http://www.openarchives.org/OAI/2.0/oai_dc/",
+			ns_schema => "http://www.openarchives.org/OAI/2.0/oai_dc.xsd",
+		},
+	},
+
+* locateXSL      => 'Salsa_OAI::MPX::locateXSL'
+	a module/function that does what? (doc todo).
+
+* nativePrefix   => 'mpx'
+
+* native_ns_uri =>'http://bla'
+	TODO: should be called nativeURI
+
+	TODO: should be combined with nativePrefix, e.g.
+	nativeNamespace => bla => { 'http://bla'};
+
+* repositoryName => 'Repo Name Example'
+	see OAI specification for details
+
+=head3 OPTIONS
+
+=for :list
+
+* debug=>callback [OPTIONAL TODO]
 	If a callback is supplied use this callback for debug output
 
-* isMetadaFormatSupported=>callback, TODO
+* isMetadaFormatSupported=>callback [OPTIONAL TODO]
 	The callback expects a single prefix and returns 1 if true and nothing
 	when not supported. Currently only global metadataFormats, i.e. for all
 	items in repository. This one seems to be obligatory, so croak when
 	missing.
 
-* xslt=>'path/to/style.xslt',
+* xslt=>'path/to/style.xslt' [OPTIONAL TODO]
 	Adds this path to HTTP::OAI::Repsonse objects to modify output in browser.
-	See also _init_xslt for more info.
+	[Doc TODO. Info should be here not in _init_xslt]
 
 	Except engine information, nothing no option seems to be required and it is
 	still uncertain, maybe even unlikely if engine will be option at all.
 	(Alternative would be to just to use the engine.)
 
-* requestURL
+* requestURL [OPTIONAL]
 	Overwrite normal requestURL, e.g. when using a reverse proxy cache etc.
 	Note that
 	a) requestURL specified during new is only the http://domain.com:port
@@ -86,7 +130,7 @@ List here only options not otherwise explained?
 	Currently, requestURL evaporates if Salsa_OAI is run under anything else
 	than HTTP::Server::Simple.
 
-* warning =>callback (Todo)
+* warning =>callback [OPTIONAL Todo]
 	If a callback is supplied use this callback for warning output
 
 =cut
@@ -97,7 +141,17 @@ sub new {
 	bless( $self, $class );
 
 	#check various required values
-	my @required = qw(adminEmail baseURL deletedRecord repositoryName);
+	my @required = qw(
+		adminEmail 
+	  	baseURL 
+		chunkCacheMaxSize 
+	  	chunkSize 
+	  	deletedRecord 
+	  	dbfile 
+	  	nativePrefix 
+	  	native_ns_uri
+	  	repositoryName 
+	  );
 
 	foreach my $value (@required) {
 		if ( !$self->{$value} ) {
@@ -106,8 +160,7 @@ sub new {
 	}
 
 	#init chunker
-	$self->{chunkCache} =
-	  new HTTP::OAI::DataProvider::ChunkCache(
+	$self->{chunkCache} = new HTTP::OAI::DataProvider::ChunkCache(
 		maxSize => $self->{chunkCacheMaxSize} )
 	  or die "Cannot init chunkCache";
 
@@ -248,8 +301,7 @@ sub Identify {
 		granularity       => $self->{engine}->granularity(),
 		repositoryName    => $self->{repositoryName},
 		requestURL        => $requestURL,
-	  )
-	  or return "Cannot create new HTTP::OAI::Identify";
+	) or return "Cannot create new HTTP::OAI::Identify";
 
 	# Output
 	return $self->_output($obj);
@@ -710,6 +762,7 @@ sub err2XML {
 		$self->overwriteRequestURL($response);
 		$self->_init_xslt($response);
 		return $response->toDOM->toString;
+
 		#return _output($response);
 	}
 }
@@ -810,6 +863,7 @@ sub _output {
 
 	#overwrites real requestURL with config value
 	$self->overwriteRequestURL($response);
+
 	#return $dom=$response->toDOM->toString;
 
 	my $xml;
