@@ -2,13 +2,12 @@
 
 use Test::More tests => 3;
 use HTTP::OAI::DataProvider;
-use HTTP::OAI::DataProvider::Test;
 use HTTP::OAI::Repository qw(validate_request);
+use HTTP::OAI::DataProvider::Test
+  qw(response2dom okValidateOAILax okOaiResponse okIfListRecordsMetadataExists);
 
 my $config   = HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
 my $provider = new HTTP::OAI::DataProvider($config);
-
-my $provider = HTTP::OAI::DataProvider->new($options);
 my $baseURL  = 'http://localhost:3000/oai';
 my %params   = (
 	verb           => 'ListRecords',
@@ -18,7 +17,7 @@ my %params   = (
 my $error = HTTP::OAI::Repository::validate_request(%params);
 
 #this test is not about query testing, just make sure it works
-if ($error) {    
+if ($error) {
 	die "Query error: $error";
 }
 
@@ -28,11 +27,8 @@ my $response =
 
 #print $response;
 
-
-
-my $dom =
-  HTTP::OAI::DataProvider::Test::basicResponseTests($response);    #two tests
-print $response;
-HTTP::OAI::DataProvider::Test::okIfListRecordMetadataExists($dom);
-
+my $dom = response2dom($response);
+okValidateOAILax($dom);
+okOaiResponse($dom);
+okIfListRecordsMetadataExists($dom);
 

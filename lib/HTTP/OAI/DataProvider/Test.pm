@@ -5,22 +5,27 @@ use warnings;
 use Test::More;
 use FindBin;
 use XML::LibXML;
-use Scalar::Util;
-use HTTP::OAI::DataProvider::Common qw(valPackageName);
+#use Scalar::Util;
+use HTTP::OAI::DataProvider::Common qw(valPackageName isScalar);
+use HTTP::OAI::DataProvider::Valid;
 use base 'Exporter';
 use vars '@EXPORT_OK';
 
-
+#single, collections, helpers
 @EXPORT_OK = qw(
-  basicResponseTests
-  loadWorkingTestConfig
   okIfIdentifierExists
   okIfMetadataExists
+  okIfListRecordsMetadataExists
   okOaiResponse
   okValidateOAI
+  okValidateOAILax
+
+  basicResponseTests
+  loadWorkingTestConfig
 
   oaiError
   registerOAI
+  response2dom
 );
 
 =head1 SIMPLE TESTS
@@ -55,6 +60,7 @@ sub okIfXpathExists {
 	valPackageName( $doc, 'XML::LibXML::Document' );
 
 	my $xpath = shift or die "Error: Need xpath!";
+
 	#TODO validate xpath
 
 	my $msg = shift || '';
@@ -91,6 +97,7 @@ sub okIfMetadataExists {
 		'/oai:OAI-PMH/oai:GetRecord/oai:record[1]/oai:metadata',
 		'first GetRecord record has a metadata element'
 	);
+
 	#print $doc->toString;
 
 }
@@ -126,18 +133,23 @@ sub okValidateOAI {
 	my $doc = shift or die "Error: Need doc!";
 	valPackageName( $doc, 'XML::LibXML::Document' );
 
-	my $xmlschema =
-	  XML::LibXML::Schema->new(
-		location => 'http://www.openarchives.org/OAI/2.0/OAI-PMH.xsd' )
-	  or die "Error: Cant parse schema! Might be temporal problem";
+	my $v   = new HTTP::OAI::DataProvider::Valid;
+	my $msg = $v->validate($doc);
 
-	eval { $xmlschema->validate($doc); };
-	ok( !$@, 'document validates against OAI-PMH v2' );
-
-	if ($@) {
-		print "$@";
-	}
+	ok( $msg eq 'ok', 'document validates against OAI-PMH v2' . $@ );
 }
+
+
+sub okValidateOAILax {
+	my $doc = shift or die "Error: Need doc!";
+	valPackageName( $doc, 'XML::LibXML::Document' );
+
+	my $v   = new HTTP::OAI::DataProvider::Valid;
+	my $msg = $v->validateLax($doc);
+
+	ok( $msg eq 'ok', 'document validates against OAI-PMH v2-lax' . $@ );
+}
+
 
 =head1 COLLECTIONS OF TESTS
 
@@ -158,7 +170,7 @@ returns the response as dom.
 
 sub basicResponseTests {
 	my $response = shift or die "Error: Need response!";
-	my $dom=response2dom ($response);
+	my $dom = response2dom($response);
 
 	#print $dom->toString;
 	okValidateOAI($dom);
@@ -239,19 +251,6 @@ sub registerOAI {
 	return $xc;
 }
 
-=func isScalar ($variable);
-
-Dies if $variable is not scalar
-
-=cut
-
-sub isScalar {
-	my $value = shift or die "Need value!";
-	die "Value is not a scalar"
-	  if ( !Scalar::Util::reftype \$value eq 'SCALAR' );
-}
-
-
 =func my $dom=response2dom ($response);
 
 expects a xml as string. Returns a XML::LibXML::Document object.
@@ -260,11 +259,9 @@ expects a xml as string. Returns a XML::LibXML::Document object.
 
 sub response2dom {
 	my $response = shift or die "Error: Need response!";
-	isScalar($response); #die if not scalar
+	isScalar($response);    #die if not scalar
 
 	return XML::LibXML->load_xml( string => $response );
 }
-
-
 
 1;

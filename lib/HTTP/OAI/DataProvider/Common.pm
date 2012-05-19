@@ -10,7 +10,21 @@ use vars '@EXPORT_OK';
 
 @EXPORT_OK = qw(
 	valPackageName
+	isScalar
 );
+
+
+=func isScalar ($variable);
+
+Dies if $variable is not scalar
+
+=cut
+
+sub isScalar {
+	my $value = shift or die "Need value!";
+	die "Value is not a scalar"
+	  if ( !Scalar::Util::reftype \$value eq 'SCALAR' );
+}
 
 
 =func valPackageName ($obj,'Package::Name');
