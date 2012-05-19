@@ -6,13 +6,16 @@ use Test::More;
 use FindBin;
 use XML::LibXML;
 use Scalar::Util;
+use HTTP::OAI::DataProvider::Common qw(valPackageName);
 use base 'Exporter';
 use vars '@EXPORT_OK';
 
+
 @EXPORT_OK = qw(
-  basicResponseTests 
+  basicResponseTests
   loadWorkingTestConfig
   okIfIdentifierExists
+  okIfMetadataExists
   okOaiResponse
   okValidateOAI
 
@@ -22,6 +25,20 @@ use vars '@EXPORT_OK';
 
 =head1 SIMPLE TESTS
 
+
+=func okIfListRecordsMetadataExists ($dom)
+
+=cut
+
+sub okIfListRecordsMetadataExists {
+	my $doc = shift or die "Error: Need doc!";
+	okIfXpathExists(
+		$doc,
+		'/oai:OAI-PMH/oai:ListRecords/oai:record[1]/oai:metadata',
+		'first record has metadata'
+	);
+}
+
 =func okIfIdentifierExists ($dom);
 
 oks if response has at least one 
@@ -29,35 +46,70 @@ oks if response has at least one
 
 =cut
 
-sub okIfIdentifierExists {
+=func okIfXpathExists ($doc, $xapth, $message);
+
+=cut
+
+sub okIfXpathExists {
 	my $doc = shift or die "Error: Need doc!";
-	valPackageName($doc, 'XML::LibXML::Document');
+	valPackageName( $doc, 'XML::LibXML::Document' );
+
+	my $xpath = shift or die "Error: Need xpath!";
+	#TODO validate xpath
+
+	my $msg = shift || '';
 
 	my $xc    = registerOAI($doc);
-	my $value=$xc->findvalue ('/oai:OAI-PMH/oai:ListIdentifiers/oai:header[1]/oai:identifier');	
+	my $value = $xc->findvalue($xpath);
 
-	ok ($value, 'first header has an identifier');
-	
-	#print "DSDSDS:$value\n";
-	#print $doc->toString;	
+	ok( $value, $msg );
 }
 
+sub okIfIdentifierExists {
+	my $doc = shift or die "Error: Need doc!";
+	okIfXpathExists(
+		$doc,
+		'/oai:OAI-PMH/oai:ListIdentifiers/oai:header[1]/oai:identifier',
+		'first header has an identifier'
+	);
+
+	#print "DSDSDS:$value\n";
+	#print $doc->toString;
+}
+
+=func okIfMetadataExists ($dom);
+
+Currently it works only for a GetRecord/record/metadata. Should it also work 
+for ListRecords/record/metadata?
+
+=cut
+
+sub okIfMetadataExists {
+	my $doc = shift or die "Error: Need doc!";
+	okIfXpathExists(
+		$doc,
+		'/oai:OAI-PMH/oai:GetRecord/oai:record[1]/oai:metadata',
+		'first GetRecord record has a metadata element'
+	);
+	#print $doc->toString;
+
+}
 
 =func okOaiResponse ($dom);
 
-	ok if OAI response contains no error
+	ok if OAI response contains _no_ error.
 
 =cut
 
 sub okOaiResponse {
 	my $doc = shift or die "Error: Need doc!";
-	valPackageName($doc, 'XML::LibXML::Document');
+	valPackageName( $doc, 'XML::LibXML::Document' );
 
 	my $err = oaiError($doc);
 	if ($err) {
 		print "   OAI-Error:\n";
-		foreach my $code (keys %{$err}){
-			print "   $code->".$err->{$code}."\n";
+		foreach my $code ( keys %{$err} ) {
+			print "   $code->" . $err->{$code} . "\n";
 		}
 	}
 	ok( !defined $err, 'OAI response error free' );
@@ -72,7 +124,7 @@ sensible diagnostic message.
 
 sub okValidateOAI {
 	my $doc = shift or die "Error: Need doc!";
-	valPackageName($doc, 'XML::LibXML::Document');
+	valPackageName( $doc, 'XML::LibXML::Document' );
 
 	my $xmlschema =
 	  XML::LibXML::Schema->new(
@@ -81,8 +133,11 @@ sub okValidateOAI {
 
 	eval { $xmlschema->validate($doc); };
 	ok( !$@, 'document validates against OAI-PMH v2' );
-}
 
+	if ($@) {
+		print "$@";
+	}
+}
 
 =head1 COLLECTIONS OF TESTS
 
@@ -102,19 +157,14 @@ returns the response as dom.
 =cut
 
 sub basicResponseTests {
-	my $response=shift or die "Error: Need response!";
+	my $response = shift or die "Error: Need response!";
+	my $dom=response2dom ($response);
 
-	valScalar($response); 
-	print ref $response;
-	
-	
-	my $dom = XML::LibXML->load_xml( string => $response );
 	#print $dom->toString;
-	okValidateOAI ($dom);
-	okOaiResponse ($dom);
+	okValidateOAI($dom);
+	okOaiResponse($dom);
 	return $dom;
 }
-
 
 =head1 UTILITY FUNCTIONS/METHODS
 
@@ -154,7 +204,7 @@ test for error with:
 
 sub oaiError {
 	my $doc = shift or die "Error: Need doc!";
-	valPackageName($doc, 'XML::LibXML::Document');
+	valPackageName( $doc, 'XML::LibXML::Document' );
 
 	my $xc    = registerOAI($doc);
 	my $error = {};
@@ -173,7 +223,6 @@ sub oaiError {
 	return;
 }
 
-
 =func my $xc=registerOAI($dom);
 
 Register the uri 'http://www.openarchives.org/OAI/2.0/' as the prefix 'oai' and
@@ -183,37 +232,39 @@ return a LibXML::xPathContext object
 
 sub registerOAI {
 	my $dom = shift or die "Error: Need doc!";
-	valPackageName ($dom, 'XML::LibXML::Document');
+	valPackageName( $dom, 'XML::LibXML::Document' );
 
 	my $xc = XML::LibXML::XPathContext->new($dom);
 	$xc->registerNs( 'oai', 'http://www.openarchives.org/OAI/2.0/' );
 	return $xc;
 }
 
+=func isScalar ($variable);
 
-=func valPackageName ($obj,'Package::Name');
-
-Dies with error message if $obj is not blessed with Package::Name. You can specify
-more than one package name. Continues if any of them machtes. You may think of 
-package names as class types.
+Dies if $variable is not scalar
 
 =cut
 
-sub valPackageName {
-	my $doc = shift or die "Error: Need doc!";
-	my @expected = @_ or die "Error: Need object type (package name)";
-
-	my @match=grep (Scalar::Util::blessed($doc) eq $_, @expected);
-	
-	if ( scalar @match == 0 ) {
-		die "Error: Wrong type! Expected one of @expected, but instead it's ".blessed ($doc);
-	}
+sub isScalar {
+	my $value = shift or die "Need value!";
+	die "Value is not a scalar"
+	  if ( !Scalar::Util::reftype \$value eq 'SCALAR' );
 }
 
-sub valScalar {
-	my $value=shift or die "Need value!";
-	die "Value is not a scalar" if (! Scalar::Util::reftype \$value eq 'SCALAR');
+
+=func my $dom=response2dom ($response);
+
+expects a xml as string. Returns a XML::LibXML::Document object.
+
+=cut
+
+sub response2dom {
+	my $response = shift or die "Error: Need response!";
+	isScalar($response); #die if not scalar
+
+	return XML::LibXML->load_xml( string => $response );
 }
+
 
 
 1;

@@ -2,14 +2,11 @@
 
 use Test::More tests => 3;
 use HTTP::OAI::DataProvider;
+use HTTP::OAI::DataProvider::Test;
 use HTTP::OAI::Repository qw(validate_request);
-use XML::LibXML;
-use FindBin;
-#use Data::Dumper qw(Dumper);
 
-#LOAD CONFIG, doesn't work with TAINT mode
-my $config = do "$FindBin::Bin/config.pl";
-die "options not loaded" if ( !$options );
+my $config   = HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
+my $provider = new HTTP::OAI::DataProvider($config);
 
 my $provider = HTTP::OAI::DataProvider->new($options);
 my $baseURL  = 'http://localhost:3000/oai';
@@ -25,21 +22,17 @@ if ($error) {
 	die "Query error: $error";
 }
 
+#execute verb
 my $response =
   $provider->GetRecord( $baseURL, %params );    #response should be a xml string
 
 #print $response;
 
-ok( $response, 'response exists' );
-ok( $response =~ /<OAI-PMH/, 'response looks ok' );
 
-my $dom = XML::LibXML->load_xml( string => $response );
-my $xpc = XML::LibXML::XPathContext->new($dom);
-$xpc->registerNs( 'oai', 'http://www.openarchives.org/OAI/2.0/' );
 
-#print $xpc."\n";
+my $dom =
+  HTTP::OAI::DataProvider::Test::basicResponseTests($response);    #two tests
+print $response;
+HTTP::OAI::DataProvider::Test::okIfListRecordMetadataExists($dom);
 
-my $object = $xpc->find('/oai:OAI-PMH/oai:ListRecords/oai:record/oai:metadata');
 
-#print $object ."sdsd\n";
-ok( $object, '/OAI-PMH/ListIdentifiers/record/metadata exists' );

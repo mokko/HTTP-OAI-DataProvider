@@ -1,62 +1,49 @@
 #!perl
 
-use Test::More tests => 3;
+use Test::More tests => 2;
 use HTTP::OAI::DataProvider;
+use HTTP::OAI::DataProvider::Test;
 use HTTP::OAI::Repository qw(validate_request);
 use XML::LibXML;
 use FindBin;
+
 #use Data::Dumper qw(Dumper);
 
 #
-# init
+# init (taken for granted)
 #
 
-#LOAD CONFIG, doesn't work with TAINT mode
-my $config = do "$FindBin::Bin/config.pl";
-die "options not loaded" if ( !$options );
-my $provider = HTTP::OAI::DataProvider->new($options);
+my $config   = HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
+my $provider = new HTTP::OAI::DataProvider($config);
 
-#
-# params
-#
-
-my $baseURL  = 'http://localhost:3000/oai';
-my %params   = (
+my $baseURL = 'http://localhost:3000/oai';
+my %params  = (
 	verb           => 'GetRecord',
 	metadataPrefix => 'mpx',
 	identifier     => 'spk-berlin.de:EM-objId-40008',
 );
 
-my $error = HTTP::OAI::Repository::validate_request(%params);
-
 #this test is not about query testing, just make sure it works
-if ($error) {    
-	die "Query error: $error";
-}
+my $error = HTTP::OAI::Repository::validate_request(%params);
+die "Query error: $error" if $error;
 
-#
-# data provider query
-#
-
+# execut the verb
 my $response =
   $provider->GetRecord( $baseURL, %params );    #response should be a xml string
 
+#
+# the actual tests
+#
+
+#validation doesn't work well with oai...
+
+my $dom=HTTP::OAI::DataProvider::Test::response2dom ($response);
+#$dom->toFile ('getRecord.xml');
+HTTP::OAI::DataProvider::Test::okOaiResponse($dom);    
+
+#currently schema validation fails error message: 
+#Element '{http://www.mpx.org/mpx}museumPlusExport': No matching global element
+#declaration available, but demanded by the strict wildcard.
+
 #print $response;
-
-#
-# testing
-#
-
-ok( $response, 'response exists' );
-ok( $response =~ /<OAI-PMH/, 'response looks ok' );
-
-my $dom = XML::LibXML->load_xml( string => $response );
-my $xpc = XML::LibXML::XPathContext->new($dom);
-$xpc->registerNs( 'oai', 'http://www.openarchives.org/OAI/2.0/' );
-
-#print $xpc."\n";
-
-my $object = $xpc->find('/oai:OAI-PMH/oai:GetRecord/oai:record/oai:metadata');
-
-#print $object ."sdsd\n";
-ok( $object, '/OAI-PMH/ListIdentifiers/record/metadata exists' );
+HTTP::OAI::DataProvider::Test::okIfMetadataExists($dom);
