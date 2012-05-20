@@ -3,8 +3,10 @@ package HTTP::OAI::DataProvider::Test;
 use strict;
 use warnings;
 use Test::More;
+use Test::Xpath;
 use FindBin;
 use XML::LibXML;
+
 #use Scalar::Util;
 use HTTP::OAI::DataProvider::Common qw(valPackageName isScalar);
 use HTTP::OAI::DataProvider::Valid;
@@ -16,6 +18,7 @@ use vars '@EXPORT_OK';
   okIfIdentifierExists
   okIfMetadataExists
   okIfListRecordsMetadataExists
+  okIfBadArgument
   okOaiResponse
   okValidateOAI
   okValidateOAILax
@@ -30,6 +33,24 @@ use vars '@EXPORT_OK';
 
 =head1 SIMPLE TESTS
 
+=func okIfBadArgument ($dom);
+
+=cut
+
+sub okIfBadArgument {
+	my $doc = shift or die "Error: Need doc!";
+	valPackageName( $doc, 'XML::LibXML::Document' );
+
+	my $v   = new HTTP::OAI::DataProvider::Valid;
+	my $err = $v->validate($doc);
+	if ( $err ne 'ok' ) {
+		die "Response not valid!";
+	}
+	my $oaiError = oaiError($doc);
+	ok( $oaiError->{badArgument},
+		'expect badArgument (' . $oaiError->{badArgument} . ')' );
+
+}
 
 =func okIfListRecordsMetadataExists ($dom)
 
@@ -139,7 +160,6 @@ sub okValidateOAI {
 	ok( $msg eq 'ok', 'document validates against OAI-PMH v2' . $@ );
 }
 
-
 sub okValidateOAILax {
 	my $doc = shift or die "Error: Need doc!";
 	valPackageName( $doc, 'XML::LibXML::Document' );
@@ -149,7 +169,6 @@ sub okValidateOAILax {
 
 	ok( $msg eq 'ok', 'document validates against OAI-PMH v2-lax' . $@ );
 }
-
 
 =head1 COLLECTIONS OF TESTS
 

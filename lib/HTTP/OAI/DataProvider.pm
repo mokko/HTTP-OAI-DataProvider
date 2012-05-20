@@ -142,16 +142,16 @@ sub new {
 
 	#check various required values
 	my @required = qw(
-		adminEmail 
-	  	baseURL 
-		chunkCacheMaxSize 
-	  	chunkSize 
-	  	deletedRecord 
-	  	dbfile 
-	  	nativePrefix 
-	  	native_ns_uri
-	  	repositoryName 
-	  );
+	  adminEmail
+	  baseURL
+	  chunkCacheMaxSize
+	  chunkSize
+	  deletedRecord
+	  dbfile
+	  nativePrefix
+	  native_ns_uri
+	  repositoryName
+	);
 
 	foreach my $value (@required) {
 		if ( !$self->{$value} ) {
@@ -338,15 +338,9 @@ sub ListMetadataFormats {
 
 	Warning 'Enter ListMetadataFormats';
 
-	#check param syntax, not really necessary
-	if ( my $error = validate_request( %{$params} ) ) {
-		return $self->err2XML($error);
+	if (my $err=$self->_validateRequest('ListMetadataFormats', $params)) {
+		return $err;	
 	}
-
-	#DEBUG
-	#	if ( $params->{identifier} ) {
-	#		Debug 'with id' . $params->{identifier};
-	#	}
 
 	my $engine        = $self->{engine};          #TODO test
 	my $globalFormats = $self->{globalFormats};
@@ -560,6 +554,7 @@ sub ListRecords {
 	my $request = shift;
 
 	my $params = _hashref(@_);
+	
 	my @errors;
 
 	#Warning 'Enter ListRecords (prefix:' . $params->{metadataPrefix};
@@ -643,12 +638,13 @@ sub ListSets {
 	my $params  = _hashref(@_);
 	my $engine  = $self->{engine};
 
-	#Warning 'Enter ListSets';
+	#print "Enter ListSets $self\n";
 
 	#
 	# Check for errors
 	#
 
+	#errors in using this package...
 	if ( !$engine ) {
 		croak "Engine missing!";
 	}
@@ -658,11 +654,11 @@ sub ListSets {
 	}
 
 	#check general param syntax
-	if ( my $error = validate_request( %{$params} ) ) {
-		return $self->err2XML($error);
+	if (my $err=$self->_validateRequest('ListSets', $params)) {
+		return $err;	
 	}
 
-	#resumptionTokens not supported
+	#resumptionTokens not supported/TODO
 	if ( $params->{resumptionToken} ) {
 
 		#Debug "resumptionToken";
@@ -694,10 +690,11 @@ sub ListSets {
 	#	Debug "used_sets: $_\n";
 	#}
 
-	# Complete naked setSpecs with info from setLibrary
-	no strict "refs";    #listSets from Dancer config
-	my $listSets = $self->{setLibraryCB}();    #the brackets () are important
-	use strict "refs";
+	if ( ! $self->{setLibrary} ) {
+		die "Configuration Error: setLibrary not defined";
+	}
+
+	my $listSets= $self->_processSetLibrary();
 
 	my $library = new HTTP::OAI::DataProvider::SetLibrary();
 	$library->addListSets($listSets)
@@ -949,6 +946,23 @@ sub _init_xslt {
 	}
 }
 
+# $self->_validateRequest ($verb, $params);
+# $params is hashref
+# returns true (0) if requests validates
+# returns false (1) if request does not validate
+
+sub _validateRequest {
+	my $self=shift or die "Error: Need myself!";
+	my $verb=shift or die "Error: Need verb!";
+	my $params=shift or die "Error: Need params!";
+	
+	$params->{verb}=$verb;
+	if ( my @error = validate_request( %{$params} ) ) {
+		return $self->err2XML(@error);
+	}
+	return;
+}
+
 =head1 OAI DATA PROVIDER FEATURES
 
 SUPPORTED
@@ -989,5 +1003,55 @@ routine via config, something like
 	);
 
 =cut
+
+=func processSetLibrary
+
+debugging...
+
+=cut
+
+sub _processSetLibrary {
+	my $self = shift;
+
+	#debug "Enter salsa_setLibrary";
+	my $setLibrary = $self->{setLibrary};
+
+	if ( !$self->{setLibrary} ) {
+		die "No setLibrary";
+	}
+
+	if ( %{$setLibrary} ) {
+		my $listSets = new HTTP::OAI::ListSets;
+
+		foreach my $setSpec ( keys %{$setLibrary} ) {
+
+			my $s = new HTTP::OAI::Set;
+			$s->setSpec($setSpec);
+			$s->setName( $setLibrary->{$setSpec}->{setName} );
+
+			#print "setSpec: $setSpec\n";
+			#print "setName: " . $setLibrary->{$setSpec}->{setName}."\n";
+
+			if ( $setLibrary->{$setSpec}->{setDescription} ) {
+
+				foreach
+				  my $desc ( @{ $setLibrary->{$setSpec}->{setDescription} } )
+				{
+
+					#not sure if the if is necessary, but maybe there cd be an
+					#empty array element. Who knows?
+
+					my $dom = XML::LibXML->load_xml( string => $desc );
+					$s->setDescription(
+						new HTTP::OAI::Metadata( dom => $dom ) );
+				}
+			}
+			$listSets->set($s);
+		}
+		return $listSets;
+	}
+	warn "no setLibrary found in Dancer's config file";
+
+}
 
 1;    # End of HTTP::OAI::DataProvider

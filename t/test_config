@@ -28,4 +28,15 @@ $options = {
 	nativePrefix   => 'mpx',
 	native_ns_uri=> 'http://www.mpx.org/mpx',
 	repositoryName => 'test config OAI Data Provider',
+	setLibrary=>{
+		'78' => {
+			'setName'=> 'Schellackplatten aus dem Phonogramm-Archiv (ursprünglich für DISMARC exportiert)' 
+		},
+ 		'MIMO'=> {
+   			'setName'=> 'Musical Instruments selected for MIMO project' 
+   		},
+  		'test' => {
+   			'setName'=> 'testing setSpecs - might not work without this one'
+		},
+	},	
 };
