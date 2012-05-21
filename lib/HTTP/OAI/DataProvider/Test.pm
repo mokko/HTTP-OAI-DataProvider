@@ -13,6 +13,8 @@ use HTTP::OAI::DataProvider::Valid;
 use base 'Exporter';
 use vars '@EXPORT_OK';
 use vars '@EXPORT';
+
+#verb tests, OAI error tests, utilities
 @EXPORT = qw (
   okIdentify
   okGetRecord
@@ -21,17 +23,20 @@ use vars '@EXPORT';
   okListRecords
   okListSets
 
-  okIfBadArgument
+  isLMFprefix
+
   isOAIerror
+  okIfBadArgument
 
   loadWorkingTestConfig
+  xpathTester
+  oaiErrorResponse
 );
 
 #old stuff deprecated? Should be removed?
 @EXPORT_OK = qw(
   okIfIdentifierExists
-  
-  
+
   okOaiResponse
   okValidateOAI
   okValidateOAILax
@@ -39,9 +44,8 @@ use vars '@EXPORT';
   isOAIerror
   isMetadataFormat
   isSetSpec
-  
+
   oaiError
-  xpathTester
 );
 
 =head1 RATIONALE
@@ -141,6 +145,32 @@ sub _okType {
 
 }
 
+=func isLMFprefix ($response, 'prefix');
+
+test if ListMetadataFormats response contains a specific prefix.
+
+=cut
+
+sub isLMFprefix {
+	my $response = shift or die "Need response";
+	my $prefix   = shift or die "Need prefix";
+	isScalar($prefix);
+	my $dom = _response2dom($response);
+
+#print "ENTER isLMFprefix:$response\n";
+#If I assume that type has already been tested, I don't need to repeat any of these as well
+#_failValidationError($dom);
+#_failifOAIerror($dom);
+#_failIfNotType ($dom,'type');
+
+	my $xt    = xpathTester($response);
+	my $xpath = q(/oai:OAI-PMH/oai:ListMetadataFormats/oai:metadataFormat)
+	  . qq([oai:metadataPrefix ='$prefix']);
+
+	#print "XPATH:$xpath\n";
+	$xt->ok( $xpath, "response has metadataPrefix='$prefix'" );
+}
+
 =head3 OAI Error tests
 
 =func isOAIerror ($response, $code);
@@ -157,19 +187,11 @@ sub isOAIerror {
 
 	my $dom = _response2dom($response);
 
-	my $v   = new HTTP::OAI::DataProvider::Valid;
-	my $err = $v->validate($dom);
-	if ( $err ne 'ok' ) {
-		fail "Response not valid!";
-	}
+	_failValidationError($dom);
+	my $oaiError = _failNoOAIerror($dom);
 
-	my $oaiError = oaiError($dom);
-
-	if ( !$oaiError ) {
-		fail 'No error where error expected!';
-	}
-
-	ok( $oaiError->{$code}, "expect OAIerror of type '$code' ($oaiError->{$code})" );
+	ok( $oaiError->{$code},
+		"expect OAIerror of type '$code' ($oaiError->{$code})" );
 
 }
 
@@ -215,7 +237,6 @@ sub oaiErrorResponse {
 	return oaiError($dom);
 }
 
-
 =func $hashref=oaiError($oai_response_as_dom);
 
 Most of the time you want oaiErrorResponse instead of this one. Still trying to
@@ -256,7 +277,6 @@ sub oaiError {
 	return;
 }
 
-
 =func my $xt=xpathTester($response);
 
 returns an Test::XPath object, so you can do things like:
@@ -273,12 +293,45 @@ sub xpathTester {
 		xml   => $response,
 		xmlns => { oai => 'http://www.openarchives.org/OAI/2.0/' },
 	);
-
 }
 
 =head2 INTERNAL INTERFACE
 
 Should only be used internally.
+
+=cut
+
+sub _failNoOAIerror {
+	my $dom = shift or die "Need dom!";
+	valPackageName( $dom, 'XML::LibXML::Document' );
+
+	my $oaiError = oaiError($dom);
+	if ( !$oaiError ) {
+		fail 'No error where error expected!';
+	}
+	return $oaiError;
+}
+
+sub _failifOAIerror {
+	my $dom = shift or die "Need dom!";
+	valPackageName( $dom, 'XML::LibXML::Document' );
+
+	my $oaiError = oaiError($dom);
+	if ($oaiError) {
+		fail 'Error where NO error expected (' . keys( %{$oaiError} ) . ')!';
+	}
+}
+
+sub _failValidationError {
+	my $dom = shift or die "Need dom!";
+	valPackageName( $dom, 'XML::LibXML::Document' );
+
+	my $v   = new HTTP::OAI::DataProvider::Valid;
+	my $err = $v->validate($dom);
+	if ( $err ne 'ok' ) {
+		fail "Response not valid!";
+	}
+}
 
 =func my $dom=_response2dom ($response);
 
@@ -295,11 +348,9 @@ sub _response2dom {
 	return XML::LibXML->load_xml( string => $response );
 }
 
-
 ###
 ###
 ###
-
 
 =head2 OLD TESTS / DEPRECATED
 
@@ -494,7 +545,6 @@ sub _validateOAIresponse {
 	}
 	return 0;        #failure;
 }
-
 
 =head1 DEPRECATED UTILITY FUNCTIONS
 

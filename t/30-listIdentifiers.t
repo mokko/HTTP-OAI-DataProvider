@@ -2,7 +2,7 @@
 
 use Test::More tests => 4;
 use HTTP::OAI::DataProvider;
-use HTTP::OAI::DataProvider::Test;    
+use HTTP::OAI::DataProvider::Test;
 use HTTP::OAI::Repository qw(validate_request);
 use XML::LibXML;
 
@@ -24,18 +24,16 @@ if ($error) {
 	die "Query error: $error";
 }
 
-#diag "Test with baseURL";
 {
 	my $response = $provider->ListIdentifiers( $baseURL, %params );
 
-	okListIdentifiers ($response);
+	okListIdentifiers($response);
 }
 
-#should be todo, but not important
-SKIP: {
+SKIP: {    #should be todo, but not important
 	skip "Known bug: DataProvider currently doesn't work without baseURL", 3;
 	diag "Test without baseURL";
-	my $response = $provider->ListIdentifiers(%params);    
+	my $response = $provider->ListIdentifiers(%params);
 
-	okListIdentifiers ($response);
+	okListIdentifiers($response);
 }
