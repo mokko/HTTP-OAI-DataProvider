@@ -1,9 +1,8 @@
 #!perl
 
-use Test::More tests => 2;
+use Test::More tests => 6;
 use HTTP::OAI::DataProvider;
 use HTTP::OAI::DataProvider::Test;
-use HTTP::OAI::Repository qw(validate_request);
 use XML::LibXML;
 use FindBin;
 
@@ -17,33 +16,57 @@ my $config   = HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
 my $provider = new HTTP::OAI::DataProvider($config);
 
 my $baseURL = 'http://localhost:3000/oai';
-my %params  = (
-	verb           => 'GetRecord',
-	metadataPrefix => 'mpx',
-	identifier     => 'spk-berlin.de:EM-objId-40008',
-);
-
-#this test is not about query testing, just make sure it works
-my $error = HTTP::OAI::Repository::validate_request(%params);
-die "Query error: $error" if $error;
-
-# execut the verb
-my $response =
-  $provider->GetRecord( $baseURL, %params );    #response should be a xml string
 
 #
 # the actual tests
 #
+{
+	my %params = (
+		metadataPrefix => 'mpx',
+		identifier     => 'spk-berlin.de:EM-objId-40008',
+	);
+	my $response = $provider->GetRecord( $baseURL, %params );
+	okGetRecord($response);
+}
 
-#validation doesn't work well with oai...
+{
+	my %params = ( identifier => 'spk-berlin.de:EM-objId-40008', );
+	my $response = $provider->GetRecord( $baseURL, %params );
+	okIfBadArgument($response);
+}
 
-my $dom=HTTP::OAI::DataProvider::Test::response2dom ($response);
-#$dom->toFile ('getRecord.xml');
-HTTP::OAI::DataProvider::Test::okOaiResponse($dom);    
+{
+	my %params = ( metadataPrefix => 'mpx', );
+	my $response = $provider->GetRecord( $baseURL, %params );
+	okIfBadArgument($response);
+}
 
-#currently schema validation fails error message: 
-#Element '{http://www.mpx.org/mpx}museumPlusExport': No matching global element
-#declaration available, but demanded by the strict wildcard.
+{
+	my %params = (
+		metadataPrefix => 'mpx',
+		identifier     => 'spk-berlin.de:EM-objId-40008',
+		meschugge      => 'schixe',
+	);
+	my $response = $provider->GetRecord( $baseURL, %params );
+	okIfBadArgument($response);
+}
 
-#print $response;
-HTTP::OAI::DataProvider::Test::okIfMetadataExists($dom);
+{
+	my %params = (
+		metadataPrefix => 'mpx',
+		identifier     => 'spk-berlin.de:EM-objId-meschugge',
+	);
+	my $response = $provider->GetRecord( $baseURL, %params );
+	isOAIerror($response, 'idDoesNotExist');
+}
+
+{
+	my %params = (
+		metadataPrefix => 'meschugge',
+		identifier     => 'spk-berlin.de:EM-objId-40008',
+	);
+	my $response = $provider->GetRecord( $baseURL, %params );
+	isOAIerror($response, 'cannotDisseminateFormat');
+}
+ 
+

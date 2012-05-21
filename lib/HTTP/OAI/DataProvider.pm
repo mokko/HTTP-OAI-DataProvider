@@ -649,7 +649,7 @@ ERRORS
 
 sub ListSets {
 	my $self    = shift;
-	my $request = shift;
+	my $request = shift; #this is not good, it can create two warning messages...
 	my $params  = _hashref(@_);
 	my $engine  = $self->{engine};
 
@@ -706,6 +706,7 @@ sub ListSets {
 	#}
 
 	if ( !$self->{setLibrary} ) {
+		#test of $self->{setLibrary} is now part of new, so it is not necessary here
 		die "Configuration Error: setLibrary not defined";
 	}
 

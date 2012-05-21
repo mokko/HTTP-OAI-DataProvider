@@ -2,7 +2,7 @@
 
 use strict;
 use warnings;
-use Test::More tests => 9;
+use Test::More tests => 10;
 use HTTP::OAI::DataProvider;
 use HTTP::OAI::DataProvider::Test qw(xpathTester okIdentify okIfBadArgument);
 use XML::LibXML;
@@ -23,26 +23,24 @@ okIdentify($response);
 #
 # 1- check config values from test_config
 #
-
-#i could save the xpath in H::O::DP::Test
-#will do so once I need it repeatedly
 my $from_config_test = {
+
+	#i could save the xpaths in H::O::DP::Test
 	repositoryName => '/oai:OAI-PMH/oai:Identify/oai:repositoryName',
 	baseURL        => '/oai:OAI-PMH/oai:Identify/oai:baseURL',
 	adminEmail     => '/oai:OAI-PMH/oai:Identify/oai:adminEmail',
 	deletedRecord  => '/oai:OAI-PMH/oai:Identify/oai:deletedRecord',
 };
 
-my $tx = xpathTester($response);
+my $xt = xpathTester($response);
 
 foreach my $key ( keys %{$from_config_test} ) {
-	$tx->is( $from_config_test->{$key}, $config->{$key}, "$key correct" );
+	$xt->is( $from_config_test->{$key}, $config->{$key}, "$key correct" );
 }
 
 #
 # 2 - test static values
 #
-
 my $other_config_values = {
 	'request'           => '/oai:OAI-PMH/oai:request',
 	'granuality'        => '/oai:OAI-PMH/oai:Identify/oai:granularity',
@@ -59,8 +57,10 @@ my $expected = {
 };
 
 foreach my $key ( keys %{$expected} ) {
-	$tx->is( $other_config_values->{$key},
-		$expected->{$key}, "$key as expected" );
+	$xt->is(
+		$other_config_values->{$key},
+		$expected->{$key}, "$key as expected"
+	);
 }
 
 #
@@ -68,10 +68,15 @@ foreach my $key ( keys %{$expected} ) {
 #
 
 {
-	my $response = $provider->Identify( bla => 'meschugge', 1 )
-	  ;    #response should be a xml string
+	my $response = $provider->Identify( bla => 'meschugge', 1 );                                  
 	okIfBadArgument($response);
 }
+
+{
+	my $response = $provider->Identify( 1, identifier => 'meschugge' );                                  
+	okIfBadArgument($response);
+}
+
 
 #
 # todo: at this point we have just tested if test configuration works as expected

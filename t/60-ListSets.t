@@ -3,8 +3,8 @@
 use Test::More tests => 1;
 use HTTP::OAI::DataProvider;
 use HTTP::OAI::Repository qw(validate_request);
-use HTTP::OAI::DataProvider::Test qw(okListSets);
-use XML::LibXML;                                     #only for debugging
+use HTTP::OAI::DataProvider::Test qw(okListSets isSetSpec);
+use XML::LibXML;    #only for debugging
 
 my $config   = HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
 my $provider = new HTTP::OAI::DataProvider($config);
@@ -20,13 +20,37 @@ if ($error) {
 	die "Query error: $error";
 }
 
-#TODO: listSets with resumptionToken
+#TODO:
+##listSets with resumptionToken
+##there is something wrong with the number of params?
 
 #execute verb:
-#TODO: there is something wrong with the number of params...
-#response should be a xml string
-print "EINS\n";    
-my $response = $provider->ListSets();
-print "HERE\n";    
+my $response = $provider->ListSets(1);
 okListSets($response);
-#print $response;
+
+TODO: {
+	local $TODO= 'some time in the future';
+
+	#test all setLibraries defined default config...
+	#print "$response";
+	my $setLibrary = $config->{setLibrary};
+	foreach my $setSpec ( keys %{$setLibrary} ) {
+		my $setName = $setLibrary->{$setSpec}->{setName};
+		my $setDesc = $setLibrary->{$setSpec}->{setDescription};
+
+		#isSetSpec( $response, $setSpec );
+		if ($setName) {
+
+			#print "\t$setName\n";
+			#isSetName (response=>$reponse,setSpec=>$setSpec, setName=>$setName,
+			#msg=>'setName $setName exists');
+		}
+		if ($setDesc) {
+
+			#print "\t$setDesc\n";
+			#isSetDesc ($reponse,$setDesc, 'setDesc $setDesc exists');
+		}
+	}
+
+}
+

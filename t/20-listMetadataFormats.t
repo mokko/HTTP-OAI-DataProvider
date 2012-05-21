@@ -1,8 +1,9 @@
 use strict;
 use warnings;
-use Test::More tests => 4;
+use Test::More tests => 5;
 use HTTP::OAI::DataProvider;
-use HTTP::OAI::DataProvider::Test qw/okIfBadArgument xpathTester okListMetadataFormats/;
+use HTTP::OAI::DataProvider::Test
+  qw/okIfBadArgument okListMetadataFormats xpathTester/;
 use Test::Xpath;
 use XML::LibXML;
 
@@ -18,11 +19,11 @@ my $baseURL = 'http://localhost:3000/oai';
 
 #TODO: currently ListMetadataFormat WARNS without identifier. THIS IS A BUG!
 #param identifier IS OPTIONAL!
-{
-	my $response =
-	  $provider->ListMetadataFormats($baseURL); #response should be a xml string
-	okListMetadataFormats($response);
-}
+
+my $response =
+  $provider->ListMetadataFormats($baseURL);    #response should be a xml string
+okListMetadataFormats($response);
+
 
 {
 	diag "ListMetadataFormats __with__ identifier";
@@ -32,26 +33,14 @@ my $baseURL = 'http://localhost:3000/oai';
 		identifier => 'spk-berlin.de:EM-objId-1560323' );
 
 	okListMetadataFormats($response);
+
 	my $xt    = xpathTester($response);
 	my $xpath = '/oai:OAI-PMH/oai:ListMetadataFormats/oai:metadataFormat/'
 	  . 'oai:metadataPrefix';
 	$xt->ok( $xpath, 'metadataPrefix exists' );
 
-	#test all setLibraries defined default config...
-	#foreach my $setSpec ( keys %($config->{setLibrary} ) ){
-	# print "setSpec: $setSpec->$config->{setLibrary}->{setSpec}\n";
-	#}
-	#	  {
-
-	#		  $tx->is(
-	#			  '/oai:OAI-PMH/oai:ListMetadataFormats/oai:metadataFormat/'
-	#				. 'oai:metadataPrefix',
-	#			  $setSpec, 'metadataPrefix '.$setSpec.' defined'
-	#		  );
-	#	}
-	#	$dom = response2dom($response);
-	#	print $dom->toString;
 }
+
 {
 
 	diag "ListMetadataFormats with badArgument";
@@ -59,3 +48,16 @@ my $baseURL = 'http://localhost:3000/oai';
 	  $provider->ListMetadataFormats( $baseURL, iddentifiier => 'wrong' );
 	okIfBadArgument($response);
 }
+
+{
+	my $response = $provider->Identify( 1, identifier => 'meschugge' );
+	okIfBadArgument($response);
+}
+
+
+#		  $tx->is(
+#			  '/oai:OAI-PMH/oai:ListMetadataFormats/oai:metadataFormat/'
+#				. 'oai:metadataPrefix',
+#			  $setSpec, 'metadataPrefix '.$setSpec.' defined'
+#		  );
+#	}

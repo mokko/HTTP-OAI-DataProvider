@@ -21,6 +21,10 @@ use vars '@EXPORT';
   okListRecords
   okListSets
 
+  isOAIerror
+  isMetadataFormat
+  isSetSpec
+
   okIfBadArgument
 );
 
@@ -185,9 +189,10 @@ sub _okType {
 
 	my $xpath = "/oai:OAI-PMH/oai:$type";
 	my $msg   = "response validates and is of type $type\n";
-	my $lax='';
+	my $lax   = '';
 
-	($type eq 'ListRecords' or $type eq 'GetRecord') ? $lax = 'lax' : 1;
+	( $type eq 'ListRecords' or $type eq 'GetRecord' ) ? $lax = 'lax' : 1;
+
 	#print "LAX:$lax|type:$type\n";
 	if ( !_validateOAIresponse( $response, $lax ) ) {
 		fail '$type response does not validate $lax';
@@ -197,7 +202,48 @@ sub _okType {
 
 	#print $response."\n";
 	$xt->ok( $xpath, $msg );
-	
+
+}
+
+=func isMetadataFormat ($response, $setSpec, $msg);
+
+TODO DOESNT WORK YET
+
+=cut
+
+sub isMetadataFormat {
+	my $response = shift or die "Need response!";
+	my $prefix   = shift or die "Need prefix!";
+	my $msg = shift || '';    #optional
+	isScalar($response);
+	isScalar($prefix);
+	isScalar($msg);
+
+	my $xpath = '/oai:OAI-PMH/oai:ListMetadataFormats/oai:metadataFormat/'
+	  . "oai:metadataPrefix[. = $prefix]";
+
+	my $xt = xpathTester($response);
+	$xt->ok( $xpath, $prefix, $msg );
+}
+
+=func isSetSpec ($response, $setSpec, $msg);
+
+TODO DOESNT WORK YET
+
+=cut
+
+sub isSetSpec {
+	my $response = shift or die "Need response!";
+	my $setSpec  = shift or die "Need setSpec!";
+	isScalar($response);
+	isScalar($setSpec);
+	my $msg   = "setSpec '$setSpec' exists";
+	my $xpath = '/oai:OAI-PMH/oai:ListSets/oai:set/oai:setSpec[1]';
+
+	#  . "[. = $setSpec]";
+
+	my $xt = xpathTester($response);
+	$xt->is( $xpath, $setSpec, $msg );
 }
 
 =func okIfMetadataExists ($dom);
@@ -211,7 +257,7 @@ sub okIfMetadataExists {
 	my $doc = shift or die "Error: Need doc!";
 	okIfXpathExists(
 		$doc,
-		'/oai:OAI-PMH/oai:GetRecord/oai:record[1]/oai:metadata',
+		' / oai : OAI-PMH / oai : GetRecord / oai : record [1] /oai:metadata',
 		'first GetRecord record has a metadata element'
 	);
 
@@ -265,7 +311,6 @@ sub okValidateOAILax {
 
 	ok( $msg eq 'ok', 'document validates against OAI-PMH v2-lax' . $@ );
 }
-
 
 =func _validateOAIresponse ($response)
 
@@ -329,11 +374,12 @@ sub basicResponseTests {
 	return $dom;
 }
 
-=head1 UTILITY FUNCTIONS/METHODS
+=head1 UTILITY FUNCTIONS/ METHODS
 
-=func my $config=HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
+	  = func my $config =
+	  HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
 
-	loadWorkingTestConfig returns a hashref with a working configuration.
+	loadWorkingTestConfig returns a hashref with a working configuration .
 
 =cut
 
@@ -392,6 +438,19 @@ sub oaiErrorResponse {
 	isScalar($response);
 	my $dom = response2dom($response);
 	return oaiError($dom);
+}
+
+sub isOAIerror {
+	my $response = shift or die "Need response!";
+	my $code    = shift or die "Need error type to look for!";
+	isScalar($response);
+	isScalar($code);
+
+	my $dom   = response2dom($response);
+	my $error = oaiError($dom);
+
+	ok ($error->{$code}, "expect OAIerror of type '$code' ($error->{$code})");
+
 }
 
 =func my $xc=registerOAI($dom);
