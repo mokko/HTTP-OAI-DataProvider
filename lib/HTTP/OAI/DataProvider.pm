@@ -151,6 +151,7 @@ sub new {
 	  nativePrefix
 	  native_ns_uri
 	  repositoryName
+	  setLibrary
 	);
 
 	foreach my $value (@required) {
@@ -225,6 +226,10 @@ sub GetRecord {
 	my $params = _hashref(@_);
 	my @errors;
 
+	if ( my $err = $self->_validateRequest( 'GetRecord', $params ) ) {
+		return $err;
+	}
+
 	#Warning 'Enter GetRecord (id:'
 	#  . $params->{identifier}
 	#  . 'prefix:'
@@ -290,6 +295,10 @@ sub Identify {
 	my $requestURL = shift;
 	my $params     = _hashref(@_);
 
+	if ( my $err = $self->_validateRequest( 'Identify', $params ) ) {
+		return $err;
+	}
+
 	#Debug "Enter Identify ($request)";
 
 	# Metadata munging
@@ -338,8 +347,8 @@ sub ListMetadataFormats {
 
 	Warning 'Enter ListMetadataFormats';
 
-	if (my $err=$self->_validateRequest('ListMetadataFormats', $params)) {
-		return $err;	
+	if ( my $err = $self->_validateRequest( 'ListMetadataFormats', $params ) ) {
+		return $err;
 	}
 
 	my $engine        = $self->{engine};          #TODO test
@@ -431,6 +440,10 @@ sub ListIdentifiers {
 
 	my $params = _hashref(@_);
 	my @errors;    #stores errors before there is a result object
+
+	if ( my $err = $self->_validateRequest( 'ListIdentifiers', $params ) ) {
+		return $err;
+	}
 
 	#Warning 'Enter ListIdentifiers (prefix:' . $params->{metadataPrefix};
 	#Debug 'from:' . $params->{from}   if $params->{from};
@@ -554,7 +567,9 @@ sub ListRecords {
 	my $request = shift;
 
 	my $params = _hashref(@_);
-	
+	if ( my $err = $self->_validateRequest( 'ListRecords', $params ) ) {
+		return $err;
+	}
 	my @errors;
 
 	#Warning 'Enter ListRecords (prefix:' . $params->{metadataPrefix};
@@ -654,8 +669,8 @@ sub ListSets {
 	}
 
 	#check general param syntax
-	if (my $err=$self->_validateRequest('ListSets', $params)) {
-		return $err;	
+	if ( my $err = $self->_validateRequest( 'ListSets', $params ) ) {
+		return $err;
 	}
 
 	#resumptionTokens not supported/TODO
@@ -690,11 +705,11 @@ sub ListSets {
 	#	Debug "used_sets: $_\n";
 	#}
 
-	if ( ! $self->{setLibrary} ) {
+	if ( !$self->{setLibrary} ) {
 		die "Configuration Error: setLibrary not defined";
 	}
 
-	my $listSets= $self->_processSetLibrary();
+	my $listSets = $self->_processSetLibrary();
 
 	my $library = new HTTP::OAI::DataProvider::SetLibrary();
 	$library->addListSets($listSets)
@@ -952,11 +967,11 @@ sub _init_xslt {
 # returns false (1) if request does not validate
 
 sub _validateRequest {
-	my $self=shift or die "Error: Need myself!";
-	my $verb=shift or die "Error: Need verb!";
-	my $params=shift or die "Error: Need params!";
-	
-	$params->{verb}=$verb;
+	my $self   = shift or die "Error: Need myself!";
+	my $verb   = shift or die "Error: Need verb!";
+	my $params = shift or die "Error: Need params!";
+
+	$params->{verb} = $verb;
 	if ( my @error = validate_request( %{$params} ) ) {
 		return $self->err2XML(@error);
 	}

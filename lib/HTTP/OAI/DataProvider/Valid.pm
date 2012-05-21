@@ -4,7 +4,8 @@ package HTTP::OAI::DataProvider::Valid;
 
 use strict;
 use warnings;
-use HTTP::OAI::DataProvider::Common qw(valPackageName);
+use HTTP::OAI::DataProvider::Common qw(valPackageName isScalar);
+use XML::LibXML;
 use File::Spec;
 use Moose;
 
@@ -19,7 +20,8 @@ my $oai=new HTTP::OAI::DataProvider::Valid ();
 =cut
 
 sub BUILD {
-	my $self=shift or die "Something's wrong!";
+	my $self = shift or die "Something's wrong!";
+
 	#store xsd in module directory because it extends functionality of package
 	my $modDir = __FILE__;
 	$modDir =~ s,\.pm$,,;
@@ -40,8 +42,7 @@ sub BUILD {
 			die "XSD file not found!";
 		}
 
-		$self->{$key} =
-		  XML::LibXML::Schema->new( location => $file )
+		$self->{$key} = XML::LibXML::Schema->new( location => $file )
 		  or die "Error: Cant parse schema!";
 	}
 }
@@ -61,7 +62,27 @@ You can test for error:
 sub validate {
 	my $self = shift or die "Something's horribly wrong";
 	my $doc  = shift or die "Error: Need doc!";
-	return $self->_validate('oaiXsd', $doc);
+	return $self->_validate( 'oaiXsd', $doc );
+}
+
+=method my $msg=$oai->validateResponse ($response[, 'lax']);
+
+	if ($msg ne 'ok') {
+		print "Error: $msg\n";
+	}
+=cut
+
+sub validateResponse {
+	my $self     = shift or die "Something's horribly wrong";
+	my $response = shift or die "Error: Need response!";
+	my $lax = shift;    #optional
+
+	isScalar($response);
+	my $doc = XML::LibXML->load_xml( string => $response );
+	my $schema = 'oaiXsd';
+	$lax && $lax eq 'lax' ? $schema = 'laxOaiXsd' : 1;
+	#print "schema:$schema\n";
+	return $self->_validate( $schema, $doc );
 }
 
 =method my $msg=$oai->validateLax($doc);
@@ -75,7 +96,7 @@ Currently, I use it for getRecord responses.
 sub validateLax {
 	my $self = shift or die "Something's horribly wrong";
 	my $doc  = shift or die "Error: Need doc!";
-	return $self->_validate('laxOaiXsd', $doc);
+	return $self->_validate( 'laxOaiXsd', $doc );
 }
 
 #
@@ -87,11 +108,11 @@ sub _validate {
 	my $type = shift or die "Error: Need type!";
 	my $doc  = shift or die "Error: Need doc!";
 
-	if (! $self->{$type}) {
+	if ( !$self->{$type} ) {
 		die "Error: After self inspection I find thast I am not of that type";
 	}
 
-	valPackageName( $doc, 'XML::LibXML::Document' );
+	valPackageName( $doc,           'XML::LibXML::Document' );
 	valPackageName( $self->{$type}, 'XML::LibXML::Schema' );
 
 	eval { $self->{$type}->validate($doc); };

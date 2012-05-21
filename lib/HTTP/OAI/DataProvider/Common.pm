@@ -1,10 +1,10 @@
 package HTTP::OAI::DataProvider::Common;
-
 # ABSTRACT: common FUNCTIONs for the dataProvider
 
 use strict;
 use warnings;
 use Scalar::Util;
+use Carp qw(carp croak);
 
 use base 'Exporter';
 use vars '@EXPORT_OK';
@@ -14,6 +14,8 @@ use vars '@EXPORT_OK';
   isScalar
 );
 
+sub argumentsLeft;
+
 =func isScalar ($variable);
 
 Dies if $variable is not scalar
@@ -22,9 +24,14 @@ Dies if $variable is not scalar
 
 sub isScalar {
 	my $value = shift
-	  or die "Need value!";    #there must be a better way, but this works...
+	  or die "Need value!";
+	carp argumentsLeft if @_;
+
 	die "Value is not a scalar"
 	  if ( !Scalar::Util::reftype \$value eq 'SCALAR' );
+
+	#there must be a better way, but this works...
+	#new perldoc suggests not to use UNIVERSAL::isa as a function, so I don't
 }
 
 =func valPackageName ($obj,'Package::Name');
@@ -40,7 +47,7 @@ You pass more than one Package::Name. Test passes if $obj is one of them.
 sub valPackageName {
 	my $obj      = shift or die "Error: Need an object!";
 	my @expected = @_    or die "Error: Need object type (package name)";
-
+	
 	#print '...xxx...:'.ref($obj)."\n";
 	my $type = Scalar::Util::blessed($obj);
 	if ($type) {
@@ -54,3 +61,7 @@ sub valPackageName {
 	}
 }
 
+
+sub argumentsLeft {
+	return "Carp: More agruments than expected";	
+}

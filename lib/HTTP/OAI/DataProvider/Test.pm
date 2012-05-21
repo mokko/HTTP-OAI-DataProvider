@@ -12,13 +12,23 @@ use HTTP::OAI::DataProvider::Common qw(valPackageName isScalar);
 use HTTP::OAI::DataProvider::Valid;
 use base 'Exporter';
 use vars '@EXPORT_OK';
+use vars '@EXPORT';
+@EXPORT = qw (
+  okIdentify
+  okGetRecord
+  okListIdentifiers
+  okListMetadataFormats
+  okListRecords
+  okListSets
+
+  okIfBadArgument
+);
 
 #single, collections, helpers
 @EXPORT_OK = qw(
   okIfIdentifierExists
   okIfMetadataExists
   okIfListRecordsMetadataExists
-  okIfBadArgument
   okOaiResponse
   okValidateOAI
   okValidateOAILax
@@ -27,9 +37,15 @@ use vars '@EXPORT_OK';
   loadWorkingTestConfig
 
   oaiError
-  registerOAI
-  response2dom
+  xpathTester
 );
+
+=head1 RATIONALE
+
+The new kind of test queues multiple 'tests', but uses Test::More only on the 
+last and most specific test. It dies on earlier tests.
+
+
 
 =head1 SIMPLE TESTS
 
@@ -38,18 +54,20 @@ use vars '@EXPORT_OK';
 =cut
 
 sub okIfBadArgument {
-	my $doc = shift or die "Error: Need doc!";
-	valPackageName( $doc, 'XML::LibXML::Document' );
+	my $response = shift or die "Error: Need response!";
 
 	my $v   = new HTTP::OAI::DataProvider::Valid;
-	my $err = $v->validate($doc);
+	my $err = $v->validateResponse($response);
 	if ( $err ne 'ok' ) {
 		die "Response not valid!";
 	}
-	my $oaiError = oaiError($doc);
+
+	my $oaiError = oaiErrorResponse($response);
+	if ( !$oaiError ) {
+		fail 'No error where error expected!';
+	}
 	ok( $oaiError->{badArgument},
 		'expect badArgument (' . $oaiError->{badArgument} . ')' );
-
 }
 
 =func okIfListRecordsMetadataExists ($dom)
@@ -102,6 +120,84 @@ sub okIfIdentifierExists {
 
 	#print "DSDSDS:$value\n";
 	#print $doc->toString;
+}
+
+=func okGetRecord($response);
+=func okIdentify($response);
+=func okListIdentifiers($response);
+
+=func okListRecords($response);
+=func okListMetadataFormats($response);
+=func okListSets($response);
+
+New version of tests. Validates and checks if element named after verb (aka 
+'the type') exists.
+
+=cut
+
+sub okGetRecord {
+	my $response = shift or die "Need xml as string!";
+	_okType( $response, 'GetRecord' );
+}
+
+sub okIdentify {
+	my $response = shift or die "Need xml as string!";
+	_okType( $response, 'Identify' );
+}
+
+sub okListIdentifiers {
+	my $response = shift or die "Need xml as string!";
+	_okType( $response, 'ListIdentifiers' );
+}
+
+sub okListRecords {
+	my $response = shift or die "Need xml as string!";
+	_okType( $response, 'ListRecords' );
+}
+
+sub okListMetadataFormats {
+	my $response = shift or die "Need xml as string!";
+	_okType( $response, 'ListMetadataFormats' );
+}
+
+sub okListSets {
+	my $response = shift or die "Need xml as string!";
+	_okType( $response, 'ListSets' );
+}
+
+#generic for okIfListIdentifiers,okIfIdentify etc.
+sub _okType {
+	my $response = shift or die "Need xml as string!";
+	my $type     = shift or die "Need type!";
+
+	isScalar($response);
+	if (
+		$type !~ /^Identify$|
+		^GetRecord$|
+		^ListIdentifiers$|
+		^ListMetadataFormats$|
+		^ListRecords$|
+		^ListSets$/x
+	  )
+	{
+		die "Error: Unknown type ($type)!";
+	}
+
+	my $xpath = "/oai:OAI-PMH/oai:$type";
+	my $msg   = "response validates and is of type $type\n";
+	my $lax='';
+
+	($type eq 'ListRecords' or $type eq 'GetRecord') ? $lax = 'lax' : 1;
+	#print "LAX:$lax|type:$type\n";
+	if ( !_validateOAIresponse( $response, $lax ) ) {
+		fail '$type response does not validate $lax';
+	}
+
+	my $xt = xpathTester($response);
+
+	#print $response."\n";
+	$xt->ok( $xpath, $msg );
+	
 }
 
 =func okIfMetadataExists ($dom);
@@ -170,6 +266,40 @@ sub okValidateOAILax {
 	ok( $msg eq 'ok', 'document validates against OAI-PMH v2-lax' . $@ );
 }
 
+
+=func _validateOAIresponse ($response)
+
+	new version!
+
+ if (!_validateOAIresponse ($response, ['lax'])) {
+	fail ('reason');
+ }
+
+=cut
+
+sub _validateOAIresponse {
+	my $response = shift or die "Error: Need doc!";
+	my $type = shift || '';
+
+	#print "TYPE:$type\n";
+	my $doc = XML::LibXML->load_xml( string => $response );
+	my $v = new HTTP::OAI::DataProvider::Valid;
+
+	my $msg;
+	if ( $type eq 'lax' ) {
+		$msg = $v->validateLax($doc);
+	}
+	else {
+		$msg = $v->validate($doc);
+	}
+
+	#print "msg:$msg (type:$type)\n";
+	if ( $msg eq 'ok' ) {
+		return 1;    #success
+	}
+	return 0;        #failure;
+}
+
 =head1 COLLECTIONS OF TESTS
 
 At this point I am not sure if I should prefer a single specific test or a 
@@ -177,6 +307,8 @@ series of increasingly tests. The answer depends on the kinds of problems
 I anticipate.
 
 =func my $dom=basicResponseTests ($response_as_string);
+
+DEPRECATED!
 
 Expects the output from the verb, a string containing XML. Carries out 4 tests.
 
@@ -246,12 +378,20 @@ sub oaiError {
 		my $desc = '';
 		$desc = $xc->findvalue('/oai:OAI-PMH/oai:error');
 
+		#print "badewanne".$doc->toString."\n";
 		if ($code) {
 			$error->{$code} = $desc;
 			return $error;
 		}
 	}
 	return;
+}
+
+sub oaiErrorResponse {
+	my $response = shift or die "Need response!";
+	isScalar($response);
+	my $dom = response2dom($response);
+	return oaiError($dom);
 }
 
 =func my $xc=registerOAI($dom);
@@ -270,9 +410,25 @@ sub registerOAI {
 	return $xc;
 }
 
+=func my $tx=xpathTester($response);
+
+=cut
+
+sub xpathTester {
+	my $response = shift or die "Need response!";
+	isScalar $response;
+	return Test::XPath->new(
+		xml   => $response,
+		xmlns => { oai => 'http://www.openarchives.org/OAI/2.0/' },
+	);
+
+}
+
 =func my $dom=response2dom ($response);
 
-expects a xml as string. Returns a XML::LibXML::Document object.
+expects a xml as string. Returns a XML::LibXML::Document object. 
+
+Will become a private function soon.
 
 =cut
 
@@ -281,6 +437,33 @@ sub response2dom {
 	isScalar($response);    #die if not scalar
 
 	return XML::LibXML->load_xml( string => $response );
+}
+
+#would it be possible to write an abstract function/method that tests
+#all possible cases
+sub _testSequence {
+	my $coderef = shift or die "Need a coderef";
+
+	my $string = 'bla';
+	my %hash   = ( key => 'value' );
+	my @array  = [ 'one', 'two', 'three' ];
+	my $obj    = {};
+	bless $obj, 'Test::ObjectY';
+
+	&$coderef($string);
+	&$coderef(@array);
+	&$coderef(%hash);
+	&$coderef( \$string );
+	&$coderef( \%hash );
+	&$coderef( \@array );
+	&$coderef( \$obj );
+
+	#coderef missing
+	#filehandle missing
+	#...
+
+	#how would I know which ones have to die() and which ones have to succeed?
+
 }
 
 1;

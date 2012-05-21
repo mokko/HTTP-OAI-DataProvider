@@ -1,19 +1,23 @@
 use strict;
 use warnings;
 use HTTP::OAI::DataProvider::Common qw(isScalar valPackageName);
-use Test::More tests => 11;
+use Test::More tests => 12;
 
 #use Data::Dumper qw(Dumper); #only for debugging tests
 
-#
-#
-#diag "testing isScalar";
+{
+	my $bla  = 'somestring';
 
-eval { isScalar('bla'); };
-ok( !$@, 'isScalar should NOT die' );
+	eval { isScalar($bla); };
+	ok( !$@, 'isScalar should NOT die (scalar)' );
 
-eval { isScalar( 'band' => 'on the run' ); };
-ok( !$@, 'isScalar should die' );
+	eval { isScalar( 'band' => 'on the run' ); };
+	ok( !$@, 'isScalar should die (hash)' );
+
+	my $test = \$bla;
+	eval { isScalar($test); };
+	ok( !$@, 'isScalar should die (scalarref)' );
+}
 
 #
 #
@@ -49,7 +53,7 @@ ok( !$@, 'fail with bad obj (hashref)' );
 {
 	my $string = 'bla';
 	$obj = \$string;
-	
+
 	eval { valPackageName( $obj, 'Test::Object', 'bla::bla', 'Beatles' ); };
 	ok( !$@, 'fail with bad obj (scalarref)' );
 }

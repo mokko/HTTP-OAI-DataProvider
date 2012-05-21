@@ -10,8 +10,8 @@ use Test::More;
 
 #load a working standard test config which should have ONLY required values
 my $config=HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
-
-plan tests => 1 + keys( %{$config} ) + 4;
+my @options = qw(debug xslt requestURL warning);
+plan tests => 1 + keys( %{$config} ) + scalar @options;
 
 # 1. Does it work? Return value right?
 #
@@ -38,6 +38,7 @@ my @required = qw(
   nativePrefix
   native_ns_uri
   repositoryName
+  setLibrary
 );
 
 foreach my $value (@required) {
@@ -50,7 +51,6 @@ foreach my $value (@required) {
 #
 # 2.2 test options: should succeed without options
 #
-my @options = qw(debug xslt requestURL warning);
 
 foreach my $value (@options) {
 	my $config=HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();

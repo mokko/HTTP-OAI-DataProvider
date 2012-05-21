@@ -1,9 +1,8 @@
 use strict;
 use warnings;
-use Test::More tests => 6;
+use Test::More tests => 4;
 use HTTP::OAI::DataProvider;
-use HTTP::OAI::DataProvider::Test
-  qw/basicResponseTests response2dom okIfBadArgument/;
+use HTTP::OAI::DataProvider::Test qw/okIfBadArgument xpathTester okListMetadataFormats/;
 use Test::Xpath;
 use XML::LibXML;
 
@@ -22,7 +21,7 @@ my $baseURL = 'http://localhost:3000/oai';
 {
 	my $response =
 	  $provider->ListMetadataFormats($baseURL); #response should be a xml string
-	basicResponseTests($response);              #two tests
+	okListMetadataFormats($response);
 }
 
 {
@@ -31,42 +30,32 @@ my $baseURL = 'http://localhost:3000/oai';
 	#response should be a xml string
 	my $response = $provider->ListMetadataFormats( $baseURL,
 		identifier => 'spk-berlin.de:EM-objId-1560323' );
-	my $dom = response2dom($response);
 
-	#print $dom->toString;
+	okListMetadataFormats($response);
+	my $xt    = xpathTester($response);
+	my $xpath = '/oai:OAI-PMH/oai:ListMetadataFormats/oai:metadataFormat/'
+	  . 'oai:metadataPrefix';
+	$xt->ok( $xpath, 'metadataPrefix exists' );
 
-	basicResponseTests($response);    #two tests
-	my $tx = Test::XPath->new(
-		xml   => $response,
-		xmlns => { oai => 'http://www.openarchives.org/OAI/2.0/' },
-	);
-#	$dom = response2dom($response);
-#	print $dom->toString;
-	$tx->ok(
-'/oai:OAI-PMH/oai:ListMetadataFormats/oai:metadataFormat/oai:metadataPrefix',
-		'metadataPrefix exists'
-	);
+	#test all setLibraries defined default config...
+	#foreach my $setSpec ( keys %($config->{setLibrary} ) ){
+	# print "setSpec: $setSpec->$config->{setLibrary}->{setSpec}\n";
+	#}
+	#	  {
 
-#test all setLibraries defined default config...
-#	foreach my $setSpec ( keys %($config->{setLibrary} ) )
-#	  {
-#		  $tx->is(
-#			  '/oai:OAI-PMH/oai:ListMetadataFormats/oai:metadataFormat/'
-#				. 'oai:metadataPrefix',
-#			  $setSpec, 'metadataPrefix '.$setSpec.' defined'
-#		  );
-#	}
-
-#	$dom = response2dom($response);
-#	print $dom->toString;
+	#		  $tx->is(
+	#			  '/oai:OAI-PMH/oai:ListMetadataFormats/oai:metadataFormat/'
+	#				. 'oai:metadataPrefix',
+	#			  $setSpec, 'metadataPrefix '.$setSpec.' defined'
+	#		  );
+	#	}
+	#	$dom = response2dom($response);
+	#	print $dom->toString;
 }
+{
 
-  {
-
-	  diag "ListMetadataFormats with badArgument";
-	  my $response =
-		$provider->ListMetadataFormats( $baseURL, iddentifiier => 'wrong' );
-	  my $dom = response2dom($response);
-
-	  okIfBadArgument($dom);
+	diag "ListMetadataFormats with badArgument";
+	my $response =
+	  $provider->ListMetadataFormats( $baseURL, iddentifiier => 'wrong' );
+	okIfBadArgument($response);
 }

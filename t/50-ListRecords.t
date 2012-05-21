@@ -1,10 +1,9 @@
 #!perl
 
-use Test::More tests => 3;
+use Test::More tests => 1;
 use HTTP::OAI::DataProvider;
 use HTTP::OAI::Repository qw(validate_request);
-use HTTP::OAI::DataProvider::Test
-  qw(response2dom okValidateOAILax okOaiResponse okIfListRecordsMetadataExists);
+use HTTP::OAI::DataProvider::Test qw(okListRecords);
 
 my $config   = HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
 my $provider = new HTTP::OAI::DataProvider($config);
@@ -23,12 +22,9 @@ if ($error) {
 
 #execute verb
 my $response =
-  $provider->GetRecord( $baseURL, %params );    #response should be a xml string
+  $provider->ListRecords( $baseURL, %params );    #response should be a xml string
 
 #print $response;
 
-my $dom = response2dom($response);
-okValidateOAILax($dom);
-okOaiResponse($dom);
-okIfListRecordsMetadataExists($dom);
+okListRecords($response);
 
