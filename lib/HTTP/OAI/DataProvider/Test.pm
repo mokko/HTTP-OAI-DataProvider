@@ -21,25 +21,25 @@ use vars '@EXPORT';
   okListRecords
   okListSets
 
-  isOAIerror
-  isMetadataFormat
-  isSetSpec
-
   okIfBadArgument
+  isOAIerror
+
+  loadWorkingTestConfig
 );
 
-#single, collections, helpers
+#old stuff deprecated? Should be removed?
 @EXPORT_OK = qw(
   okIfIdentifierExists
-  okIfMetadataExists
-  okIfListRecordsMetadataExists
+  
+  
   okOaiResponse
   okValidateOAI
   okValidateOAILax
 
-  basicResponseTests
-  loadWorkingTestConfig
-
+  isOAIerror
+  isMetadataFormat
+  isSetSpec
+  
   oaiError
   xpathTester
 );
@@ -49,82 +49,12 @@ use vars '@EXPORT';
 The new kind of test queues multiple 'tests', but uses Test::More only on the 
 last and most specific test. It dies on earlier tests.
 
+=head1 NEW TESTS
 
+=head2 Verb tests
 
-=head1 SIMPLE TESTS
-
-=func okIfBadArgument ($dom);
-
-=cut
-
-sub okIfBadArgument {
-	my $response = shift or die "Error: Need response!";
-
-	my $v   = new HTTP::OAI::DataProvider::Valid;
-	my $err = $v->validateResponse($response);
-	if ( $err ne 'ok' ) {
-		die "Response not valid!";
-	}
-
-	my $oaiError = oaiErrorResponse($response);
-	if ( !$oaiError ) {
-		fail 'No error where error expected!';
-	}
-	ok( $oaiError->{badArgument},
-		'expect badArgument (' . $oaiError->{badArgument} . ')' );
-}
-
-=func okIfListRecordsMetadataExists ($dom)
-
-=cut
-
-sub okIfListRecordsMetadataExists {
-	my $doc = shift or die "Error: Need doc!";
-	okIfXpathExists(
-		$doc,
-		'/oai:OAI-PMH/oai:ListRecords/oai:record[1]/oai:metadata',
-		'first record has metadata'
-	);
-}
-
-=func okIfIdentifierExists ($dom);
-
-oks if response has at least one 
-	/oai:OAI-PMH/oai:ListIdentifiers/oai:header[1]/oai:identifier
-
-=cut
-
-=func okIfXpathExists ($doc, $xapth, $message);
-
-=cut
-
-sub okIfXpathExists {
-	my $doc = shift or die "Error: Need doc!";
-	valPackageName( $doc, 'XML::LibXML::Document' );
-
-	my $xpath = shift or die "Error: Need xpath!";
-
-	#TODO validate xpath
-
-	my $msg = shift || '';
-
-	my $xc    = registerOAI($doc);
-	my $value = $xc->findvalue($xpath);
-
-	ok( $value, $msg );
-}
-
-sub okIfIdentifierExists {
-	my $doc = shift or die "Error: Need doc!";
-	okIfXpathExists(
-		$doc,
-		'/oai:OAI-PMH/oai:ListIdentifiers/oai:header[1]/oai:identifier',
-		'first header has an identifier'
-	);
-
-	#print "DSDSDS:$value\n";
-	#print $doc->toString;
-}
+expect a stringified response; pass if response validates against OAI (or 
+OAIlax).
 
 =func okGetRecord($response);
 =func okIdentify($response);
@@ -198,11 +128,231 @@ sub _okType {
 		fail '$type response does not validate $lax';
 	}
 
+	my $error = oaiErrorResponse($response);
+
+	if ($error) {
+		fail "response is OAI error where not expected";
+	}
+
 	my $xt = xpathTester($response);
 
 	#print $response."\n";
 	$xt->ok( $xpath, $msg );
 
+}
+
+=head3 OAI Error tests
+
+=func isOAIerror ($response, $code);
+
+passes if $response is of error type $code
+
+=cut
+
+sub isOAIerror {
+	my $response = shift or die "Need response!";
+	my $code     = shift or die "Need error type to look for!";
+	isScalar($response);
+	isScalar($code);
+
+	my $dom = _response2dom($response);
+
+	my $v   = new HTTP::OAI::DataProvider::Valid;
+	my $err = $v->validate($dom);
+	if ( $err ne 'ok' ) {
+		fail "Response not valid!";
+	}
+
+	my $oaiError = oaiError($dom);
+
+	if ( !$oaiError ) {
+		fail 'No error where error expected!';
+	}
+
+	ok( $oaiError->{$code}, "expect OAIerror of type '$code' ($oaiError->{$code})" );
+
+}
+
+=func okIfBadArgument ($response);
+
+passes if response is OAI error badArgument
+
+=cut
+
+sub okIfBadArgument {
+	my $response = shift or die "Error: Need response!";
+	isOAIerror( $response, 'badArgument' );
+}
+
+=head2 NEW UTILITIES
+
+=func my $config =
+	  HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
+
+	loadWorkingTestConfig returns a hashref with a working configuration .
+
+=cut
+
+sub loadWorkingTestConfig {
+
+	my $config = do "$FindBin::Bin/test_config"
+	  or die "Error: Configuration not loaded";
+
+	#in lieu of proper validation
+	die "Error: Not a hashref" if ref $config ne 'HASH';
+
+	return $config;
+}
+
+=func my $err=oaiErrorResponse ($response)
+
+=cut
+
+sub oaiErrorResponse {
+	my $response = shift or die "Need response!";
+	isScalar($response);
+	my $dom = _response2dom($response);
+	return oaiError($dom);
+}
+
+
+=func $hashref=oaiError($oai_response_as_dom);
+
+Most of the time you want oaiErrorResponse instead of this one. Still trying to
+figure out if this function should be internal.
+
+Returns nothing if no response is not an error. If the response is erroneous, 
+returns a hashref with one or more errors.
+
+	$hashref->{code}->{description};
+
+test for error with:
+	if (my $err=oaiError $dom) {
+		foreach my $code (keys %{$err}){
+			print "code:$code->".$err->{$code}."\n";
+		}
+	}
+=cut
+
+sub oaiError {
+	my $doc = shift or die "Error: Need doc!";
+	valPackageName( $doc, 'XML::LibXML::Document' );
+
+	my $xc    = registerOAI($doc);
+	my $error = {};
+
+	#todo: this should be foreach to check for multiple errors
+	if ( $xc->exists('/oai:OAI-PMH/oai:error') ) {
+		my $code = $xc->findvalue('/oai:OAI-PMH/oai:error/@code');
+		my $desc = '';
+		$desc = $xc->findvalue('/oai:OAI-PMH/oai:error');
+
+		#print "badewanne".$doc->toString."\n";
+		if ($code) {
+			$error->{$code} = $desc;
+			return $error;
+		}
+	}
+	return;
+}
+
+
+=func my $xt=xpathTester($response);
+
+returns an Test::XPath object, so you can do things like:
+	$xt->ok($xpath, 'msg');
+
+See L<Test::XPath> for details
+
+=cut
+
+sub xpathTester {
+	my $response = shift or die "Need response!";
+	isScalar $response;
+	return Test::XPath->new(
+		xml   => $response,
+		xmlns => { oai => 'http://www.openarchives.org/OAI/2.0/' },
+	);
+
+}
+
+=head2 INTERNAL INTERFACE
+
+Should only be used internally.
+
+=func my $dom=_response2dom ($response);
+
+expects a xml as string. Returns a XML::LibXML::Document object. 
+
+Will become a private function soon.
+
+=cut
+
+sub _response2dom {
+	my $response = shift or die "Error: Need response!";
+	isScalar($response);    #die if not scalar
+
+	return XML::LibXML->load_xml( string => $response );
+}
+
+
+###
+###
+###
+
+
+=head2 OLD TESTS / DEPRECATED
+
+=func okIfListRecordsMetadataExists ($dom)
+
+=cut
+
+sub okIfListRecordsMetadataExists {
+	my $doc = shift or die "Error: Need doc!";
+	okIfXpathExists(
+		$doc,
+		'/oai:OAI-PMH/oai:ListRecords/oai:record[1]/oai:metadata',
+		'first record has metadata'
+	);
+}
+
+=func okIfXpathExists ($doc, $xapth, $message);
+
+=cut
+
+sub okIfXpathExists {
+	my $doc = shift or die "Error: Need doc!";
+	valPackageName( $doc, 'XML::LibXML::Document' );
+
+	my $xpath = shift or die "Error: Need xpath!";
+
+	#TODO validate xpath
+
+	my $msg = shift || '';
+
+	my $xc    = registerOAI($doc);
+	my $value = $xc->findvalue($xpath);
+
+	ok( $value, $msg );
+}
+
+=func okIfIdentifierExists ($dom);
+
+oks if response has at least one 
+	/oai:OAI-PMH/oai:ListIdentifiers/oai:header[1]/oai:identifier
+
+=cut
+
+sub okIfIdentifierExists {
+	my $doc = shift or die "Error: Need doc!";
+	okIfXpathExists(
+		$doc,
+		'/oai:OAI-PMH/oai:ListIdentifiers/oai:header[1]/oai:identifier',
+		'first header has an identifier'
+	);
+
+	#print "DSDSDS:$value\n";
+	#print $doc->toString;
 }
 
 =func isMetadataFormat ($response, $setSpec, $msg);
@@ -345,113 +495,9 @@ sub _validateOAIresponse {
 	return 0;        #failure;
 }
 
-=head1 COLLECTIONS OF TESTS
 
-At this point I am not sure if I should prefer a single specific test or a 
-series of increasingly tests. The answer depends on the kinds of problems
-I anticipate.
+=head1 DEPRECATED UTILITY FUNCTIONS
 
-=func my $dom=basicResponseTests ($response_as_string);
-
-DEPRECATED!
-
-Expects the output from the verb, a string containing XML. Carries out 4 tests.
-
-1) Does response validate as a OAI response?
-2) Does response contain OAI errors?
-
-returns the response as dom.
-
-=cut
-
-sub basicResponseTests {
-	my $response = shift or die "Error: Need response!";
-	my $dom = response2dom($response);
-
-	#print $dom->toString;
-	okValidateOAI($dom);
-	okOaiResponse($dom);
-	return $dom;
-}
-
-=head1 UTILITY FUNCTIONS/ METHODS
-
-	  = func my $config =
-	  HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
-
-	loadWorkingTestConfig returns a hashref with a working configuration .
-
-=cut
-
-sub loadWorkingTestConfig {
-
-	my $config = do "$FindBin::Bin/test_config"
-	  or die "Error: Configuration not loaded";
-
-	#in lieu of proper validation
-	die "Error: Not a hashref" if ref $config ne 'HASH';
-
-	return $config;
-}
-
-=func $hashref=oaiError($oai_response_as_dom);
-
-Returns nothing if no response is not an error. If the response is erroneous, 
-returns a hashref with one or more errors.
-
-	$hashref->{code}->{description};
-
-test for error with:
-	if (my $err=oaiError $dom) {
-		foreach my $code (keys %{$err}){
-			print "code:$code->".$err->{$code}."\n";
-		}
-	}
-
-
-=cut
-
-sub oaiError {
-	my $doc = shift or die "Error: Need doc!";
-	valPackageName( $doc, 'XML::LibXML::Document' );
-
-	my $xc    = registerOAI($doc);
-	my $error = {};
-
-	#todo: this should be foreach to check for multiple errors
-	if ( $xc->exists('/oai:OAI-PMH/oai:error') ) {
-		my $code = $xc->findvalue('/oai:OAI-PMH/oai:error/@code');
-		my $desc = '';
-		$desc = $xc->findvalue('/oai:OAI-PMH/oai:error');
-
-		#print "badewanne".$doc->toString."\n";
-		if ($code) {
-			$error->{$code} = $desc;
-			return $error;
-		}
-	}
-	return;
-}
-
-sub oaiErrorResponse {
-	my $response = shift or die "Need response!";
-	isScalar($response);
-	my $dom = response2dom($response);
-	return oaiError($dom);
-}
-
-sub isOAIerror {
-	my $response = shift or die "Need response!";
-	my $code    = shift or die "Need error type to look for!";
-	isScalar($response);
-	isScalar($code);
-
-	my $dom   = response2dom($response);
-	my $error = oaiError($dom);
-
-	ok ($error->{$code}, "expect OAIerror of type '$code' ($error->{$code})");
-
-}
 
 =func my $xc=registerOAI($dom);
 
@@ -467,62 +513,6 @@ sub registerOAI {
 	my $xc = XML::LibXML::XPathContext->new($dom);
 	$xc->registerNs( 'oai', 'http://www.openarchives.org/OAI/2.0/' );
 	return $xc;
-}
-
-=func my $tx=xpathTester($response);
-
-=cut
-
-sub xpathTester {
-	my $response = shift or die "Need response!";
-	isScalar $response;
-	return Test::XPath->new(
-		xml   => $response,
-		xmlns => { oai => 'http://www.openarchives.org/OAI/2.0/' },
-	);
-
-}
-
-=func my $dom=response2dom ($response);
-
-expects a xml as string. Returns a XML::LibXML::Document object. 
-
-Will become a private function soon.
-
-=cut
-
-sub response2dom {
-	my $response = shift or die "Error: Need response!";
-	isScalar($response);    #die if not scalar
-
-	return XML::LibXML->load_xml( string => $response );
-}
-
-#would it be possible to write an abstract function/method that tests
-#all possible cases
-sub _testSequence {
-	my $coderef = shift or die "Need a coderef";
-
-	my $string = 'bla';
-	my %hash   = ( key => 'value' );
-	my @array  = [ 'one', 'two', 'three' ];
-	my $obj    = {};
-	bless $obj, 'Test::ObjectY';
-
-	&$coderef($string);
-	&$coderef(@array);
-	&$coderef(%hash);
-	&$coderef( \$string );
-	&$coderef( \%hash );
-	&$coderef( \@array );
-	&$coderef( \$obj );
-
-	#coderef missing
-	#filehandle missing
-	#...
-
-	#how would I know which ones have to die() and which ones have to succeed?
-
 }
 
 1;

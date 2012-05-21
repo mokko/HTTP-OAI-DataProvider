@@ -1,8 +1,8 @@
 #!perl
 
-use Test::More tests => 6;
+use Test::More tests => 4;
 use HTTP::OAI::DataProvider;
-use HTTP::OAI::DataProvider::Test;    # qw(basicResponseTests);
+use HTTP::OAI::DataProvider::Test;    
 use HTTP::OAI::Repository qw(validate_request);
 use XML::LibXML;
 
@@ -24,25 +24,18 @@ if ($error) {
 	die "Query error: $error";
 }
 
-diag "Test with baseURL";
+#diag "Test with baseURL";
 {
-	my $response = $provider->ListIdentifiers( $baseURL, %params )
-	  ;    #response should be a xml string
+	my $response = $provider->ListIdentifiers( $baseURL, %params );
 
-	my $dom =
-	  HTTP::OAI::DataProvider::Test::basicResponseTests($response);   #two tests
-	HTTP::OAI::DataProvider::Test::okIfIdentifierExists($dom);
+	okListIdentifiers ($response);
 }
 
-
+#should be todo, but not important
 SKIP: {
 	skip "Known bug: DataProvider currently doesn't work without baseURL", 3;
 	diag "Test without baseURL";
-	my $response = $provider->ListIdentifiers(%params)
-	  ;    #response should be a xml string
+	my $response = $provider->ListIdentifiers(%params);    
 
-	my $dom =
-	  HTTP::OAI::DataProvider::Test::basicResponseTests($response);   #two tests
-
-	HTTP::OAI::DataProvider::Test::okIfIdentifierExists($dom);
+	okListIdentifiers ($response);
 }
