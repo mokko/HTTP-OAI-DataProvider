@@ -3,7 +3,7 @@ use warnings;
 use Test::More;
 use HTTP::OAI::DataProvider;
 use HTTP::OAI::DataProvider::Test
-  qw/isLMFprefix okIfBadArgument okListMetadataFormats xpathTester/;
+  qw/isLMFprefix okIfBadArgument okListMetadataFormats xpathTester isOAIerror/;
 use Test::Xpath;
 use XML::LibXML;
 
@@ -11,7 +11,7 @@ use XML::LibXML;
 my $config   = HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
 my $provider = new HTTP::OAI::DataProvider($config);
 
-plan tests => ( keys( %{ $config->{GlobalFormats} } ) + 4 );
+plan tests => ( keys( %{ $config->{GlobalFormats} } ) + 5 );
 
 #
 # 1 - ListMetadataFormats without identifier and basic response tests
@@ -33,6 +33,7 @@ my $baseURL = 'http://localhost:3000/oai';
 }
 
 {
+
 	#diag "ListMetadataFormats __with__ identifier";
 	my $response = $provider->ListMetadataFormats( $baseURL,
 		identifier => 'spk-berlin.de:EM-objId-1560323' );
@@ -42,13 +43,19 @@ my $baseURL = 'http://localhost:3000/oai';
 
 {
 
+	#testing badArgument
 	#diag "ListMetadataFormats with badArgument";
 	my $response =
 	  $provider->ListMetadataFormats( $baseURL, iddentifiier => 'wrong' );
 	okIfBadArgument($response);
+	$response = $provider->Identify( 1, identifier => 'meschugge' );
+	okIfBadArgument($response);
 }
 
 {
-	my $response = $provider->Identify( 1, identifier => 'meschugge' );
-	okIfBadArgument($response);
+	my $response =
+	  $provider->ListMetadataFormats( $baseURL, identifier => 'spk-berlin.de:EM-objId-01234567890A' );
+	isOAIerror( $response, 'idDoesNotExist' );
 }
+
+#DataProvider with globalFormats cant really respond with noMetadataFormats.

@@ -190,8 +190,7 @@ sub isOAIerror {
 	_failValidationError($dom);
 	my $oaiError = _failNoOAIerror($dom);
 
-	ok( $oaiError->{$code},
-		"expect OAIerror of type '$code' ($oaiError->{$code})" );
+	ok( defined $oaiError->{$code}, "expect OAIerror of type '$code'" );
 
 }
 
