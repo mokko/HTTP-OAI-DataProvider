@@ -1,3 +1,26 @@
 RELEASE HISTORY
-0.06 with dist::zilla
+
+TODO
+Bug Fixes
+Tests
+-todo: even more tests for ingest and data consistency
+-todo: finish tests for OAI errors from spec
+API Changes
+-todo: turn into moose
+-todo: $baseURL in $provider->$verb($baseURL,%params) is about to go in new DataProvider (%params)
+-todo: improve db interface so I can write alternative db implementations
+
+$next (0.07)
+Bug Fixes
+-some small fixes i have forgotten about
+Tests
+-lots more tests for verbs, oai errors, validation etc.
+Feature Enhancements
+-more consistent param validation for most (all?) verbs
+API Changes
+-new packages DP::Test, DP::Common, DP::Valid
+-config value setLibraryCB is not necessary anymore
+
+0.06 with dist::zilla (version used in production at SALSA_OAI)
+-works, but is a bit buggy and difficult to install
 0.05 with query cache and chunking
