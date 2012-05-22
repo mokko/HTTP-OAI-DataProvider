@@ -60,13 +60,13 @@ last and most specific test. It dies on earlier tests.
 expect a stringified response; pass if response validates against OAI (or 
 OAIlax).
 
-=func okGetRecord($response);
-=func okIdentify($response);
-=func okListIdentifiers($response);
+=func okGetRecord($response[,'optional alternative msg']);
+=func okIdentify($response[,'optional alternative msg']);
+=func okListIdentifiers($response[,'optional alternative msg']);
 
-=func okListRecords($response);
-=func okListMetadataFormats($response);
-=func okListSets($response);
+=func okListRecords($response[,'optional alternative msg']);
+=func okListMetadataFormats($response[,'optional alternative msg']);
+=func okListSets($response[,'optional alternative msg']);
 
 New version of tests. Validates and checks if element named after verb (aka 
 'the type') exists.
@@ -75,39 +75,39 @@ New version of tests. Validates and checks if element named after verb (aka
 
 sub okGetRecord {
 	my $response = shift or die "Need xml as string!";
-	_okType( $response, 'GetRecord' );
+	_okType( $response, 'GetRecord', shift );
 }
 
 sub okIdentify {
 	my $response = shift or die "Need xml as string!";
-	_okType( $response, 'Identify' );
+	_okType( $response, 'Identify', shift );
 }
 
 sub okListIdentifiers {
 	my $response = shift or die "Need xml as string!";
-	_okType( $response, 'ListIdentifiers' );
+	_okType( $response, 'ListIdentifiers', shift );
 }
 
 sub okListRecords {
 	my $response = shift or die "Need xml as string!";
-	_okType( $response, 'ListRecords' );
+	_okType( $response, 'ListRecords', shift );
 }
 
 sub okListMetadataFormats {
 	my $response = shift or die "Need xml as string!";
-	_okType( $response, 'ListMetadataFormats' );
+	_okType( $response, 'ListMetadataFormats', shift );
 }
 
 sub okListSets {
 	my $response = shift or die "Need xml as string!";
-	_okType( $response, 'ListSets' );
+	_okType( $response, 'ListSets', shift );
 }
 
 #generic for okIfListIdentifiers,okIfIdentify etc.
 sub _okType {
 	my $response = shift or die "Need xml as string!";
 	my $type     = shift or die "Need type!";
-
+	my $msg=shift || "response validates and is of type $type\n";
 	isScalar($response);
 	if (
 		$type !~ /^Identify$|
@@ -122,21 +122,14 @@ sub _okType {
 	}
 
 	my $xpath = "/oai:OAI-PMH/oai:$type";
-	my $msg   = "response validates and is of type $type\n";
-	my $lax   = '';
-
-	( $type eq 'ListRecords' or $type eq 'GetRecord' ) ? $lax = 'lax' : 1;
+	my $lax   = ( $type =~ /^ListRecords$|^GetRecord$/) ? 'lax' : '';
 
 	#print "LAX:$lax|type:$type\n";
 	if ( !_validateOAIresponse( $response, $lax ) ) {
 		fail '$type response does not validate $lax';
 	}
 
-	my $error = oaiErrorResponse($response);
-
-	if ($error) {
-		fail "response is OAI error where not expected";
-	}
+	_failIfOAIerror (_response2dom($response));
 
 	my $xt = xpathTester($response);
 
@@ -160,7 +153,7 @@ sub isLMFprefix {
 #print "ENTER isLMFprefix:$response\n";
 #If I assume that type has already been tested, I don't need to repeat any of these as well
 #_failValidationError($dom);
-#_failifOAIerror($dom);
+#_failIfOAIerror($dom);
 #_failIfNotType ($dom,'type');
 
 	my $xt    = xpathTester($response);
@@ -306,18 +299,21 @@ sub _failNoOAIerror {
 
 	my $oaiError = oaiError($dom);
 	if ( !$oaiError ) {
-		fail 'No error where error expected!';
+		fail 'No error where OAI error expected!';
+		exit 1;
 	}
 	return $oaiError;
 }
 
-sub _failifOAIerror {
+sub _failIfOAIerror {
 	my $dom = shift or die "Need dom!";
 	valPackageName( $dom, 'XML::LibXML::Document' );
 
 	my $oaiError = oaiError($dom);
 	if ($oaiError) {
-		fail 'Error where NO error expected (' . keys( %{$oaiError} ) . ')!';
+		my @e=keys %{$oaiError};
+		fail "Error:Unexpected OAI error (@e)!";
+		exit 1;
 	}
 }
 
@@ -329,6 +325,7 @@ sub _failValidationError {
 	my $err = $v->validate($dom);
 	if ( $err ne 'ok' ) {
 		fail "Response not valid!";
+		exit 1;
 	}
 }
 

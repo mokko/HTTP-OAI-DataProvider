@@ -1,39 +1,163 @@
 #!perl
 
-use Test::More tests => 4;
+use Test::More tests => 11;
 use HTTP::OAI::DataProvider;
 use HTTP::OAI::DataProvider::Test;
 use HTTP::OAI::Repository qw(validate_request);
 use XML::LibXML;
+#use Data::Dumper; #debugging the test
 
-#use FindBin;
-#use Data::Dumper qw(Dumper);
+
+#
+# $baseURL is not tested since it is deprecated anyway.
+#
 
 my $config   = HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
 my $provider = new HTTP::OAI::DataProvider($config);
 
 my $baseURL = 'http://localhost:3000/oai';
-my %params  = (
-	verb           => 'ListIdentifiers',
-	metadataPrefix => 'oai_dc',
-	set            => 'MIMO',
-);
 
-my $error = HTTP::OAI::Repository::validate_request(%params);
-if ($error) {
-	die "Query error: $error";
+{
+	my %params = (
+		verb           => 'ListIdentifiers',
+		metadataPrefix => 'oai_dc',
+	);
+	validateRequest(%params);
+	my $response = $provider->ListIdentifiers( $baseURL, %params );
+	okListIdentifiers($response);
 }
 
 {
+	my %params = (
+		verb           => 'ListIdentifiers',
+		metadataPrefix => 'mpx',
+	);
+	validateRequest(%params);
 	my $response = $provider->ListIdentifiers( $baseURL, %params );
-
-	okListIdentifiers($response);
+	okListIdentifiers($response, 'different format');
 }
 
-SKIP: {    #should be todo, but not important
-	skip "Known bug: DataProvider currently doesn't work without baseURL", 3;
-	diag "Test without baseURL";
-	my $response = $provider->ListIdentifiers(%params);
+{
+	my %params = (
+		verb           => 'ListIdentifiers',
+		metadataPrefix => 'oai_dc',
+		set            => 'MIMO',
+	);
+	validateRequest(%params);
+	my $response = $provider->ListIdentifiers( $baseURL, %params );
+	okListIdentifiers($response, 'with set');
+}
 
-	okListIdentifiers($response);
+{
+	my %params = (
+		verb           => 'ListIdentifiers',
+		metadataPrefix => 'oai_dc',
+		set            => 'MIMO',
+		'from' => '2011-05-22T02:34:23Z',
+	);
+	validateRequest(%params);
+	
+	my $response = $provider->ListIdentifiers( $baseURL, %params );
+	okListIdentifiers( $response, 'with from' );
+}
+{
+	my %params = (
+		verb           => 'ListIdentifiers',
+		metadataPrefix => 'oai_dc',
+		set            => 'MIMO',
+		until => '2012-05-22',
+	);
+	
+	validateRequest(%params);
+
+	my $response = $provider->ListIdentifiers( $baseURL, %params );
+	okListIdentifiers( $response, 'with until' );
+}
+{
+
+	my %params = (
+		verb           => 'ListIdentifiers',
+		metadataPrefix => 'oai_dc',
+		set            => 'MIMO',
+		'from' => '1900-05-22T02:34:23Z',
+		'until' => '2011-05-22T02:34:23Z',
+	);
+	validateRequest(%params);
+	my $response = $provider->ListIdentifiers( $baseURL, %params );
+	okListIdentifiers( $response, 'with from and until' );
+}
+
+#
+# test OAI errors
+#
+{
+	my %params = (
+		verb           => 'ListIdentifiers',
+		resumptionToken           => '01234',
+	);
+	validateRequest(%params);
+	my $response = $provider->ListIdentifiers( $baseURL, %params );
+	isOAIerror( $response, 'badResumptionToken' );
+}
+
+{
+	my %params = (
+		verb           => 'ListIdentifiers',
+		metadataPrefix => 'bla',
+		set            => 'MIMO',
+	);
+	validateRequest(%params);
+	my $response = $provider->ListIdentifiers( $baseURL, %params );
+	isOAIerror( $response, 'cannotDisseminateFormat' );
+}
+
+{
+	my %params = (
+		verb           => 'ListIdentifiers',
+		set            => 'MIMO',
+	);
+	#validateRequest(%params);
+	my $response = $provider->ListIdentifiers( $baseURL, %params );
+	isOAIerror( $response, 'badArgument' );
+}
+
+{
+	my %params = (
+		verb           => 'ListIdentifiers',
+	);
+	#validateRequest(%params);
+	my $response = $provider->ListIdentifiers( $baseURL, %params );
+	isOAIerror( $response, 'badArgument' );
+}
+
+{
+	my %params = (
+		verb           => 'ListIdentifiers',
+		metadataPrefix => 'oai_dc',
+		set            => 'bla',
+	);
+	#validateRequest(%params);
+	my $response = $provider->ListIdentifiers( $baseURL, %params );
+	isOAIerror( $response, 'noRecordsMatch' );
+}
+
+#TODO: 
+#noSetHierarchy
+
+#
+#
+#
+=func validateRequest(%params);
+
+Fails with intelligble error message if %params are not correct. Why test this
+here? I need to know that an error is not caused by the params.
+
+Using fail is probably bad style, because it changes the number of tests, but
+it gives me an error message in the right color.
+
+=cut
+sub validateRequest {
+	if ( my @e = HTTP::OAI::Repository::validate_request(@_) ) {
+		fail "Query error: " . $e[0]->code . "\n";
+	}
 }
