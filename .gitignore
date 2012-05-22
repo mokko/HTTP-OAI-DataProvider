@@ -2,6 +2,7 @@
 .#*
 *~
 blib
+Makefile.PL
 Makefile
 Makefile.old
 devel-test
