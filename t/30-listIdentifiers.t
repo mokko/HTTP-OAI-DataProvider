@@ -141,8 +141,7 @@ my $baseURL = 'http://localhost:3000/oai';
 	isOAIerror( $response, 'noRecordsMatch' );
 }
 
-#TODO: 
-#noSetHierarchy
+#TODO: noSetHierarchy
 
 #
 #
@@ -155,7 +154,11 @@ here? I need to know that an error is not caused by the params.
 Using fail is probably bad style, because it changes the number of tests, but
 it gives me an error message in the right color.
 
+Could also be called 
+  failOnRequestError (%params);
+and be placed in DP::Test
 =cut
+
 sub validateRequest {
 	if ( my @e = HTTP::OAI::Repository::validate_request(@_) ) {
 		fail "Query error: " . $e[0]->code . "\n";

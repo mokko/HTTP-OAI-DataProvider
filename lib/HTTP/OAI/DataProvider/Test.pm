@@ -26,7 +26,8 @@ use vars '@EXPORT';
   isLMFprefix
 
   isOAIerror
-  okIfBadArgument
+  
+  failOnRequestError
 
   loadWorkingTestConfig
   xpathTester
@@ -107,7 +108,7 @@ sub okListSets {
 sub _okType {
 	my $response = shift or die "Need xml as string!";
 	my $type     = shift or die "Need type!";
-	my $msg=shift || "response validates and is of type $type\n";
+	my $msg = shift || "response validates and is of type $type\n";
 	isScalar($response);
 	if (
 		$type !~ /^Identify$|
@@ -122,14 +123,14 @@ sub _okType {
 	}
 
 	my $xpath = "/oai:OAI-PMH/oai:$type";
-	my $lax   = ( $type =~ /^ListRecords$|^GetRecord$/) ? 'lax' : '';
+	my $lax = ( $type =~ /^ListRecords$|^GetRecord$/ ) ? 'lax' : '';
 
-	#print "LAX:$lax|type:$type\n";
+	print "LAX:$lax|type:$type\n";
 	if ( !_validateOAIresponse( $response, $lax ) ) {
 		fail '$type response does not validate $lax';
 	}
 
-	_failIfOAIerror (_response2dom($response));
+	_failIfOAIerror( _response2dom($response) );
 
 	my $xt = xpathTester($response);
 
@@ -177,19 +178,24 @@ sub isOAIerror {
 	my $code     = shift or die "Need error type to look for!";
 	isScalar($response);
 	isScalar($code);
+	if ($code !~ /badArgument|cannotDisseminate|noRecordMatches|idDoesNotExist/) {
+		print "Unrecognized OAI error code\n"; 
+	}
 
 	my $dom = _response2dom($response);
-
 	_failValidationError($dom);
 	my $oaiError = _failNoOAIerror($dom);
 
 	ok( defined $oaiError->{$code}, "expect OAIerror of type '$code'" );
-
 }
 
 =func okIfBadArgument ($response);
 
-passes if response is OAI error badArgument
+passes if response is OAI error badArgument.
+
+DEPRECATED! 
+Instead use: 
+	C<isOAIerror ($response, 'badArgument');>
 
 =cut
 
@@ -269,6 +275,22 @@ sub oaiError {
 	return;
 }
 
+=func failOnRequestError(%params);
+
+Expects the parameters you are about to hand over to data provider as a hash.
+Fails with meaninggful error message and exists if the parameters are not 
+valid. (Wrapper around HTTP::OAI::Repository::validate_request.)
+
+=cut
+
+sub failOnRequestError {
+	if ( my @e = HTTP::OAI::Repository::validate_request(@_) ) {
+		fail "Query error: " . grep ($_->code, @e) . "\n";
+		exit 1;
+	}
+}
+
+
 =func my $xt=xpathTester($response);
 
 returns an Test::XPath object, so you can do things like:
@@ -311,7 +333,7 @@ sub _failIfOAIerror {
 
 	my $oaiError = oaiError($dom);
 	if ($oaiError) {
-		my @e=keys %{$oaiError};
+		my @e = keys %{$oaiError};
 		fail "Error:Unexpected OAI error (@e)!";
 		exit 1;
 	}
@@ -388,9 +410,11 @@ sub okIfXpathExists {
 oks if response has at least one 
 	/oai:OAI-PMH/oai:ListIdentifiers/oai:header[1]/oai:identifier
 
+DEPRECATED
+
 =cut
 
-sub okIfIdentifierExists {
+sub _okIfIdentifierExists {
 	my $doc = shift or die "Error: Need doc!";
 	okIfXpathExists(
 		$doc,
@@ -425,7 +449,7 @@ sub isMetadataFormat {
 
 =func isSetSpec ($response, $setSpec, $msg);
 
-TODO DOESNT WORK YET
+UNTESTED
 
 =cut
 
@@ -435,9 +459,7 @@ sub isSetSpec {
 	isScalar($response);
 	isScalar($setSpec);
 	my $msg   = "setSpec '$setSpec' exists";
-	my $xpath = '/oai:OAI-PMH/oai:ListSets/oai:set/oai:setSpec[1]';
-
-	#  . "[. = $setSpec]";
+	my $xpath = "/oai:OAI-PMH/oai:ListSets/oai:set[oai:setSpec = $setSpec]";
 
 	my $xt = xpathTester($response);
 	$xt->is( $xpath, $setSpec, $msg );
@@ -448,9 +470,11 @@ sub isSetSpec {
 Currently it works only for a GetRecord/record/metadata. Should it also work 
 for ListRecords/record/metadata?
 
+DEPRECATED
+
 =cut
 
-sub okIfMetadataExists {
+sub _okIfMetadataExists {
 	my $doc = shift or die "Error: Need doc!";
 	okIfXpathExists(
 		$doc,
@@ -543,7 +567,6 @@ sub _validateOAIresponse {
 }
 
 =head1 DEPRECATED UTILITY FUNCTIONS
-
 
 =func my $xc=registerOAI($dom);
 

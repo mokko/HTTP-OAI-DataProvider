@@ -3,7 +3,7 @@ use warnings;
 use Test::More;
 use HTTP::OAI::DataProvider;
 use HTTP::OAI::DataProvider::Test
-  qw/isLMFprefix okIfBadArgument okListMetadataFormats xpathTester isOAIerror/;
+  qw/isLMFprefix okListMetadataFormats xpathTester isOAIerror/;
 use Test::Xpath;
 use XML::LibXML;
 
@@ -42,14 +42,12 @@ my $baseURL = 'http://localhost:3000/oai';
 }
 
 {
-
 	#testing badArgument
-	#diag "ListMetadataFormats with badArgument";
 	my $response =
 	  $provider->ListMetadataFormats( $baseURL, iddentifiier => 'wrong' );
-	okIfBadArgument($response);
+	isOAIerror($response, 'badArgument');
 	$response = $provider->Identify( 1, identifier => 'meschugge' );
-	okIfBadArgument($response);
+	isOAIerror($response, 'badArgument');
 }
 
 {
@@ -58,4 +56,5 @@ my $baseURL = 'http://localhost:3000/oai';
 	isOAIerror( $response, 'idDoesNotExist' );
 }
 
-#DataProvider with globalFormats cant really respond with noMetadataFormats.
+#DataProvider with globalFormats cant really respond with noMetadataFormats 
+#(There are no metadata formats available for the specified item.).

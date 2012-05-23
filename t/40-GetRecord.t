@@ -19,7 +19,7 @@ my $baseURL = 'http://localhost:3000/oai';
 
 #
 # the actual tests
-#
+# 1-see if it works
 {
 	my %params = (
 		metadataPrefix => 'mpx',
@@ -29,16 +29,20 @@ my $baseURL = 'http://localhost:3000/oai';
 	okGetRecord($response);
 }
 
+#
+# 2-OAI errors
+#
+
 {
 	my %params = ( identifier => 'spk-berlin.de:EM-objId-40008', );
 	my $response = $provider->GetRecord( $baseURL, %params );
-	okIfBadArgument($response);
+	isOAIerror($response, 'badArgument');
 }
 
 {
 	my %params = ( metadataPrefix => 'mpx', );
 	my $response = $provider->GetRecord( $baseURL, %params );
-	okIfBadArgument($response);
+	isOAIerror($response, 'badArgument');
 }
 
 {
@@ -48,7 +52,7 @@ my $baseURL = 'http://localhost:3000/oai';
 		meschugge      => 'schixe',
 	);
 	my $response = $provider->GetRecord( $baseURL, %params );
-	okIfBadArgument($response);
+	isOAIerror($response, 'badArgument');
 }
 
 {

@@ -3,7 +3,7 @@
 use Test::More tests => 1;
 use HTTP::OAI::DataProvider;
 use HTTP::OAI::Repository qw(validate_request);
-use HTTP::OAI::DataProvider::Test qw(okListRecords);
+use HTTP::OAI::DataProvider::Test qw(okListRecords failOnRequestError);
 
 my $config   = HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
 my $provider = new HTTP::OAI::DataProvider($config);
@@ -13,14 +13,8 @@ my %params   = (
 	metadataPrefix => 'mpx',
 );
 
-my $error = HTTP::OAI::Repository::validate_request(%params);
+failOnRequestError (%params); #I do want to make sure that params are correct
 
-#this test is not about query testing, just make sure it works
-if ($error) {
-	die "Query error: $error";
-}
-
-#execute verb
 my $response =
   $provider->ListRecords( $baseURL, %params );    #response should be a xml string
 

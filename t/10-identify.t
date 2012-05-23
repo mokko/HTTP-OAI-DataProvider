@@ -4,7 +4,7 @@ use strict;
 use warnings;
 use Test::More tests => 10;
 use HTTP::OAI::DataProvider;
-use HTTP::OAI::DataProvider::Test qw(xpathTester okIdentify okIfBadArgument);
+use HTTP::OAI::DataProvider::Test;
 use XML::LibXML;
 use Test::Xpath;
 
@@ -69,12 +69,12 @@ foreach my $key ( keys %{$expected} ) {
 
 {
 	my $response = $provider->Identify( bla => 'meschugge', 1 );                                  
-	okIfBadArgument($response);
+	isOAIerror($response, 'badArgument');
 }
 
 {
 	my $response = $provider->Identify( 1, identifier => 'meschugge' );                                  
-	okIfBadArgument($response);
+	isOAIerror($response, 'badArgument');
 }
 
 
