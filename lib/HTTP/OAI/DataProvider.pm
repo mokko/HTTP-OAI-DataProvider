@@ -1,4 +1,5 @@
 package HTTP::OAI::DataProvider;
+
 # ABSTRACT: A simple OAI data provider
 
 use warnings;
@@ -148,11 +149,12 @@ sub new {
 	  chunkSize
 	  deletedRecord
 	  dbfile
+	  locateXSL
 	  nativePrefix
 	  native_ns_uri
 	  repositoryName
 	  setLibrary
-	  );    #locateXSL missing in engine
+	  );    
 
 	foreach my $value (@required) {
 		if ( !$self->{$value} ) {
@@ -233,10 +235,10 @@ sub GetRecord {
 	my $globalFormats = $self->{globalFormats};
 
 	# Error handling
-	my $notExist =
-	  $self->err2XML( new HTTP::OAI::Error( code => 'idDoesNotExist' ) );
-	my $header = $engine->findByIdentifier( $params->{identifier} )
-	  or push( @errors, $notExist );
+	my $header = $engine->findByIdentifier( $params->{identifier} );
+	if ( !$header ) {
+		push( @errors, new HTTP::OAI::Error( code => 'idDoesNotExist' ) );
+	}
 
 	if ( my $e = $self->checkFormatSupported( $params->{metadataPrefix} ) ) {
 		push @errors, $e;    #check if metadataFormat is supported
@@ -245,6 +247,7 @@ sub GetRecord {
 	if (@errors) {
 		return $self->err2XML(@errors);
 	}
+
 	# Metadata handling
 	my $response = $engine->query( $params, $request );
 
@@ -323,24 +326,21 @@ sub ListMetadataFormats {
 	my $request = shift;
 
 	my $params = _hashref(@_);
-
 	Warning 'Enter ListMetadataFormats';
 
 	if ( my $err = $self->_validateRequest( 'ListMetadataFormats', $params ) ) {
 		return $err;
 	}
 
-	my $engine        = $self->{engine};          #TODO test
-	my $globalFormats = $self->{globalFormats};
+	my $engine = $self->{engine};    #TODO test
 
 	#
 	# Error handling
 	#
 
 	#only if there is actually an identifier
-	if ( my $identifier = $params->{identifier} ) {
-
-		my $header = $engine->findByIdentifier($identifier);
+	if ( $params->{identifier} ) {
+		my $header = $engine->findByIdentifier( $params->{identifier} );
 		if ( !$header ) {
 			return $self->err2XML(
 				new HTTP::OAI::Error( code => 'idDoesNotExist' ) );
@@ -348,15 +348,23 @@ sub ListMetadataFormats {
 	}
 
 	#Metadata Handling
-	my $lmfs = $globalFormats->get_list();
+	my $list = new HTTP::OAI::ListMetadataFormats;
+	foreach my $prefix ( keys %{ $self->{GlobalFormats} } ) {
 
-	#$lmfs has requestURL info, so recreate it from $params
+		#print "prefix:$prefix\n";
+		my $format = new HTTP::OAI::MetadataFormat;
+		$format->metadataPrefix($prefix);
+		$format->schema( $self->{GlobalFormats}{$prefix}{ns_schema} );
+		$format->metadataNamespace( $self->{GlobalFormats}{$prefix}{ns_uri} );
+		$list->metadataFormat($format);
+	}
+
+	#ListMetadataFormat has requestURL info, so recreate it from $params
 	#mk sure we don't lose requestURL in Starman
-	$lmfs->requestURL($request);
-	my @mdfs = $lmfs->metadataFormat();
+	$list->requestURL($request);
 
 	#check if noMetadataFormats
-	if ( @mdfs == 0 ) {
+	if ( $list->metadataFormat() == 0 ) {
 		return $self->err2XML(
 			new HTTP::OAI::Error( code => 'noMetadataFormats' ) );
 	}
@@ -365,7 +373,7 @@ sub ListMetadataFormats {
 	# Return
 	#
 
-	return $self->_output($lmfs);
+	return $self->_output($list);
 }
 
 =method my $xml=$provider->ListIdentifiers ($params);
@@ -439,10 +447,6 @@ sub ListIdentifiers {
 		croak "Internal error: Data store missing!";
 	}
 
-	if ( !$globalFormats ) {
-		croak "Internal error: Formats missing!";
-	}
-
 	#check param syntax. Frontend will likely check it, but why not again?
 	if ( my $e = validate_request( %{$params} ) ) {
 		push @errors, $e;
@@ -499,7 +503,6 @@ sub ListIdentifiers {
 	return $self->_output($response);
 }
 
-#this doesn't really make sense, does it?
 #where is it called?
 sub _badResumptionToken {
 	my $self = shift;

@@ -136,7 +136,7 @@ sub executeVerb {
 
 	#stupid requestURL
 	my $response;
-	if ( $verb eq 'GetRecord' or $verb eq 'ListRecord' ) {
+	if ( $verb eq 'GetRecord' or $verb eq 'ListRecord' or $verb eq 'ListMetadataFormats') {
 		$response = $provider->$verb( undef, %params ) or die "Cant execute verb!";
 	}
 	else {

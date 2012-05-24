@@ -69,7 +69,7 @@ sub add {
 
 	#ensure that necessary info is there
 	#next is option since last chunk has no next
-	foreach (qw /chunkNo maxChunkNo sql targetPrefix total token/) {
+	foreach (qw (chunkNo maxChunkNo sql targetPrefix total token)) {
 		if ( !$chunkDesc->{$_} ) {
 			croak "$_ missing";
 			$self->error++;

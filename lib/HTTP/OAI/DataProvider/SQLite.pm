@@ -393,7 +393,7 @@ sub findByIdentifier {
 		}
 		return $h;
 	}
-	carp "Return empty handed!";
+	#carp "Return empty handed!";
 	return; #failure
 
 }
