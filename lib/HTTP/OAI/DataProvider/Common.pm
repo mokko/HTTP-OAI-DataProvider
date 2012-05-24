@@ -62,7 +62,7 @@ Dies if $variable is not scalar
 sub isScalar {
 	my $value = shift
 	  or die "Need value!";
-	croak argumentsLeft if @_;
+	carp argumentsLeft if @_;
 
 	croak "Value is not a scalar"
 	  if ( !Scalar::Util::reftype \$value eq 'SCALAR' );
