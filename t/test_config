@@ -10,7 +10,7 @@ $options = {
 	chunkSize         => 10,
 
 	#dbfile value for test is not good...
-	dbfile        => "$FindBin::Bin/db",
+	dbfile        => "$FindBin::Bin/../t/db",
 
 	#capital letter important: GlobalFormats
 	GlobalFormats => {
@@ -24,7 +24,11 @@ $options = {
 			ns_schema => "http://www.openarchives.org/OAI/2.0/oai_dc.xsd",
 		},
 	},
-	locateXSL      => 'Salsa_OAI::MPX::locateXSL',
+	locateXSL      => sub  {
+		my $prefix       = shift;
+		my $nativeFormat = $options->{nativePrefix} or die "Info on nativeFormat missing";
+		return "$FindBin::Bin/../t/$nativeFormat".'2'."$prefix.xsl";
+	},
 	nativePrefix   => 'mpx',
 	native_ns_uri=> 'http://www.mpx.org/mpx',
 	repositoryName => 'test config OAI Data Provider',

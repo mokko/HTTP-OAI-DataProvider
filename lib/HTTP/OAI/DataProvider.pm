@@ -245,7 +245,6 @@ sub GetRecord {
 	if (@errors) {
 		return $self->err2XML(@errors);
 	}
-
 	# Metadata handling
 	my $response = $engine->query( $params, $request );
 

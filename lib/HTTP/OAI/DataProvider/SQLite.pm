@@ -365,14 +365,17 @@ sub findByIdentifier {
 	records.identifier = sets.identifier WHERE records.identifier=?/;
 
 	my $sth = $dbh->prepare($sql) or croak $dbh->errstr();
+	#print "$sql ($identifier)\n";
 	$sth->execute($identifier) or croak $dbh->errstr();
-	my $aref = $sth->fetch;
+	my $aref = $sth->fetchall_arrayref or carp "difficult fetch";
+	if ($sth->err) {
+		carp "DBI error:".$sth->err;
+	}
 
 	#there should be exactly one record with that id or none and I will trust
 	#my db on that
 	#However, I do want to test if I really get a result at all
 	if ( $aref->[0] ) {
-
 		my $h = new HTTP::OAI::Header(
 			identifier => $identifier,
 			datestamp  => $aref->[0]
@@ -390,6 +393,7 @@ sub findByIdentifier {
 		}
 		return $h;
 	}
+	carp "Return empty handed!";
 	return; #failure
 
 }
@@ -560,10 +564,10 @@ my $dbh=$connection->dbh;
 
 sub _connect_db {
 	my $self   = shift;
-	my $dbfile = shift;
+	my $dbfile = shift or die "Need dbfile!";
 
-	if ( !$dbfile ) {
-		croak "_connect_db: No dbfile";
+	if ( !-f $dbfile ) {
+		carp "Warning: No dbfile exists; will create new db";
 	}
 
 	#Debug "Connecting to $dbfile...";
