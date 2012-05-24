@@ -367,6 +367,58 @@ sub _response2dom {
 	return XML::LibXML->load_xml( string => $response );
 }
 
+=func my $xc=_registerOAI($dom);
+
+Register the uri 'http://www.openarchives.org/OAI/2.0/' as the prefix 'oai' and
+return a LibXML::xPathContext object
+
+=cut
+
+sub _registerOAI {
+	my $dom = shift or croak "Error: Need doc!";
+	valPackageName( $dom, 'XML::LibXML::Document' );
+
+	my $xc = XML::LibXML::XPathContext->new($dom);
+	$xc->registerNs( 'oai', 'http://www.openarchives.org/OAI/2.0/' );
+	return $xc;
+}
+
+
+=func _validateOAIresponse ($response, 'lax');
+
+	new version!
+
+ if (!_validateOAIresponse ($response, ['lax'])) {
+	fail ('validation reason');
+ }
+
+=cut
+
+sub _validateOAIresponse {
+	my $response = shift or croak "Error: Need doc!";
+	my $type = shift || '';
+
+	#print "TYPE:$type\n";
+	my $doc = XML::LibXML->load_xml( string => $response );
+	my $v = new HTTP::OAI::DataProvider::Valid;
+
+	my $msg;
+	if ( $type eq 'lax' ) {
+		$msg = $v->validateLax($doc);
+	}
+	else {
+		$msg = $v->validate($doc);
+	}
+
+	#print "msg:$msg (type:$type)\n";
+	if ( $msg eq 'ok' ) {
+		return 1;    #success
+	}
+	carp "$msg\n";
+	return 0;
+}
+
+
 ###
 ###
 ###
@@ -388,9 +440,11 @@ sub okIfListRecordsMetadataExists {
 
 =func okIfXpathExists ($doc, $xapth, $message);
 
+DEPRECATED use Test::XPath instead.
+
 =cut
 
-sub okIfXpathExists {
+sub _okIfXpathExists {
 	my $doc = shift or croak "Error: Need doc!";
 	valPackageName( $doc, 'XML::LibXML::Document' );
 
@@ -400,32 +454,12 @@ sub okIfXpathExists {
 
 	my $msg = shift || '';
 
-	my $xc    = registerOAI($doc);
+	my $xc    = _registerOAI($doc);
 	my $value = $xc->findvalue($xpath);
 
 	ok( $value, $msg );
 }
 
-=func okIfIdentifierExists ($dom);
-
-oks if response has at least one 
-	/oai:OAI-PMH/oai:ListIdentifiers/oai:header[1]/oai:identifier
-
-DEPRECATED
-
-=cut
-
-sub _okIfIdentifierExists {
-	my $doc = shift or croak "Error: Need doc!";
-	okIfXpathExists(
-		$doc,
-		'/oai:OAI-PMH/oai:ListIdentifiers/oai:header[1]/oai:identifier',
-		'first header has an identifier'
-	);
-
-	#print "DSDSDS:$value\n";
-	#print $doc->toString;
-}
 
 =func isMetadataFormat ($response, $setSpec, $msg);
 
@@ -466,34 +500,17 @@ sub isSetSpec {
 	$xt->is( $xpath, $setSpec, $msg );
 }
 
-=func okIfMetadataExists ($dom);
 
-Currently it works only for a GetRecord/record/metadata. Should it also work 
-for ListRecords/record/metadata?
-
-DEPRECATED
-
-=cut
-
-sub _okIfMetadataExists {
-	my $doc = shift or croak "Error: Need doc!";
-	okIfXpathExists(
-		$doc,
-		' / oai : OAI-PMH / oai : GetRecord / oai : record [1] /oai:metadata',
-		'first GetRecord record has a metadata element'
-	);
-
-	#print $doc->toString;
-
-}
-
-=func okOaiResponse ($dom);
+=func _okOaiResponse ($dom);
 
 	ok if OAI response contains _no_ error.
 
+	DEPRECATED: use _failIfOAIerror and _failNoOAIerror to replace most of 
+	this functionality.
+
 =cut
 
-sub okOaiResponse {
+sub _okOaiResponse {
 	my $doc = shift or croak "Error: Need doc!";
 	valPackageName( $doc, 'XML::LibXML::Document' );
 
@@ -516,76 +533,6 @@ DEPRECATED: use _validateOAIresponse($response, 'lax') instead
 
 =cut
 
-sub okValidateOAI {
-	my $doc = shift or croak "Error: Need doc!";
-	valPackageName( $doc, 'XML::LibXML::Document' );
 
-	my $v   = new HTTP::OAI::DataProvider::Valid;
-	my $msg = $v->validate($doc);
-
-	ok( $msg eq 'ok', 'document validates against OAI-PMH v2' . $@ );
-}
-
-sub okValidateOAILax {
-	my $doc = shift or croak "Error: Need doc!";
-	valPackageName( $doc, 'XML::LibXML::Document' );
-
-	my $v   = new HTTP::OAI::DataProvider::Valid;
-	my $msg = $v->validateLax($doc);
-
-	ok( $msg eq 'ok', 'document validates against OAI-PMH v2-lax' . $@ );
-}
-
-=func _validateOAIresponse ($response, 'lax');
-
-	new version!
-
- if (!_validateOAIresponse ($response, ['lax'])) {
-	fail ('validation reason');
- }
-
-=cut
-
-sub _validateOAIresponse {
-	my $response = shift or croak "Error: Need doc!";
-	my $type = shift || '';
-
-	#print "TYPE:$type\n";
-	my $doc = XML::LibXML->load_xml( string => $response );
-	my $v = new HTTP::OAI::DataProvider::Valid;
-
-	my $msg;
-	if ( $type eq 'lax' ) {
-		$msg = $v->validateLax($doc);
-	}
-	else {
-		$msg = $v->validate($doc);
-	}
-
-	#print "msg:$msg (type:$type)\n";
-	if ( $msg eq 'ok' ) {
-		return 1;    #success
-	}
-	carp "$msg\n";
-	return 0;
-}
-
-=head1 DEPRECATED UTILITY FUNCTIONS
-
-=func my $xc=registerOAI($dom);
-
-Register the uri 'http://www.openarchives.org/OAI/2.0/' as the prefix 'oai' and
-return a LibXML::xPathContext object
-
-=cut
-
-sub registerOAI {
-	my $dom = shift or croak "Error: Need doc!";
-	valPackageName( $dom, 'XML::LibXML::Document' );
-
-	my $xc = XML::LibXML::XPathContext->new($dom);
-	$xc->registerNs( 'oai', 'http://www.openarchives.org/OAI/2.0/' );
-	return $xc;
-}
 
 1;
