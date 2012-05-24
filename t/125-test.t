@@ -2,7 +2,7 @@
 
 use strict;    #test the test (this is so meta...)
 use warnings;
-use Test::More tests => 3;
+use Test::More tests => 5;
 use HTTP::OAI::DataProvider::Test;
 use HTTP::OAI;
 use XML::LibXML;
@@ -27,6 +27,43 @@ use XML::LibXML;
 }
 
 {
+	my $response = testGetRecord();
+
+	#print "$response\n";
+	okGetRecord($response);
+}
+
+{
+	my $header = new HTTP::OAI::Header(
+		identifier => 'oai:myarchive.org:2233-add',
+		datestamp  => '2002-04-12T20:31:00Z',
+	);
+
+	my $li = new HTTP::OAI::ListIdentifiers;
+	$li->identifier($header);
+
+	my $response = $li->toDOM->toString;
+
+	#print "$response\n";
+	okListIdentifiers($response);
+}
+
+{
+	my $response = testGetRecord();
+	ok(
+		HTTP::OAI::DataProvider::Test::_validateOAIresponse( $response, 'lax' ),
+		'validates as expected'
+	);
+	ok( !HTTP::OAI::DataProvider::Test::_validateOAIresponse($response),
+		'does not validate as expected' );
+
+}
+
+###
+### SUBs
+###
+
+sub testGetRecord {
 	my $xml = '<data1 xmlns="http://www.test.org">eins</data1>';
 	my $md  = XML::LibXML->load_xml( string => $xml );
 	my $ab  = XML::LibXML->load_xml( string => $xml );
@@ -43,21 +80,6 @@ use XML::LibXML;
 	my $gr = new HTTP::OAI::GetRecord();
 	$gr->record($record);
 
-	my $response = $gr->toDOM->toString;
-	#print "$response\n";
-	okGetRecord($response);
-}
+	return $gr->toDOM->toString;
 
-{
-	my $header = new HTTP::OAI::Header(
-		identifier => 'oai:myarchive.org:2233-add',
-		datestamp  => '2002-04-12T20:31:00Z',
-	);
-
-	my $li = new HTTP::OAI::ListIdentifiers;
-	$li->identifier($header);
-
-	my $response = $li->toDOM->toString;
-	#print "$response\n";
-	okListIdentifiers($response);
 }

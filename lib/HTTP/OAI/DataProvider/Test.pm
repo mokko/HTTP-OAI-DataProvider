@@ -6,13 +6,14 @@ use Test::More;
 use Test::Xpath;
 use FindBin;
 use XML::LibXML;
+use Carp qw(carp croak);
 
 #use Scalar::Util;
 use HTTP::OAI::DataProvider::Common qw(valPackageName isScalar);
 use HTTP::OAI::DataProvider::Valid;
 use base 'Exporter';
-use vars '@EXPORT_OK';
-use vars '@EXPORT';
+our @EXPORT_OK;
+our @EXPORT;
 
 #verb tests, OAI error tests, utilities
 @EXPORT = qw (
@@ -52,7 +53,7 @@ use vars '@EXPORT';
 =head1 RATIONALE
 
 The new kind of test queues multiple 'tests', but uses Test::More only on the 
-last and most specific test. It dies on earlier tests.
+last and most specific test. It croaks on earlier tests.
 
 =head1 NEW TESTS
 
@@ -75,39 +76,39 @@ New version of tests. Validates and checks if element named after verb (aka
 =cut
 
 sub okGetRecord {
-	my $response = shift or die "Need xml as string!";
+	my $response = shift or croak "Need xml as string!";
 	_okType( $response, 'GetRecord', shift );
 }
 
 sub okIdentify {
-	my $response = shift or die "Need xml as string!";
+	my $response = shift or croak "Need xml as string!";
 	_okType( $response, 'Identify', shift );
 }
 
 sub okListIdentifiers {
-	my $response = shift or die "Need xml as string!";
+	my $response = shift or croak "Need xml as string!";
 	_okType( $response, 'ListIdentifiers', shift );
 }
 
 sub okListRecords {
-	my $response = shift or die "Need xml as string!";
+	my $response = shift or croak "Need xml as string!";
 	_okType( $response, 'ListRecords', shift );
 }
 
 sub okListMetadataFormats {
-	my $response = shift or die "Need xml as string!";
+	my $response = shift or croak "Need xml as string!";
 	_okType( $response, 'ListMetadataFormats', shift );
 }
 
 sub okListSets {
-	my $response = shift or die "Need xml as string!";
+	my $response = shift or croak "Need xml as string!";
 	_okType( $response, 'ListSets', shift );
 }
 
 #generic for okIfListIdentifiers,okIfIdentify etc.
 sub _okType {
-	my $response = shift or die "Need xml as string!";
-	my $type     = shift or die "Need type!";
+	my $response = shift or croak "Need xml as string!";
+	my $type     = shift or croak "Need type!";
 	my $msg = shift || "response validates and is of type $type\n";
 	isScalar($response);
 	if (
@@ -119,7 +120,7 @@ sub _okType {
 		^ListSets$/x
 	  )
 	{
-		die "Error: Unknown type ($type)!";
+		croak "Error: Unknown type ($type)!";
 	}
 
 	my $xpath = "/oai:OAI-PMH/oai:$type";
@@ -146,8 +147,8 @@ test if ListMetadataFormats response contains a specific prefix.
 =cut
 
 sub isLMFprefix {
-	my $response = shift or die "Need response";
-	my $prefix   = shift or die "Need prefix";
+	my $response = shift or croak "Need response";
+	my $prefix   = shift or croak "Need prefix";
 	isScalar($prefix);
 	my $dom = _response2dom($response);
 
@@ -174,8 +175,8 @@ passes if $response is of error type $code
 =cut
 
 sub isOAIerror {
-	my $response = shift or die "Need response!";
-	my $code     = shift or die "Need error type to look for!";
+	my $response = shift or croak "Need response!";
+	my $code     = shift or croak "Need error type to look for!";
 	isScalar($response);
 	isScalar($code);
 	if ($code !~ /badArgument|cannotDisseminate|noRecordMatches|idDoesNotExist/) {
@@ -200,7 +201,7 @@ Instead use:
 =cut
 
 sub okIfBadArgument {
-	my $response = shift or die "Error: Need response!";
+	my $response = shift or croak "Error: Need response!";
 	isOAIerror( $response, 'badArgument' );
 }
 
@@ -216,10 +217,10 @@ sub okIfBadArgument {
 sub loadWorkingTestConfig {
 
 	my $config = do "$FindBin::Bin/test_config"
-	  or die "Error: Configuration not loaded";
+	  or croak "Error: Configuration not loaded";
 
 	#in lieu of proper validation
-	die "Error: Not a hashref" if ref $config ne 'HASH';
+	croak "Error: Not a hashref" if ref $config ne 'HASH';
 
 	return $config;
 }
@@ -229,7 +230,7 @@ sub loadWorkingTestConfig {
 =cut
 
 sub oaiErrorResponse {
-	my $response = shift or die "Need response!";
+	my $response = shift or croak "Need response!";
 	isScalar($response);
 	my $dom = _response2dom($response);
 	return oaiError($dom);
@@ -254,10 +255,10 @@ test for error with:
 =cut
 
 sub oaiError {
-	my $doc = shift or die "Error: Need doc!";
+	my $doc = shift or croak "Error: Need doc!";
 	valPackageName( $doc, 'XML::LibXML::Document' );
 
-	my $xc    = registerOAI($doc);
+	my $xc    = _registerOAI($doc);
 	my $error = {};
 
 	#todo: this should be foreach to check for multiple errors
@@ -301,7 +302,7 @@ See L<Test::XPath> for details
 =cut
 
 sub xpathTester {
-	my $response = shift or die "Need response!";
+	my $response = shift or croak "Need response!";
 	isScalar $response;
 	return Test::XPath->new(
 		xml   => $response,
@@ -316,7 +317,7 @@ Should only be used internally.
 =cut
 
 sub _failNoOAIerror {
-	my $dom = shift or die "Need dom!";
+	my $dom = shift or croak "Need dom!";
 	valPackageName( $dom, 'XML::LibXML::Document' );
 
 	my $oaiError = oaiError($dom);
@@ -328,7 +329,7 @@ sub _failNoOAIerror {
 }
 
 sub _failIfOAIerror {
-	my $dom = shift or die "Need dom!";
+	my $dom = shift or croak "Need dom!";
 	valPackageName( $dom, 'XML::LibXML::Document' );
 
 	my $oaiError = oaiError($dom);
@@ -340,7 +341,7 @@ sub _failIfOAIerror {
 }
 
 sub _failValidationError {
-	my $dom = shift or die "Need dom!";
+	my $dom = shift or croak "Need dom!";
 	valPackageName( $dom, 'XML::LibXML::Document' );
 
 	my $v   = new HTTP::OAI::DataProvider::Valid;
@@ -360,8 +361,8 @@ Will become a private function soon.
 =cut
 
 sub _response2dom {
-	my $response = shift or die "Error: Need response!";
-	isScalar($response);    #die if not scalar
+	my $response = shift or croak "Error: Need response!";
+	isScalar($response);    #croaks if not scalar
 
 	return XML::LibXML->load_xml( string => $response );
 }
@@ -377,7 +378,7 @@ sub _response2dom {
 =cut
 
 sub okIfListRecordsMetadataExists {
-	my $doc = shift or die "Error: Need doc!";
+	my $doc = shift or croak "Error: Need doc!";
 	okIfXpathExists(
 		$doc,
 		'/oai:OAI-PMH/oai:ListRecords/oai:record[1]/oai:metadata',
@@ -390,10 +391,10 @@ sub okIfListRecordsMetadataExists {
 =cut
 
 sub okIfXpathExists {
-	my $doc = shift or die "Error: Need doc!";
+	my $doc = shift or croak "Error: Need doc!";
 	valPackageName( $doc, 'XML::LibXML::Document' );
 
-	my $xpath = shift or die "Error: Need xpath!";
+	my $xpath = shift or croak "Error: Need xpath!";
 
 	#TODO validate xpath
 
@@ -415,7 +416,7 @@ DEPRECATED
 =cut
 
 sub _okIfIdentifierExists {
-	my $doc = shift or die "Error: Need doc!";
+	my $doc = shift or croak "Error: Need doc!";
 	okIfXpathExists(
 		$doc,
 		'/oai:OAI-PMH/oai:ListIdentifiers/oai:header[1]/oai:identifier',
@@ -433,8 +434,8 @@ TODO DOESNT WORK YET
 =cut
 
 sub isMetadataFormat {
-	my $response = shift or die "Need response!";
-	my $prefix   = shift or die "Need prefix!";
+	my $response = shift or croak "Need response!";
+	my $prefix   = shift or croak "Need prefix!";
 	my $msg = shift || '';    #optional
 	isScalar($response);
 	isScalar($prefix);
@@ -454,8 +455,8 @@ UNTESTED
 =cut
 
 sub isSetSpec {
-	my $response = shift or die "Need response!";
-	my $setSpec  = shift or die "Need setSpec!";
+	my $response = shift or croak "Need response!";
+	my $setSpec  = shift or croak "Need setSpec!";
 	isScalar($response);
 	isScalar($setSpec);
 	my $msg   = "setSpec '$setSpec' exists";
@@ -475,7 +476,7 @@ DEPRECATED
 =cut
 
 sub _okIfMetadataExists {
-	my $doc = shift or die "Error: Need doc!";
+	my $doc = shift or croak "Error: Need doc!";
 	okIfXpathExists(
 		$doc,
 		' / oai : OAI-PMH / oai : GetRecord / oai : record [1] /oai:metadata',
@@ -493,7 +494,7 @@ sub _okIfMetadataExists {
 =cut
 
 sub okOaiResponse {
-	my $doc = shift or die "Error: Need doc!";
+	my $doc = shift or croak "Error: Need doc!";
 	valPackageName( $doc, 'XML::LibXML::Document' );
 
 	my $err = oaiError($doc);
@@ -507,14 +508,16 @@ sub okOaiResponse {
 }
 
 =func okValidateOAI($dom);
-
+=func okValidateOAILax ($dom)
 Validate if $dom complies with OAI namespace, execute Test::More::ok with 
 sensible diagnostic message.
+
+DEPRECATED: use _validateOAIresponse($response, 'lax') instead
 
 =cut
 
 sub okValidateOAI {
-	my $doc = shift or die "Error: Need doc!";
+	my $doc = shift or croak "Error: Need doc!";
 	valPackageName( $doc, 'XML::LibXML::Document' );
 
 	my $v   = new HTTP::OAI::DataProvider::Valid;
@@ -524,7 +527,7 @@ sub okValidateOAI {
 }
 
 sub okValidateOAILax {
-	my $doc = shift or die "Error: Need doc!";
+	my $doc = shift or croak "Error: Need doc!";
 	valPackageName( $doc, 'XML::LibXML::Document' );
 
 	my $v   = new HTTP::OAI::DataProvider::Valid;
@@ -533,18 +536,18 @@ sub okValidateOAILax {
 	ok( $msg eq 'ok', 'document validates against OAI-PMH v2-lax' . $@ );
 }
 
-=func _validateOAIresponse ($response)
+=func _validateOAIresponse ($response, 'lax');
 
 	new version!
 
  if (!_validateOAIresponse ($response, ['lax'])) {
-	fail ('reason');
+	fail ('validation reason');
  }
 
 =cut
 
 sub _validateOAIresponse {
-	my $response = shift or die "Error: Need doc!";
+	my $response = shift or croak "Error: Need doc!";
 	my $type = shift || '';
 
 	#print "TYPE:$type\n";
@@ -563,8 +566,8 @@ sub _validateOAIresponse {
 	if ( $msg eq 'ok' ) {
 		return 1;    #success
 	}
-	print "$msg\n";
-	return 0;        #failure;
+	carp "$msg\n";
+	return 0;
 }
 
 =head1 DEPRECATED UTILITY FUNCTIONS
@@ -577,7 +580,7 @@ return a LibXML::xPathContext object
 =cut
 
 sub registerOAI {
-	my $dom = shift or die "Error: Need doc!";
+	my $dom = shift or croak "Error: Need doc!";
 	valPackageName( $dom, 'XML::LibXML::Document' );
 
 	my $xc = XML::LibXML::XPathContext->new($dom);

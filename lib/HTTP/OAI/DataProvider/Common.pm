@@ -10,7 +10,7 @@ use File::Spec;
 
 use base 'Exporter';
 our @EXPORT_OK;
-our $modDir=_modDir();
+our $modDir = _modDir();
 
 @EXPORT_OK = qw(
   isScalar
@@ -28,9 +28,8 @@ printed if the same error occurs.
 =cut
 
 sub argumentsLeft {
-	return "Carp: More arguments than expected";	
+	return "Carp: More arguments than expected";
 }
-
 
 =func $modDir=modDir();
 
@@ -46,12 +45,12 @@ sub modDir {
 sub _modDir {
 	my $_modDir = __FILE__;
 	$_modDir =~ s,\.pm$,,;
-	$_modDir=realpath(File::Spec->catfile($_modDir, '..'));
+	$_modDir = realpath( File::Spec->catfile( $_modDir, '..' ) );
 
 	if ( !-d $_modDir ) {
 		carp "modDir does not exist! ($_modDir)";
 	}
-	$modDir=$_modDir;
+	$modDir = $_modDir;
 }
 
 =func isScalar ($variable);
@@ -63,9 +62,9 @@ Dies if $variable is not scalar
 sub isScalar {
 	my $value = shift
 	  or die "Need value!";
-	carp argumentsLeft if @_;
+	croak argumentsLeft if @_;
 
-	die "Value is not a scalar"
+	croak "Value is not a scalar"
 	  if ( !Scalar::Util::reftype \$value eq 'SCALAR' );
 
 	#there must be a better way, but this works...
@@ -74,7 +73,7 @@ sub isScalar {
 
 =func valPackageName ($obj,'Package::Name');
 
-Dies with error message if $obj is not blessed with Package::Name. You can specify
+Croak with error message if $obj is not blessed with Package::Name. You can specify
 more than one package name. Continues if any of them machtes. You may think of 
 package names as class types.
 
@@ -83,19 +82,17 @@ You pass more than one Package::Name. Test passes if $obj is one of them.
 =cut
 
 sub valPackageName {
-	my $obj      = shift or die "Error: Need an object!";
-	my @expected = @_    or die "Error: Need object type (package name)";
-	
+	my $obj      = shift or croak "Error: Need an object!";
+	my @expected = @_    or croak "Error: Need object type (package name)";
+
 	#print '...xxx...:'.ref($obj)."\n";
 	my $type = Scalar::Util::blessed($obj);
 	if ($type) {
 		my @match =
 		  grep ( $type eq $_, @expected );
 		if ( scalar @match == 0 ) {
-			die
-			  "Error: Wrong type! Expected one of @expected, but instead it's "
-			  . $type;
+			croak "Error: Wrong type! Expected one of @expected, "
+			  . "but instead it's $type";
 		}
 	}
 }
-

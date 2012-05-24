@@ -3,7 +3,7 @@ package HTTP::OAI::DataProvider::Valid;
 
 use strict;
 use warnings;
-use HTTP::OAI::DataProvider::Common qw(valPackageName isScalar modDir);
+use HTTP::OAI::DataProvider::Common qw(isScalar modDir valPackageName);
 use XML::LibXML;
 use File::Spec;
 use Moose;
