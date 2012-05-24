@@ -8,7 +8,6 @@ use Carp qw/croak carp/;
 
 use HTTP::OAI;
 use HTTP::OAI::Repository qw/validate_request/;
-use HTTP::OAI::DataProvider::GlobalFormats;
 use HTTP::OAI::DataProvider::SetLibrary;
 use HTTP::OAI::DataProvider::ChunkCache;
 use HTTP::OAI::DataProvider::Transformer;
