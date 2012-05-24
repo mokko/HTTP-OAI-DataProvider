@@ -13,13 +13,21 @@ use HTTP::OAI;
 use lib File::Spec->catfile( $FindBin::Bin, '..', 'lib' );
 use HTTP::OAI::DataProvider;
 
+our %opts;
+sub verbose;
+
 =head1 SYNOPSIS
 
 A simple command line interface to HTTP::OAI::DataProvider to execute verbs 
 for testing and debugging:
 
+#OAI verbs and paramters
 dp --verb Identify
 dp --verb GetRecord --identifier 12342 --metadataPrefix oai_dc
+
+#other stuff
+--verbose
+	more info
 
 Currently this script loads t/test_config on start up as a config. 
 
@@ -29,10 +37,11 @@ Normally, you should never need any of the following functions.
 
 =cut
 
-my $config = loadConfig();    #from disk
 my %params = getOpt();        #command line
-validateRequest(%params);
+my $config = loadConfig();    #from disk
+
 my $response = executeVerb(%params);
+verbose "OAI response";
 print "$response\n";
 exit;
 
@@ -64,7 +73,7 @@ sub loadConfig {
 
 	#in lieu of proper validation
 	die "Error: Not a hashref" if ref $config ne 'HASH';
-
+	verbose "Config file $configFile loaded";
 	return $config;
 }
 
@@ -77,14 +86,24 @@ sub getOpt {
 		'identifier=s'      => \$params{identifier},
 		'from=s'            => \$params{from},
 		'metadataPrefix=s'  => \$params{metadataPrefix},
+		'resumptionToken=s' => \$params{resumptionToken},
 		'set=s'             => \$params{set},
 		'until=s'           => \$params{'until'},
 		'verb=s'            => \$params{verb},
-		'resumptionToken=s' => \$params{resumptionToken},
+		'verbose'           => \$opts{v},
 	);
 
 	#cleanup the hash
-	grep ( !$params{$_} ? delete $params{$_} : 1, keys %params );
+	verbose "Input params";
+	foreach my $key ( keys %params ) {
+		if ( !$params{$key} ) {
+			delete $params{$key};
+		}
+		else {
+			verbose " $key: " . $params{$key};
+		}
+	}
+	validateRequest(%params);
 	return %params;
 }
 
@@ -100,6 +119,7 @@ sub validateRequest {
 		}
 		exit 1;
 	}
+	verbose " input validates";
 }
 
 =func my $response=executeVerb (%params);
@@ -109,7 +129,27 @@ sub executeVerb {
 	my %params = @_ or die "Need params!";
 	my $verb = $params{verb};
 	delete $params{verb};
+	verbose "About to execute $verb";
+
 	#new might die on error
-	my $provider = new HTTP::OAI::DataProvider($config);
-	return $provider->$verb(%params);
+	my $provider = new HTTP::OAI::DataProvider($config) or die "Cant create new object";
+
+	#stupid requestURL
+	my $response;
+	if ( $verb eq 'GetRecord' or $verb eq 'ListRecord' ) {
+		$response = $provider->$verb( undef, %params ) or die "Cant execute verb!";
+	}
+	else {
+		$response = $provider->$verb(%params) or die "Cant execute verb!";
+	}
+	return $response;
+}
+
+=func verbose "bla";
+	prints message if $opt{v} defined
+=cut
+
+sub verbose {
+	my $msg = shift;
+	print '*'.$msg . "\n" if ( $opts{v} );
 }

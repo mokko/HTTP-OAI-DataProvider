@@ -1,5 +1,4 @@
 package HTTP::OAI::DataProvider;
-
 # ABSTRACT: A simple OAI data provider
 
 use warnings;
@@ -16,6 +15,7 @@ use HTTP::OAI::DataProvider::SQLite;
 
 #TODO
 #use HTTP::OAI::DataProvider::Message qw/Debug Warning/;
+#Dancer will have to go
 use Dancer::CommandLine qw/Debug Warning/;
 
 #for debugging
@@ -152,7 +152,7 @@ sub new {
 	  native_ns_uri
 	  repositoryName
 	  setLibrary
-	);
+	  );    #locateXSL missing in engine
 
 	foreach my $value (@required) {
 		if ( !$self->{$value} ) {
@@ -167,34 +167,28 @@ sub new {
 
 	#init global metadata formats
 	#small camel is object, big camel is its description
-	$self->{globalFormats} = new HTTP::OAI::DataProvider::GlobalFormats;
 
 	if ( !exists $self->{GlobalFormats} ) {
 		die 'GlobalFormats missing from $config';
 	}
+
 	my %cnf = %{ $self->{GlobalFormats} };
 
+	#check if info complete
 	foreach my $prefix ( keys %cnf ) {
-
-		#debug " Registering global format $prefix";
 		if ( !$cnf{$prefix}{ns_uri} or !$cnf{$prefix}{ns_schema} ) {
 			die "GlobalFormat $prefix in yaml configuration incomplete";
 		}
-		$self->{globalFormats}->register(
-			ns_prefix => $prefix,
-			ns_uri    => $cnf{$prefix}{ns_uri},
-			ns_schema => $cnf{$prefix}{ns_schema},
-		);
 	}
 
 	#init engine (todo: this is noT properly abstracted)
 	$self->{engine} = new HTTP::OAI::DataProvider::SQLite(
 		dbfile       => $self->{dbfile},
 		chunkCache   => $self->{chunkCache},
-		chunkSize    => $self->{chunkSize},
+		chunkSize    => $self->{chunkSize},       # probably not necessary
 		nativePrefix => $self->{nativePrefix},
 		nativeURI    => $self->{native_ns_uri},
-		transformer  => new HTTP::OAI::DataProvider::Transformer(
+		transformer => new HTTP::OAI::DataProvider::Transformer(
 			nativePrefix => $self->{nativePrefix},
 			locateXSL    => $self->{locateXSL},
 		),
@@ -230,36 +224,22 @@ sub GetRecord {
 		return $err;
 	}
 
-	#Warning 'Enter GetRecord (id:'
-	#  . $params->{identifier}
-	#  . 'prefix:'
-	#  . $params->{metadataPrefix} . ')';
+	Warning 'Enter GetRecord (id:'
+	  . $params->{identifier}
+	  . 'prefix:'
+	  . $params->{metadataPrefix} . ')';
 
 	my $engine        = $self->{engine};
 	my $globalFormats = $self->{globalFormats};
 
 	# Error handling
+	my $notExist =
+	  $self->err2XML( new HTTP::OAI::Error( code => 'idDoesNotExist' ) );
+	my $header = $engine->findByIdentifier( $params->{identifier} )
+	  or push( @errors, $notExist );
 
-	#only if there is actually an identifier
-	if ( $params->{identifier} ) {
-
-		my $header = $engine->findByIdentifier( $params->{identifier} );
-		if ( !$header ) {
-			return $self->err2XML(
-				new HTTP::OAI::Error( code => 'idDoesNotExist' ) );
-		}
-	}
-
-	#somethings utterly wrong, so sense in continuing
-	if ( my $error = validate_request( %{$params} ) ) {
-		return $self->err2XML($error);
-	}
-
-	#check is metadataFormat is supported
-	if ( my $e =
-		$globalFormats->check_format_supported( $params->{metadataPrefix} ) )
-	{
-		push @errors, $e;
+	if ( my $e = $self->checkFormatSupported( $params->{metadataPrefix} ) ) {
+		push @errors, $e;    #check if metadataFormat is supported
 	}
 
 	if (@errors) {
@@ -445,7 +425,6 @@ sub ListIdentifiers {
 		return $err;
 	}
 
-
 	#Warning 'Enter ListIdentifiers (prefix:' . $params->{metadataPrefix};
 	#Debug 'from:' . $params->{from}   if $params->{from};
 	#Debug 'until:' . $params->{until} if $params->{until};
@@ -485,10 +464,9 @@ sub ListIdentifiers {
 				new HTTP::OAI::Error( code => 'badResumptionToken' ) );
 		}
 	}
-	if ( my $e =
-		$globalFormats->check_format_supported( $params->{metadataPrefix} ) )
-	{
-		push @errors, $e;    #cannotDisseminateFormat if necessary
+
+	if ( my $e = $self->checkFormatSupported( $params->{metadataPrefix} ) ) {
+		push @errors, $e;    #cannotDisseminateFormat
 	}
 
 	if ( $params->{Set} ) {
@@ -599,12 +577,8 @@ sub ListRecords {
 		}
 	}
 
-	#check is metadataFormat is supported
-	if ( my $e =
-		$globalFormats->check_format_supported( $params->{metadataPrefix} ) )
-	{
-		Debug "error in check_format_supported" . $e;
-		push @errors, $e;
+	if ( my $e = $self->checkFormatSupported( $params->{metadataPrefix} ) ) {
+		push @errors, $e;    #cannotDisseminateFormat
 	}
 
 	if (@errors) {
@@ -649,10 +623,11 @@ ERRORS
 =cut
 
 sub ListSets {
-	my $self    = shift;
-	my $request = shift; #this is not good, it can create two warning messages...
-	my $params  = _hashref(@_);
-	my $engine  = $self->{engine};
+	my $self = shift;
+	my $request =
+	  shift;    #this is not good, it can create two warning messages...
+	my $params = _hashref(@_);
+	my $engine = $self->{engine};
 
 	#print "Enter ListSets $self\n";
 
@@ -707,7 +682,8 @@ sub ListSets {
 	#}
 
 	if ( !$self->{setLibrary} ) {
-		#test of $self->{setLibrary} is now part of new, so it is not necessary here
+
+	#test of $self->{setLibrary} is now part of new, so it is not necessary here
 		die "Configuration Error: setLibrary not defined";
 	}
 
@@ -749,7 +725,27 @@ sub ListSets {
 
 check error, display error, warning, debug etc.
 
-=head2 my $xml=$provider->err2XML(@obj);
+=method checkFormatSupported ($prefixWanted);
+
+Expects a prefix for a metadataPrefix (as scalar), returns an OAI error if the 
+format cannot be disseminated. Returns nothing on success, so you can do:
+
+	if ( my $e = $self->checkFormatSupported( $params->{metadataPrefix} ) ) {
+		push @errors, $e;
+	}
+
+=cut
+
+sub checkFormatSupported {
+	my $self         = shift or carp "Need self!";
+	my $prefixWanted = shift or carp "Need something to test for";
+	if ( !$self->{GlobalFormats}{$prefixWanted} ) {
+		return new HTTP::OAI::Error( code => 'cannotDisseminateFormat' );
+	}
+	return;    #empty is success here
+}
+
+=method my $xml=$provider->err2XML(@obj);
 
 Parameter is an array of HTTP::OAI::Error objects. Of course, also a single
 value.

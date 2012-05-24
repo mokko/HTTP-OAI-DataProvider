@@ -1,4 +1,5 @@
 package HTTP::OAI::DataProvider::SQLite;
+
 # ABSTRACT: A sqlite engine for HTTP::OAI::DataProvider
 
 use warnings;
@@ -17,7 +18,6 @@ use Carp qw/carp croak/;
 use DBI qw(:sql_types);    #new
 use DBIx::Connector;
 use parent qw(HTTP::OAI::DataProvider::Engine);
-
 
 =head1 SYNOPSIS
 
@@ -142,7 +142,8 @@ sub queryChunk {
 	#next is optional because last chunk has no next
 	if ( $chunkDesc->{'next'} ) {
 		$opts{'next'} = $chunkDesc->{'next'},;
-	} else {
+	}
+	else {
 		Debug "queryChunk: this is the last chunk!";
 		$opts{'last'} = 1;
 	}
@@ -197,7 +198,8 @@ sub queryChunk {
 			}
 			if ( $aref->[4] ) {
 				$md = $aref->[4];
-			} else {
+			}
+			else {
 
 				#not all records also have md, e.g. deleted records
 				$md = '';
@@ -388,6 +390,8 @@ sub findByIdentifier {
 		}
 		return $h;
 	}
+	return; #failure
+
 }
 
 =head2 my @setSpecs=$provider->listSets();
@@ -657,7 +661,8 @@ sub planChunking {
 		my $secondChunk = $chunkCache->get($secondToken);
 		if ($secondChunk) {
 			Debug "2nd CHUNK FOUND" . $secondChunk->{token};
-		} else {
+		}
+		else {
 
 			#die "2nd chunk not found in cache";
 		}
@@ -887,7 +892,8 @@ sub _storeRecord {
 		}
 
 		#else: db date is older than current one -> NO update
-	} else {
+	}
+	else {
 
 		#Debug "$identifier new -> insert";
 
