@@ -73,8 +73,8 @@ development and not during runtime it may also croak.
 	TODO: DB stuff needs better abstraction
 
 * deletedRecord => 'transient'
-	TODO: deletedRecord should not be mandatory. It should default to a meaningful default instead.
-	see OAI specification for details
+	TODO: deletedRecord should not be mandatory. It should default to a meaningful
+	default instead see OAI specification for details.
 
 * GlobalFormats => {
 		oai_dc => {
@@ -83,8 +83,12 @@ development and not during runtime it may also croak.
 		},
 	},
 
-* locateXSL      => 'Salsa_OAI::MPX::locateXSL'
-	a module/function that does what? (doc todo).
+* locateXSL      => sub {
+	my $prefix = shift or croak "Need prefix";
+	return "someDir/$prefix.xsl";
+  }
+  callback which locates the xsl for a specific prefix. Expects a prefix and 
+  returns a path.
 
 * nativePrefix   => 'mpx'
 
