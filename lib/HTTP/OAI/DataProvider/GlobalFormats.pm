@@ -1,4 +1,5 @@
 package HTTP::OAI::DataProvider::GlobalFormats;
+
 # ABSTRACT: Handle global metadata formats
 
 use warnings;
@@ -6,7 +7,22 @@ use strict;
 use HTTP::OAI;
 use Carp qw/croak carp/;
 
-=head1 SYNOPSIS
+=head1 DESCRIPTION / RATIONALE
+
+A format is global if each record in the repository is available in it. A 
+repository with global formats serves each record it stores in each format
+it knows.
+
+GlobalFormats keeps track of a bunch of formats and provides a simple method 
+to test if this format is supported.
+
+Currently, GlobalFormats creates proper HTTP::OAI::ListMetadataFormats objects, 
+but I wonder if it would not be enough if we store a simple hash or hashref 
+with the metadataPrefixes. That would make the whole package unnecessary.
+
+This works only if prefix identify metadataFormats unambiguously.
+
+=head1 OLD SYNOPSIS
 
     use HTTP::OAI::DataProvider::GlobalFormats;
 
@@ -34,28 +50,19 @@ use Carp qw/croak carp/;
 	my @formats=$globalFormats->get ();
 	my $lmdf=$globalFormats->get_list ();
 
-
-=head1 DESCRIPTION
-
-A format is global if each and every record in a repository is available in it.
-HTTP::OAI::Repository::Simple assumes that all formats are global, i.e. all
-records available in all supported formats.
-
-=head1 METHODS
-
-=head2 my $globalFormats = HTTP::OAI::Repository::Simple::GlobalFormats->new();
+=method my new $globalFormats = HTTP::OAI::Repository::Simple::GlobalFormats();
 
 =cut
 
 sub new {
 	my $class = shift;
 	my $self  = {};
-	$self->{lmfs} = HTTP::OAI::ListMetadataFormats->new;
-	bless( $self, $class );
+	$self->{lmf} = HTTP::OAI::ListMetadataFormats->new;
+	bless $self, $class;
 	return $self;
 }
 
-=head2	my $err= $globalFormats->register ( ns_prefix => $prefix,
+=method	my $err= $globalFormats->register ( ns_prefix => $prefix,
 		ns_uri    => $uri,
 		ns_schema => $location
 	);
@@ -75,13 +82,14 @@ sub register {
 	$mdf->metadataPrefix( $args{ns_prefix} );
 	$mdf->schema( $args{ns_schema} );
 	$mdf->metadataNamespace( $args{ns_uri} );
-	$self->{lmfs}->metadataFormat($mdf);
 
-	#if anything goes wrong return error
-	return ();
+	#
+	$self->{lmf}->metadataFormat($mdf);
+
+	return 1;    #success
 }
 
-=head2	my $err=$globalFormats->unregister ($prefix);
+=method	my $err=$globalFormats->unregister ($prefix);
 
 Delete a format from global formats. On success, returns nothing or error on
 failure.
@@ -89,32 +97,39 @@ failure.
 =cut
 
 sub unregister {
-	my $self   = shift;
-	my $prefix = shift;
+	my $self = shift;
+	my $prefix = shift or croak "No prefix specified";
 
-	return "No prefix specified" if ( !$prefix );
-	my $lmdf = new HTTP::OAI::ListMetadataFormats;
+	my $newList = new HTTP::OAI::ListMetadataFormats;
 
-	foreach my $mdf ( $self->{lmdf}->metadataFormat ) {
-		if ( $mdf->metadataPrefix ne $prefix ) {
-			$lmdf->metadataPrefix($mdf);
+	if ( !$self->{lmf} ) {
+		croak 'Internal $self->{lmf} doesn\'t exist!';
+	}
+
+	foreach my $format ( $self->{lmf}->metadataFormat ) {
+		if ( $format->metadataPrefix ne $prefix ) {
+			$newList->metadataPrefix($format);
 		}
 	}
-	$self->{lmdf} = $lmdf;
-	return ();
+	$self->{lmf} = $newList;
+	return 1;    #success
 }
 
-=head2 my $format=$globalFormats->get ($prefix);
+=method my $format=$globalFormats->get ($prefix);
 
-Returns the HTTP::OAI::MetadataFormat in tone or more metadata formats which have been registered before.
+$prefix is optional.
 
-If prefix, returns one format as HTTP::OAI::MetadataFormat. If no
-prefix, it returns all defined as list of HTTP::OAI::MetadataFormat.
+If prefix specified and exists in $globalFormats, return format as 
+HTTP::OAI::MetadataFormat. If no prefix specified, it is unclear what this
+method does: 
+-should it return one HTTP::OAI::MetadataFormat or several 
+ HTTP::OAI::MetadataFormat as a list?
+-should it return ListMetadataFormats?
+
+Currently it returns the next MetadataFormat.
 
 On failure or if no metadata format with that prefix is defined, returns
 nothing.
-
-Todo: Test. Is it possible that there are several formats of the same prefix?
 
 =cut
 
@@ -123,38 +138,44 @@ sub get {
 	my $prefix = shift;
 
 	if ( !$prefix ) {
-		return $self->{lmfs}->metadataFormat;
+		return $self->{lmf}->metadataFormat;
 	}
 
-	foreach my $mdf ( $self->{lmfs}->metadataFormat ) {
+	foreach my $mdf ( $self->{lmf}->metadataFormat ) {
 		if ( $mdf->metadataPrefix eq $prefix ) {
 			return $mdf;
 		}
 	}
 
-	return ();
+	return;    #failure
 }
 
-=head2 my $l=$globalFormats->get_list
+=method my $lmf=$globalFormats->getList
 
 returns the HTTP::OAI::ListMetadataFormats object saved inside of the
-HTTP::OAI::DataProvider::Simple::GlobalFormats.
+HTTP::OAI::DataProvider::GlobalFormats.
 
+Should this method be called getList instead?
 
 =cut
 
-sub get_list {
+sub getList {
+
 	my $self = shift;
 
 	if ( $self->{'lmfs'} ) {
 		return $self->{'lmfs'};
 	}
 	return ();
+
 }
 
-=head2 check_format_supported ($prefix);
+sub get_list {
+	warn "deprecated! Please use getList instead!";
+	goto &getList;
+}
 
-my $e=check_format_supported ($prefix);
+=method my $e=$globalFormats->check_format_supported ($prefix); 
 
 Check if metadataFormat $prefix is supported by this repository.
 
@@ -169,23 +190,23 @@ so several errors can be returned.
 
 =cut
 
+sub checkFormatSupported { goto &check_format_supported }
+
 sub check_format_supported {
 	my $self   = shift;
-	my $prefix = shift;
+	my $prefix = shift
+	  or return new HTTP::OAI::Error(
+		code    => 'badArgument',
+		message => 'No prefix specified!',
+	  );
 
 	#this can happen in case of empty resumption token
 	#"verb=ListRecords&resumptionToken="
 	#this should not happen, but anybody could just enter it
-	if ( !$prefix ) {
-		return new HTTP::OAI::Error(
-			code    => 'badArgument',
-			message => 'No prefix specified!',
-		);
-	}
 
 	#print "check_format_supported ($prefix)";
 
-	foreach my $mdf ( $self->{lmfs}->metadataFormat ) {
+	foreach my $mdf ( $self->{lmf}->metadataFormat ) {
 		if ( $prefix eq $mdf->metadataPrefix ) {
 
 			#return empty handed on success
@@ -197,61 +218,5 @@ sub check_format_supported {
 	return new HTTP::OAI::Error( code => 'cannotDisseminateFormat' );
 
 }
-
-=head1 AUTHOR
-
-Maurice Mengel, C<< <mauricemengel at gmail.com> >>
-
-=head1 BUGS
-
-Please report any bugs or feature requests to C<bug-http-oai-repository-simple-globalmetadataformats at rt.cpan.org>, or through
-the web interface at L<http://rt.cpan.org/NoAuth/ReportBug.html?Queue=HTTP-OAI-Repository-Simple-GlobalMetadataFormats>.  I will be notified, and then you'll
-automatically be notified of progress on your bug as I make changes.
-
-=head1 SUPPORT
-
-You can find documentation for this module with the perldoc command.
-
-    perldoc HTTP::OAI::Repository::Simple::GlobalMetadataFormats
-
-
-You can also look for information at:
-
-=over 4
-
-=item * RT: CPAN's request tracker
-
-L<http://rt.cpan.org/NoAuth/Bugs.html?Dist=HTTP-OAI-Repository-Simple-GlobalMetadataFormats>
-
-=item * AnnoCPAN: Annotated CPAN documentation
-
-L<http://annocpan.org/dist/HTTP-OAI-Repository-Simple-GlobalMetadataFormats>
-
-=item * CPAN Ratings
-
-L<http://cpanratings.perl.org/d/HTTP-OAI-Repository-Simple-GlobalMetadataFormats>
-
-=item * Search CPAN
-
-L<http://search.cpan.org/dist/HTTP-OAI-Repository-Simple-GlobalMetadataFormats/>
-
-=back
-
-
-=head1 ACKNOWLEDGEMENTS
-
-
-=head1 LICENSE AND COPYRIGHT
-
-Copyright 2010 Maurice Mengel.
-
-This program is free software; you can redistribute it and/or modify it
-under the terms of either: the GNU General Public License as published
-by the Free Software Foundation; or the Artistic License.
-
-See http://dev.perl.org/licenses/ for more information.
-
-
-=cut
 
 1;    # End of HTTP::OAI::Repository::GlobalMetadataFormats

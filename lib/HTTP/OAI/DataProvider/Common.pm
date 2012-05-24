@@ -61,7 +61,7 @@ Dies if $variable is not scalar
 
 sub isScalar {
 	my $value = shift
-	  or die "Need value!";
+	  or croak "Need value!";
 	carp argumentsLeft if @_;
 
 	croak "Value is not a scalar"
