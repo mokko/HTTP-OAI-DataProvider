@@ -204,7 +204,7 @@
       that is compliant with an XML Schema defined by a community.</documentation>
     </annotation>
     <sequence>
-      <any namespace="##other" processContents="strict"/>
+      <any namespace="##other" processContents="lax"/>
     </sequence>
   </complexType>
 

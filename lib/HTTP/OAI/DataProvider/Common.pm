@@ -5,16 +5,54 @@ use strict;
 use warnings;
 use Scalar::Util;
 use Carp qw(carp croak);
+use Cwd qw(realpath);
+use File::Spec;
 
 use base 'Exporter';
-use vars '@EXPORT_OK';
+our @EXPORT_OK;
+our $modDir=_modDir();
 
 @EXPORT_OK = qw(
-  valPackageName
   isScalar
+  modDir
+  valPackageName
 );
 
 sub argumentsLeft;
+
+=func carp argumentsLeft if @_;
+
+argumentsLeft stores just an error message in an attempt to unify the message
+printed if the same error occurs.
+
+=cut
+
+sub argumentsLeft {
+	return "Carp: More arguments than expected";	
+}
+
+
+=func $modDir=modDir();
+
+returns the directory of the module, e.g.
+/usr/lib/perl5/site_perl/5.10/HTTP/OAI/DataProvider
+
+=cut
+
+sub modDir {
+	return $modDir;
+}
+
+sub _modDir {
+	my $_modDir = __FILE__;
+	$_modDir =~ s,\.pm$,,;
+	$_modDir=realpath(File::Spec->catfile($_modDir, '..'));
+
+	if ( !-d $_modDir ) {
+		carp "modDir does not exist! ($_modDir)";
+	}
+	$modDir=$_modDir;
+}
 
 =func isScalar ($variable);
 
@@ -61,7 +99,3 @@ sub valPackageName {
 	}
 }
 
-
-sub argumentsLeft {
-	return "Carp: More agruments than expected";	
-}

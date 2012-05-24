@@ -125,9 +125,9 @@ sub _okType {
 	my $xpath = "/oai:OAI-PMH/oai:$type";
 	my $lax = ( $type =~ /^ListRecords$|^GetRecord$/ ) ? 'lax' : '';
 
-	print "LAX:$lax|type:$type\n";
+	#print "LAX:$lax|type:$type\n";
 	if ( !_validateOAIresponse( $response, $lax ) ) {
-		fail '$type response does not validate $lax';
+		fail "$type response does not validate $lax";
 	}
 
 	_failIfOAIerror( _response2dom($response) );
@@ -563,6 +563,7 @@ sub _validateOAIresponse {
 	if ( $msg eq 'ok' ) {
 		return 1;    #success
 	}
+	print "$msg\n";
 	return 0;        #failure;
 }
 

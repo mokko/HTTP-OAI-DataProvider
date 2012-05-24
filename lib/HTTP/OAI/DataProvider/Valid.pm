@@ -1,10 +1,9 @@
 package HTTP::OAI::DataProvider::Valid;
-
-# ABSTRACT: Utilities for validation of OAI documents
+# ABSTRACT: Validation of OAI documents
 
 use strict;
 use warnings;
-use HTTP::OAI::DataProvider::Common qw(valPackageName isScalar);
+use HTTP::OAI::DataProvider::Common qw(valPackageName isScalar modDir);
 use XML::LibXML;
 use File::Spec;
 use Moose;
@@ -23,16 +22,10 @@ sub BUILD {
 	my $self = shift or die "Something's wrong!";
 
 	#store xsd in module directory because it extends functionality of package
-	my $modDir = __FILE__;
-	$modDir =~ s,\.pm$,,;
-
-	if ( !-d $modDir ) {
-		warn "No dir!";
-	}
 
 	my %load = (
-		oaiXsd    => File::Spec->catfile( $modDir, 'OAI-PMH.xsd' ),
-		laxOaiXsd => File::Spec->catfile( $modDir, 'OAI-PMH-lax.xsd' ),
+		oaiXsd    => File::Spec->catfile( modDir(), 'OAI-PMH.xsd' ),
+		laxOaiXsd => File::Spec->catfile( modDir(), 'OAI-PMH-lax.xsd' ),
 	);
 
 	foreach my $key ( keys %load ) {

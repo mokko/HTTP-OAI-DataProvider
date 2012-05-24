@@ -1,14 +1,14 @@
 RELEASE HISTORY
 
 TODO
-Bug Fixes
-Tests
--todo: even more tests for ingest and data consistency
--todo: finish tests for OAI errors from spec
-API Changes
--todo: turn into moose
--todo: $baseURL in $provider->$verb($baseURL,%params) is about to go in new DataProvider (%params)
--todo: improve db interface so I can write alternative db implementations
+ Bug Fixes
+ Tests
+ -todo: even more tests for ingest and data consistency
+ -todo: finish tests for OAI errors from spec
+ API Changes
+ -todo: turn into moose
+ -todo: $baseURL in $provider->$verb($baseURL,%params) is about to go in new DataProvider (%params)
+ -todo: improve db interface so I can write alternative db implementations
 $next (0.07)
  New Tools
  -dp.pl - a command line interface to HTTP::OAI::DataProvider
