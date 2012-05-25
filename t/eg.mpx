@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+    <museumPlusExport xmlns="http://www.mpx.org/mpx"
+     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+     xsi:schemaLocation="http://www.mpx.org/mpx">
+     <multimediaobjekt exportdatum="2011-08-22T17:37:24" mulId="2873170"
+      freigabe="Web" priorität="10">
+      <bearbDatum>16.03.2010 08:31:46</bearbDatum>
+      <multimediaAnfertDat>11.03.2010</multimediaAnfertDat>
+      <multimediaDateiname>V A 43151</multimediaDateiname>
+      <multimediaErweiterung>jpg</multimediaErweiterung>
+      <multimediaFarbe>farbig</multimediaFarbe>
+      <multimediaFunktion>Repro Digitalisat</multimediaFunktion>
+      <multimediaPersonenKörperschaft>Ines Seibt
+      </multimediaPersonenKörperschaft>
+      <multimediaPfadangabe>M:\MuseumPlus\Produktiv\Multimedia\EM\Amerikanische
+       Archäologie\Fotos</multimediaPfadangabe>
+      <multimediaTyp>Digitale Aufnahme</multimediaTyp>
+      <multimediaUrhebFotograf>Ines Seibt</multimediaUrhebFotograf>
+      <standardbild>M:\MuseumPlus\Produktiv\Multimedia\EM\Amerikanische
+       Archäologie\Fotos\V A 43151.jpg</standardbild>
+      <verknüpftesObjekt>40008</verknüpftesObjekt>
+     </multimediaobjekt>
+     <multimediaobjekt exportdatum="2011-08-22T17:37:24" mulId="2873217"
+      freigabe="intern">
+      <bearbDatum>16.03.2010 08:31:49</bearbDatum>
+      <multimediaAnfertDat>11.03.2010</multimediaAnfertDat>
+      <multimediaDateiname>V A 43151 -KK</multimediaDateiname>
+      <multimediaErweiterung>jpg</multimediaErweiterung>
+      <multimediaFarbe>farbig</multimediaFarbe>
+      <multimediaFunktion>Repro Digitalisat</multimediaFunktion>
+      <multimediaPersonenKörperschaft>Ines Seibt
+      </multimediaPersonenKörperschaft>
+      <multimediaPfadangabe>M:\MuseumPlus\Produktiv\Multimedia\EM\Amerikanische
+       Archäologie\Karteikarten</multimediaPfadangabe>
+      <multimediaTyp>Scan</multimediaTyp>
+      <multimediaUrhebFotograf>Ines Seibt</multimediaUrhebFotograf>
+      <verknüpftesObjekt>40008</verknüpftesObjekt>
+     </multimediaobjekt>
+     <sammlungsobjekt exportdatum="2011-08-22T17:37:24" objId="40008">
+      <andereNr art="Andere Nr.">8750</andereNr>
+      <bearbDatum>16.03.2010</bearbDatum>
+      <credits>Staatliche Museen zu Berlin, Preußischer Kulturbesitz,
+       Ethnologisches Museum</credits>
+      <erwerbDatum>1907</erwerbDatum>
+      <erwerbNr>V/23/1907</erwerbNr>
+      <erwerbungsart>Schenkung</erwerbungsart>
+      <geogrBezug funktion="Herkunft (Allgemein)">Peru</geogrBezug>
+      <geogrBezug funktion="Herkunft (Allgemein)">Pachacamac</geogrBezug>
+      <identNr art="Ident. Nr.">V A 43151</identNr>
+      <materialTechnik art="Ausgabe">Ton</materialTechnik>
+      <maßangabe typ="Objektmaß">2 x 1,7 x 5,1 cm</maßangabe>
+      <objStatus>vorhanden</objStatus>
+      <objekttyp>Musikinstrument</objekttyp>
+      <oov art="Vorgang">E 2158/1906</oov>
+      <personKörperschaftRef funktion="Mäzen" id="710">Zypen,
+       Julius van der</personKörperschaftRef>
+      <personKörperschaftRef funktion="Sammler" id="204">Gretzer,
+       Wilhelm</personKörperschaftRef>
+      <sachbegriff art="Sachbegriff">Tonflöte</sachbegriff>
+      <ständigerStandort>Depot/Studiensammlung (Amerikanische Archäologie) / S:
+       239, F: 9, Kasten: B</ständigerStandort>
+      <verantwortlichkeit>EM-Am Archäologie</verantwortlichkeit>
+      <verwaltendeInstitution>Ethnologisches Museum, Staatliche Museen zu Berlin
+      </verwaltendeInstitution>
+     </sammlungsobjekt>
+    </museumPlusExport>
+
