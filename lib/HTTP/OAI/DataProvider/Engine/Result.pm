@@ -1,14 +1,16 @@
 package HTTP::OAI::DataProvider::Engine::Result;
+
 # ABSTRACT: Result object for engine
 
-use Carp qw/croak/;
+use Carp qw(croak carp);
 use HTTP::OAI;
 use Encode qw/decode/;    #encoding problem when dealing with data from sqlite
 use parent qw(HTTP::OAI::DataProvider::Engine);
+use HTTP::OAI::DataProvider::Message qw(warning debug);
 
-use Dancer ':syntax';     #only for debug in development, warnings?
+#use Dancer ':syntax';     #only for debug in development, warnings?
 
-=head1 USAGE
+=head1 OLD SYNOPSIS 
 
 A result is an object that carries the db response before it is transformed to
 a HTTP::OAI::Response object.
@@ -57,15 +59,13 @@ a HTTP::OAI::Response object.
 	$result->expirationDate; #create an expiration date
 	$result->mkToken; #make a token using current micro second
 
-=cut
-
 =method my $result=HTTP::OAI::DataProvider::Engine->new (%opts);
 
 	my %opts = (
 		requestURL  => $self->{requestURL},
-		transformer => $self->{transformer},
-		verb        => $params->{verb},
-		params      => $params,
+		transformer => $self->{transformer}, #required
+		verb        => $params->{verb}, #required
+		params      => $params,		#this params should not have a verb
 
 		#for resumptionToken
 		chunkSize    => $self->{chunkSize},
@@ -113,12 +113,13 @@ is convenient.
 
 #don't think this is necessary anymore, should be done by DataProvider::_output
 sub requestURL {
-	my $result  = shift;
+	my $result = shift or carp "Need myself!";
 	my $request = shift;
 
 	if ($request) {    #setter
 		$result->{requestURL} = $request;
-	} else {           #getter
+	}
+	else {             #getter
 		return $result->{requestURL};
 	}
 }
@@ -126,20 +127,40 @@ sub requestURL {
 =method $result->addError($code[, $message]);
 
 Adds an HTTP::OAI::Error error to a result object. Test with
-	#untested
 	if ($result->isError) {
 		$provider->err2XML ($result->isError);
 	}
 
+isError returns 
+-in scalar context: true if error is defined and nothing (false) if error is 
+ not defined. 
+-in list context a list of HTTP::OAI errors, if any
+
 =cut
 
 sub addError {
-	my $self = shift;
-	my $code = shift;    #required
-	my $msg  = shift;    #optional
+	my $self   = shift;
+	my $code   = shift;    #required
+	my $msg    = shift;    #optional
+	my @possibleErrors = qw(
+	  badArgument
+	  badGranularity
+	  badResumptionToken
+	  badVerb
+	  cannotDisseminateFormat
+	  idDoesNotExist
+	  noRecordsMatch
+	  noMetadataFormats
+	  noSetHierarchy
+	);
 
 	if ( !$code ) {
-		die "addError needs a code";
+		carp "addError needs a code";
+	}
+
+	if (grep ($_ eq $code,@possibleErrors) == 0) {
+		croak "Error code not recognized"; #carp or return?
+		return 0; #error
 	}
 
 	my %arg;
@@ -231,7 +252,8 @@ sub responseCount {
 	}
 	if ( ref $response eq 'HTTP::OAI::ListIdentifiers' ) {
 		debug "HeadCount" . $result->countHeaders;
-	} else {
+	}
+	else {
 		debug "RecCount" . $result->countRecords;
 	}
 }
@@ -267,7 +289,8 @@ sub getType {
 		#TODO: should be numerical operator '>'
 		if ( $result->countRecords > 0 ) {
 			$chunkRequest->{type} = 'records';
-		} else {
+		}
+		else {
 			$chunkRequest->{type} = 'headers';
 		}
 	}
@@ -396,13 +419,15 @@ sub save {
 			$dom = $transformer->toTargetPrefix( $prefix, $dom );
 
 			#debug "transformed dom" . $dom;
-		} else {
+		}
+		else {
 			warning "Transformer not available";
 		}
 
 		#debug $dom->toString;
 		$args{metadata} = new HTTP::OAI::Metadata( dom => $dom );
-	} else {
+	}
+	else {
 		warning "metadata not available, but that might well be the case";
 	}
 
@@ -544,11 +569,11 @@ sub isError {
 
 	if ( $result->{errors} ) {
 		return @{ $result->{errors} };
-	} else {
+	}
+	else {
 		return ();    #fail
 	}
 }
-
 
 =method my $ret=result->lastChunk;
 
@@ -559,11 +584,11 @@ sub isError {
 =cut
 
 sub lastChunk {
-	my $result=shift;
-	if ($result->{last}) {
+	my $result = shift;
+	if ( $result->{last} ) {
 		return 1;
 	}
 	return ();
 }
 
-1; #HTTP::OAI::DataProvider::Engine::Result
+1;    #HTTP::OAI::DataProvider::Engine::Result

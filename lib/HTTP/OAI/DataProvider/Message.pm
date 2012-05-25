@@ -1,4 +1,5 @@
 package HTTP::OAI::DataProvider::Message;
+
 # ABSTRACT: Debug and warning messages for the data provider
 
 use strict;
@@ -7,7 +8,7 @@ use warnings;
 require Exporter;
 
 our @ISA       = qw(Exporter);
-our @EXPORT_OK = qw(Debug Warning);    # symbols to export on request
+our @EXPORT_OK = qw(Debug debug Warning warning);    # symbols to export on request
 our $Debug;
 our $Warning;
 
@@ -36,15 +37,15 @@ to me. TODO
 =cut
 
 sub new {
-	my $class=shift;
-	my %args=@_;
+	my $class = shift;
+	my %args  = @_;
 
-	if ($args{Debug}) {
-		$HTTP::OAI::DataProvider::Message::Debug=$args{Debug};
+	if ( $args{Debug} ) {
+		$HTTP::OAI::DataProvider::Message::Debug = $args{Debug};
 	}
 
-	if ($args{Warning}) {
-		$HTTP::OAI::DataProvider::Message::Debug=$args{Warning};
+	if ( $args{Warning} ) {
+		$HTTP::OAI::DataProvider::Message::Debug = $args{Warning};
 	}
 }
 
@@ -53,6 +54,8 @@ sub Debug {
 		goto $HTTP::OAI::DataProvider::Message::Debug;
 	}
 }
+
+sub debug { goto &Debug; }
 
 =head2 Warning "Message";
 
@@ -67,4 +70,6 @@ sub Warning {
 	}
 }
 
-1; #true;
+sub warning { goto &Warning; }
+
+1;                                #true;
