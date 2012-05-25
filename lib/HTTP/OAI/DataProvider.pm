@@ -13,13 +13,10 @@ use HTTP::OAI::DataProvider::ChunkCache;
 use HTTP::OAI::DataProvider::Transformer;
 use HTTP::OAI::DataProvider::SQLite;
 
-#TODO
-#use HTTP::OAI::DataProvider::Message qw/Debug Warning/;
-#Dancer will have to go
-use Dancer::CommandLine qw/Debug Warning/;
+#TODO: not sure if Message works.
+use HTTP::OAI::DataProvider::Message qw/Debug Warning/;
 
-#for debugging
-#use Data::Dumper qw/Dumper/;
+#use Data::Dumper qw/Dumper/; #for debugging
 
 =head1 SYNOPSIS
 

@@ -9,7 +9,7 @@ use HTTP::OAI;
 use Carp qw/croak/;
 #use Data::Dumper qw/Dumper/;
 
-=head1 SYNOPSIS
+=head1 OLD SYNOPSIS
 
 Separate sets and their definition. Access only sets that are actually present
 in your repository.
@@ -76,9 +76,7 @@ The sets will then no longer be setSpec strings only, but 'complete', i.e.
 have the name and the description defined in the library. Return value is a
 HTTP::OAI::ListSets object which can be easily turned into output.
 
-=head1 METHODS
-
-=head2 	my $s=new HTTP::OAI::SetLibrary->new();
+=method	my $s=new HTTP::OAI::SetLibrary->new();
 
 Creates a new HTTP::OAI::SetLibrary object. You can optionally specify a hashref
 containing initial set info for the library. At the moment, I use setSpec for key
@@ -112,7 +110,7 @@ sub new {
 
 }
 
-=head2 	$library->addSet($s);
+=method 	$library->addSet($s);
 Add a single HTTP::OAI::Set object to a library
 
 Logic-wise I could also add a listSets object, but I don't do this here.
@@ -143,7 +141,7 @@ sub addSet {
 
 }
 
-=head2 	$library->addListSets($s);
+=method 	$library->addListSets($s);
 Adds a HTTP::OAI::ListSet object (possibly containing multiple sets) to a Set
 library.
 
@@ -178,7 +176,7 @@ sub addListSets {
 	return 1;    #successful;
 }
 
-=head3 my $ListSets=$library->expand(@setSpecs)
+=method my $ListSets=$library->expand(@setSpecs)
 
 Expects an array of setSpecs (as strings). Returns a HTTP::OAI::ListSet object
 which contains setDescription and setName for each of the input setSpecs which
@@ -242,7 +240,7 @@ sub expand {
 	return $result_LS;
 }
 
-=head2 my $string=$library->show();
+=method my $string=$library->show();
 
 Output library information as string. For example for debugging.
 
@@ -272,7 +270,7 @@ sub show {
 	return $out;
 }
 
-=head2 my $listSets=$library->toListSets;
+=method my $listSets=$library->toListSets;
 
 Just returns the whole library as a HTTP::OAI::ListSets object.
 
@@ -285,68 +283,6 @@ sub toListSets {
 	return $self->{ListSets};
 }
 
-=head1 SEE ALSO
-
-The Open Archives Initiative Protocol for Metadata Harvesting,
-http://www.openarchives.org/OAI/openarchivesprotocol.html
-
-Tim Brody's excellent HTTP::OAI available on a CPAN near you.
-
-=head1 AUTHOR
-
-Maurice Mengel, C<< <mauricemengel at gmail.com> >>
-
-=head1 BUGS
-
-Please report any bugs or feature requests to C<bug-http-oai-setlibrary at rt.cpan.org>, or through
-the web interface at L<http://rt.cpan.org/NoAuth/ReportBug.html?Queue=HTTP-OAI-SetLibrary>.  I will be notified, and then you'll
-automatically be notified of progress on your bug as I make changes.
-
-=head1 SUPPORT
-
-You can find documentation for this module with the perldoc command.
-
-    perldoc HTTP::OAI::SetLibrary
-
-
-You can also look for information at:
-
-=over 4
-
-=item * RT: CPAN's request tracker
-
-L<http://rt.cpan.org/NoAuth/Bugs.html?Dist=HTTP-OAI-SetLibrary>
-
-=item * AnnoCPAN: Annotated CPAN documentation
-
-L<http://annocpan.org/dist/HTTP-OAI-SetLibrary>
-
-=item * CPAN Ratings
-
-L<http://cpanratings.perl.org/d/HTTP-OAI-SetLibrary>
-
-=item * Search CPAN
-
-L<http://search.cpan.org/dist/HTTP-OAI-SetLibrary/>
-
-=back
-
-
-=head1 ACKNOWLEDGEMENTS
-
-
-=head1 LICENSE AND COPYRIGHT
-
-Copyright 2010 Maurice Mengel.
-
-This program is free software; you can redistribute it and/or modify it
-under the terms of either: the GNU General Public License as published
-by the Free Software Foundation; or the Artistic License.
-
-See http://dev.perl.org/licenses/ for more information.
-
-
-=cut
 
 1;    # End of HTTP::OAI::SetLibrary. Perl Dancer is still cool!
 
