@@ -65,10 +65,14 @@ Return 1 on success.
 
 sub add {
 	my $self  = shift;
-	my $chunkDesc = shift;
+	my $chunkDesc = shift or croak "Need chunkDescription!";
+	if (!ref $chunkDesc) {
+		croak "chunk Description is wrong format!";
+	}
 
 	#ensure that necessary info is there
-	#next is option since last chunk has no next
+	#next is optional; last chunk has no next
+	#croak exists on error, so error is never raised
 	foreach (qw (chunkNo maxChunkNo sql targetPrefix total token)) {
 		if ( !$chunkDesc->{$_} ) {
 			croak "$_ missing";
@@ -82,7 +86,7 @@ sub add {
 	}
 
 	if ($self->error) {
-		return 1;
+		return 1; #strange return value
 	}
 
 	#write into cache
@@ -123,7 +127,7 @@ Structure of hashref:
 	$chunk={
 			chunkNo=>$chunkNo,
 			maxChunkNo=>$maxChunkNo,
-			next=>$token,
+			[next=>$token,]
 			sql=>$sql,
 			targetPrefix=>$prefix,
 			token=>$token,
