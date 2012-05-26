@@ -3,7 +3,7 @@
 
 use strict;
 use warnings;
-use Test::More tests => 12;
+use Test::More tests => 16;
 use HTTP::OAI;
 use HTTP::OAI::DataProvider::Test;
 use HTTP::OAI::DataProvider::Transformer;
@@ -15,10 +15,10 @@ BEGIN {
 }
 
 #
-# test new
+# preparations
 #
 
-my $t;
+my $t;    #used in subsequent tests!
 {
 	my $config   = HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
 	my %t_config = (
@@ -27,6 +27,10 @@ my $t;
 	);
 	$t = new HTTP::OAI::DataProvider::Transformer(%t_config);
 }
+
+#
+# 1-test new
+#
 
 {
 	my %opts;
@@ -42,17 +46,15 @@ my $t;
 	ok( $@, 'should fail: ' . $@ );
 }
 
-my %opts = (
-	transformer => $t,
-	verb        => 'GetRecord',
-);
+my $result = minimalResult();
+{
 
-my $result = new HTTP::OAI::DataProvider::Engine::Result(%opts);
-ok( blessed($result) eq 'HTTP::OAI::DataProvider::Engine::Result',
-	'new works' );
+	ok( blessed($result) eq 'HTTP::OAI::DataProvider::Engine::Result',
+		'new works' );
+}
 
 #
-# $result->requestURL
+# 2-$result->requestURL
 #
 
 my $url = $result->requestURL();    #getter
@@ -64,13 +66,12 @@ ok( $url eq 'http://some.uri.com', 'url exists now' );
 $url = $result->requestURL();                                         #getter
 ok( $url eq 'http://some.uri.com', 'url exists now' );
 
-
 #
-# $result->addError($code[, $message]);
-# $result->isError()
+# 3-$result->addError($code[, $message]);
+# 4-$result->isError()
 #
 
-ok ( !$result->isError, 'isError should return nothing' );
+ok( !$result->isError, 'isError should return nothing' );
 
 eval { $result->addError('nonsense'); };
 ok( $@, 'should fail: ' . $@ );
@@ -78,7 +79,72 @@ ok( $@, 'should fail: ' . $@ );
 $result->addError('badArgument');
 ok( $result->addError('badArgument'), 'adds error and returns true' );
 
-ok ( $result->isError, 'isError should return true' );
+ok( $result->isError, 'isError should return true' );
 
-my @err=$result->isError();
-ok ( $err[0]->code eq 'badArgument', 'isError contains right HTTP::OAI error' ); 
+my @err = $result->isError();
+ok( $err[0]->code eq 'badArgument', 'isError contains right HTTP::OAI error' );
+
+#
+# 5-$result->countHeaders()
+#
+
+$result = minimalResult();
+ok( $result->countHeaders() == 0, "head count is zero" );
+
+#TODO see if it changes
+
+#
+# 6-$result->chunkSize
+#
+{
+	my $config = HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
+	die "Need chunkSize" if ( !$config->{chunkSize} );
+
+	my %opts = (
+		transformer => $t,
+		verb        => 'GetRecord',
+		chunkSize   => $config->{chunkSize},
+	);
+	$result = new HTTP::OAI::DataProvider::Engine::Result(%opts);
+	new HTTP::OAI::DataProvider::Engine::Result(%opts);
+	ok( $result->chunkSize == $config->{chunkSize}, 'chunkSize seems right' );
+}
+
+#
+# 7-$result->getType();
+#
+
+ok( $result->getType(), '$r->getType is weird' );
+
+#TODO
+
+#
+# 8-$result->getResponse
+#
+
+eval { $result->getResponse(); };
+
+ok( $@, '$r->getResponse should fail' );
+
+#
+# 9-
+#
+
+###
+### SUBS
+###
+
+sub minimalResult {
+	my $config   = HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
+	my %t_config = (
+		nativePrefix => $config->{nativePrefix},
+		locateXSL    => $config->{locateXSL},
+	);
+	my $t = new HTTP::OAI::DataProvider::Transformer(%t_config);
+
+	my %opts = (
+		transformer => $t,
+		verb        => 'GetRecord',
+	);
+	return new HTTP::OAI::DataProvider::Engine::Result(%opts);
+}

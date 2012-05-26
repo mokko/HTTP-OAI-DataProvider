@@ -10,10 +10,14 @@ use HTTP::OAI::DataProvider::Message qw(warning debug);
 
 #use Dancer ':syntax';     #only for debug in development, warnings?
 
-=head1 OLD SYNOPSIS 
+=head1 DESCRIPTIOPN
 
-A result is an object that carries the db response before it is transformed to
-a HTTP::OAI::Response object.
+A result is an object can carry 
+a) info to carry out a DB query and
+b) the db response before it is transformed to a HTTP::OAI::Response object.
+c) it can also carry OAI errors
+
+=head1 OLD SYNOPSIS 
 
 	#INIT
 	my $result=new HTTP::OAI::DataProvider::Engine (%opts);
@@ -237,13 +241,13 @@ sub countHeaders {
 	$result->{headCount} ? return $result->{headCount} : return 0;
 }
 
-=method my $result->responseCount
+=method my $result->_responseCount
 
-Triggers debug output!
+Similar to countHeaders, but triggers debug output!
 
 =cut
 
-sub responseCount {
+sub _responseCount {
 	my $result   = shift;
 	my $response = shift;
 
@@ -278,15 +282,15 @@ sub chunkSize {
 getType sets internal type in $result to either headers or records, depending
 on content of $result.
 
+TODO:
+-This is weird. It looks like it should also return the value;
+-There should also be an undef state
 =cut
 
 sub getType {
-	my $result       = shift;
-	my $chunkRequest = $result->chunkRequest;
+	my $result       = shift or die "Wrong!";
 
-	if ( !$chunkRequest->{type} ) {
-
-		#TODO: should be numerical operator '>'
+	if ( !$result->{type} ) {
 		if ( $result->countRecords > 0 ) {
 			$chunkRequest->{type} = 'records';
 		}
@@ -294,6 +298,7 @@ sub getType {
 			$chunkRequest->{type} = 'headers';
 		}
 	}
+	#return $result->{type};
 }
 
 =method my $response=$result->getResponse;
