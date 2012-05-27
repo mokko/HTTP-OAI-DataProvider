@@ -71,9 +71,7 @@ sub requiredType {
 Feature is a key of a hashref, either the object itself or another hashref
 object.
 
-Croaks if a or b are not present. If hashref is omitted, checks in $self.
-
-Variation:
+Croaks if a or b are not present. If hashref is omitted, checks in $self:
 	$self->requiredFeatures ('a', b');
 
 =cut

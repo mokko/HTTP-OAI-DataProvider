@@ -8,8 +8,6 @@ use Encode qw/decode/;    #encoding problem when dealing with data from sqlite
 use parent qw(HTTP::OAI::DataProvider::Engine);
 use HTTP::OAI::DataProvider::Message qw(warning debug);
 
-#use Dancer ':syntax';     #only for debug in development, warnings?
-
 =head1 DESCRIPTIOPN
 
 A result is an object can carry 
@@ -66,21 +64,21 @@ c) it can also carry OAI errors
 =method my $result=HTTP::OAI::DataProvider::Engine->new (%opts);
 
 	my %opts = (
-		requestURL  => $self->{requestURL},
-		transformer => $self->{transformer}, #required
-		verb        => $params->{verb}, #required
+		requestURL  => $requestURL, #optional
+		transformer => $transformer, #required
+		verb        => $verb, #required
 		params      => $params,		#this params should not have a verb
 
 		#for resumptionToken
-		chunkSize    => $self->{chunkSize},
-		chunkNo      => $chunkDesc->{chunkNo},
-		targetPrefix => $chunkDesc->{targetPrefix},
-		token        => $chunkDesc->{token},
-		total        => $chunkDesc->{total},
+		chunkSize    => $chunkSize,
+		chunkNo      => $chunkNo,
+		targetPrefix => $targetPrefix,
+		token        => $token,
+		total        => $total,
 	);
 
-$opts{last}
-$opts{next}
+#$opts{last}
+#$opts{next}
 
 =cut
 
@@ -364,7 +362,7 @@ object.
 
 This is an abstracted version of saveRecord that automatically does the right
 thing whether being passed header or record information. It makes addHeader
-and addRecord private methods and saveRecord obsolete.
+and addRecord private methods (and saveRecord obsolete).
 
 Gets called in engine's queryChunk.
 
@@ -376,12 +374,11 @@ verb to result->{verb} when result is born.
 =cut
 
 sub save {
-	my $result = shift;
+	my $result = shift or carp "Need myself!";
 	my %args   = @_;      #contains params, header, optional: $md
 
 	#debug "Enter save";
 
-	$result->requiredType('HTTP::OAI::DataProvider::Engine::Result');
 	$result->requiredFeatures( \%args, 'header' );
 	$result->requiredFeatures('params');
 
@@ -408,14 +405,7 @@ sub save {
 		# or return "Salsa Error: Loading xml file failed for strange reason";
 		#now md should become appropriate metadata
 
-		my $prefix;
-		$result->{params}->{metadataPrefix}
-		  ? $prefix = $result->{params}->{metadataPrefix}
-		  : $prefix = $result->{targetPrefix};
-
-		if ( !$prefix ) {
-			die "still no prefix?";
-		}
+		my $prefix = $args{params}{metadataPrefix} or croak "still no prefix?";
 
 		#debug "prefix:$prefix-----------------------";
 

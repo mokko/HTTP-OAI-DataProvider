@@ -1,12 +1,16 @@
 package HTTP::OAI::DataProvider::ChunkCache;
+
 # ABSTRACT: Store request info per resumptionToken
 
 use strict;
 use warnings;
+use Moose;
+use namespace::autoclean;
 use Carp qw/carp croak/;
+use HTTP::OAI::DataProvider::ChunkCache::Description;
 
 our $chunkCache = {};
-
+has 'maxSize' => ( is => 'ro', isa => 'Int', required => '1' );
 
 =head1 SYNOPSIS
 
@@ -15,14 +19,14 @@ our $chunkCache = {};
 
 	#chunkDesc is description of a chunk as hashref
 	#next is optional. Last token doesn't have a next
-	my $chunkDesc={
+	my $chunkDesc= new HTTP::OAI::DataProvider::ChunkCache::Description(
 		chunkNo=>$chunkNo,
 		maxChunkNo=>$maxChunkNo,
 		[next=>$token,]
 		sql=>$sql,
 		token=>$token,
 		total=>$total,
-	};
+	);
 
 	#add a chunkDesc to cache
 	$cache->add ($chunkDesc) or die $cache->error;
@@ -38,23 +42,6 @@ our $chunkCache = {};
 
 =head2 my $chunkCache=HTTP::OAI::DataProvider::ChunkCache::new (maxSize=>1000);
 
-=cut
-
-sub new {
-	my $class = shift;
-	my $self  = {};
-	my %args  = @_;
-
-	if ( $args{maxSize} ) {
-		$self->{maxSize} = $args{maxSize};
-	} else {
-		croak "Need maxSize for cache";
-	}
-
-	bless $self, $class;
-	return $self;
-}
-
 =head2 $chunkCache->add(%chunk);
 
 Add chunk information to the cache. Add will delete old chunks if no of cached
@@ -64,33 +51,25 @@ Return 1 on success.
 =cut
 
 sub add {
-	my $self  = shift;
-	my $chunkDesc = shift or croak "Need chunkDescription!";
-	if (!ref $chunkDesc) {
+	my $self = shift;
+	my $chunkDesc = shift or croak "Need chunkDescription!";    #should be return
+
+	if ( !ref $chunkDesc ) {
 		croak "chunk Description is wrong format!";
 	}
 
-	#ensure that necessary info is there
-	#next is optional; last chunk has no next
-	#croak exists on error, so error is never raised
-	foreach (qw (chunkNo maxChunkNo sql targetPrefix total token)) {
-		if ( !$chunkDesc->{$_} ) {
-			croak "$_ missing";
-			$self->error++;
-		}
-	}
-
-
-	if ($chunkDesc->{maxChunkNo} > $self->{maxSize}) {
+	if ( $chunkDesc->maxChunkNo > $self->maxSize ) {
 		croak "maxChunkNo greater than chunkCache maxSize";
 	}
 
-	if ($self->error) {
-		return 1; #strange return value
+	#if necessary remove a description from cache
+	my $count   = $self->count();
+	my $overPar = $count + 1 - $self->{maxSize};
+	if ( $overPar > 0 ) {
+		$self->_rmFromCache($overPar);
 	}
 
 	#write into cache
-	$self->_cacheSize();
 	$chunkCache->{ $chunkDesc->{token} } = $chunkDesc;
 }
 
@@ -121,39 +100,23 @@ sub error {
 
 =head2 my $chunk=$chunkCache->get($token);
 
-Returns a chunk description as hashref or nothing on error.
+Returns a HTTP::OAI::DataProvider::ChunkCache::Description object or nothing. 
 
-Structure of hashref:
-	$chunk={
-			chunkNo=>$chunkNo,
-			maxChunkNo=>$maxChunkNo,
-			[next=>$token,]
-			sql=>$sql,
-			targetPrefix=>$prefix,
-			token=>$token,
-			total=>$total
-	};
-
-Of course, it is not a chunk (i.e. results), but the description of a chunk.
+Nothing is return if no token is supplied or when no matching description was
+found.
 
 =cut
 
 sub get {
-	my $self  = shift;
-	my $token = shift;
-
-	if ( !$token ) {
-		$self->{error} = "No token specified when \$cache->get() was called";
-		return ();
-	}
+	my $self = shift;
+	my $token = shift or return;
 
 	if ( !$chunkCache->{$token} ) {
 		$self->{error} = "This token does not exist in cache";
-		return();
+		return;
 	}
 
 	return $chunkCache->{$token};
-
 }
 
 =head2 my @tokens=$cache->list;
@@ -165,47 +128,14 @@ Todo: What do on error?
 =cut
 
 sub list {
-	my $self = shift;
 	return ( keys %{$chunkCache} );
-}
-
-=head2 my $maxSize=$cache->size;
-
-Gets or sets maximum size of cache.
-
-=cut
-
-sub size {
-	my $self = shift;
-	my $size=shift;
-
-	#i am not sure what scalar does
-	if ($size) {
-		$self->{maxSize} = scalar $size;
-	} else {
-		return $self->{maxSize};
-	}
 }
 
 #
 # PRIVATE
 #
 
-#gets called in add
-sub _cacheSize {
-	my $self  = shift;
-	my $count = $self->count();
-
-	#called before we add an item to cache, so we have to add one to the count
-	#overPar: no of items which cache exceeds maxSize, should max be 1
-	my $overPar = $count + 1 - $self->{maxSize};
-	if ( $overPar > 0 ) {
-		$self->_rmFromCache($overPar);
-	}
-}
-
-#gets called in _cacheSize
-sub _rmFromCache {
+sub _rmFromCache {    #gets called in add
 	my $self    = shift;
 	my $overPar = shift;
 
@@ -220,4 +150,5 @@ sub _rmFromCache {
 	}
 }
 
+__PACKAGE__->meta->make_immutable;
 1;

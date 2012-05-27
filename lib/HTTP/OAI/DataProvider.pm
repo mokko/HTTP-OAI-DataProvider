@@ -165,13 +165,13 @@ sub new {
 	#init chunker
 	$self->{chunkCache} = new HTTP::OAI::DataProvider::ChunkCache(
 		maxSize => $self->{chunkCacheMaxSize} )
-	  or die "Cannot init chunkCache";
+	  or croak "Cannot init chunkCache";
 
 	#init global metadata formats
 	#small camel is object, big camel is its description
 
 	if ( !exists $self->{GlobalFormats} ) {
-		die 'GlobalFormats missing from $config';
+		croak 'GlobalFormats missing from $config';
 	}
 
 	my %cnf = %{ $self->{GlobalFormats} };
@@ -806,8 +806,8 @@ TODO: should be called getChunkDesc
 Tests whether
 
 =for :list
-	a) whether a resumptionToken is in params and
-	b) there is a chunkDesc with that token in the cache.
+* whether a resumptionToken is in params and
+* there is a chunkDesc with that token in the cache.
 
 It returns either a chunkDesc or nothing.
 
@@ -822,34 +822,17 @@ Usage:
 sub chunkExists {
 	my $self    = shift;
 	my $params  = shift;
-	my $request = shift;
-	my $token   = $params->{resumptionToken};
-
-	#do NOT check if provider is born with chunking ability!
-	#check is request has token
-	if ( !$token ) {
-		return ();    #how to react if token missing?
-	}
-
-	#a) wrong token -> error message
-	#b) right token -> return token
-
+	my $request = shift; #should be optional, but isn't, right?
+	my $token   = $params->{resumptionToken} or return;
 	my $chunkCache = $self->{chunkCache};
 
 	if ( !$chunkCache ) {
-		die "No chunkCache!";
+		carp "No chunkCache!";
 	}
 
 	#Debug "Query chunkCache for " . $token;
 
-	my $chunkDesc = $self->{chunkCache}->get($token);
-
-	if ( !$chunkDesc ) {
-
-		#ensure that it does return nothing on error! And not 0
-		Debug "no chunk description found!";
-		return ();
-	}
+	my $chunkDesc = $chunkCache->get($token) or return; #possibly we need a return here!
 
 	#chunk is a HTTP::OAI::Response object
 	my $response = $self->{engine}->queryChunk( $chunkDesc, $params, $request );

@@ -3,6 +3,7 @@
 use FindBin;
 use Test::More tests => 10;
 use HTTP::OAI::DataProvider::ChunkCache;
+use HTTP::OAI::DataProvider::ChunkCache::Description;
 
 my $soll = 1000;
 
@@ -30,14 +31,14 @@ ok( $@, 'add() should not pass' );
 eval { $cache->add( a => 'b' ); };
 ok( $@, 'add() should not pass' );
 
-my $desc = {
+my $desc = new HTTP::OAI::DataProvider::ChunkCache::Description(
 	chunkNo      => '1',
 	maxChunkNo   => '10',
 	sql          => 'SELECT * from Y',
 	targetPrefix => 'oai',
 	total        => '1000',
 	token        => 'token',
-};
+);
 ok( $cache->count() == 0, 'count when empty' );
 eval { $cache->add($desc); };
 ok( !$@, 'add($desc) should pass' );

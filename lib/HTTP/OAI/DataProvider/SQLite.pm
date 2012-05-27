@@ -123,6 +123,10 @@ sub queryChunk {
 	$self->argumentExists($chunkDesc);
 	$self->argumentExists($params);
 
+	#use Data::Dumper qw(Dumper);
+	#print Dumper ($params);
+
+
 	#Debug "Enter queryChunk";
 
 	my %opts = (
@@ -133,15 +137,15 @@ sub queryChunk {
 
 		#for resumptionToken
 		chunkSize    => $self->{chunkSize},
-		chunkNo      => $chunkDesc->{chunkNo},
-		targetPrefix => $chunkDesc->{targetPrefix},
-		token        => $chunkDesc->{token},
-		total        => $chunkDesc->{total},
+		chunkNo      => $chunkDesc->chunkNo,
+		targetPrefix => $chunkDesc->{targetPrefix}, #why here?
+		token        => $chunkDesc->token,
+		total        => $chunkDesc->total,
 	);
 
 	#next is optional because last chunk has no next
-	if ( $chunkDesc->{'next'} ) {
-		$opts{'next'} = $chunkDesc->{'next'},;
+	if ( $chunkDesc->next ) {
+		$opts{'next'} = $chunkDesc->next;
 	}
 	else {
 		Debug "queryChunk: this is the last chunk!";
@@ -157,7 +161,7 @@ sub queryChunk {
 
 	#SQL
 	my $dbh = $self->{connection}->dbh()         or die $DBI::errstr;
-	my $sth = $dbh->prepare( $chunkDesc->{sql} ) or croak $dbh->errstr();
+	my $sth = $dbh->prepare( $chunkDesc->sql ) or croak $dbh->errstr();
 	$sth->execute() or croak $dbh->errstr();
 
 	#Debug "chunkDesc SQL $chunkDesc->{sql}";
@@ -183,6 +187,7 @@ sub queryChunk {
 				$result->save(
 					header => $header,
 					md     => $md,
+					params=>$params, #doesn't it need params?
 				);
 
 				#Debug "md".$md;
@@ -219,6 +224,7 @@ sub queryChunk {
 	$result->save(
 		header => $header,
 		md     => $md,
+		params=>$params, #doesn't it need params?
 	);
 
 	# Check result
@@ -628,14 +634,14 @@ sub planChunking {
 		);
 		my $nextToken = $self->mkToken();
 
-		my $chunk = {
+		my $chunk = new HTTP::OAI::DataProvider::ChunkCache::Description(
 			chunkNo      => $chunkNo,
 			maxChunkNo   => $maxChunkNo,
 			sql          => $sql,
 			targetPrefix => $params->{metadataPrefix},
 			token        => $currentToken,
 			total        => $total
-		};
+		);
 
 		#the last chunk has no resumption token
 		if ( $chunkNo < $maxChunkNo ) {
