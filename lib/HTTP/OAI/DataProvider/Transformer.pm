@@ -3,9 +3,11 @@ package HTTP::OAI::DataProvider::Transformer;
 
 use warnings;
 use strict;
+use Moose;
+#use namespace::autoclean;
 
 use Carp qw/croak carp/;
-use Dancer::CommandLine qw/Debug Warning/;
+use HTTP::OAI::DataProvider::Message qw/Debug Warning/;
 use XML::LibXSLT;
 
 #the currently compiled xsl, see _cache_stylesheet
@@ -31,28 +33,8 @@ our %stylesheet_cache;
 
 =cut
 
-sub new {
-	my $class = shift;
-	my %args  = @_;
-	my $self  = {};
-
-	if ( !$args{nativePrefix} ) {
-		croak "NativePrefix missing";
-	}
-	if ( !$args{locateXSL} ) {
-		croak "locateXSL missing";
-	}
-
-	if ( $args{nativePrefix} ) {
-		$self->{nativePrefix} = $args{nativePrefix};
-	}
-
-	if ( $args{locateXSL} ) {
-		$self->{locateXSL} = $args{locateXSL};
-	}
-
-	return ( bless $self, $class );
-}
+has 'nativePrefix' => (is => 'ro', isa => 'Str', required => 1,);
+has 'locateXSL' => (is => 'ro', isa => 'CodeRef', required => 1,);
 
 =head2 	my $dom=$t->toTargetPrefix ($targetPrefix,$dom);
 
@@ -132,5 +114,6 @@ sub _cache_stylesheet {
 
 }
 
+__PACKAGE__->meta->make_immutable;
 1;
 
