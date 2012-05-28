@@ -6,7 +6,7 @@ use Carp qw(croak carp);
 use HTTP::OAI;
 use Encode qw/decode/;    #encoding problem when dealing with data from sqlite
 use parent qw(HTTP::OAI::DataProvider::Engine);
-use HTTP::OAI::DataProvider::Message qw(warning debug);
+use HTTP::OAI::DataProvider::Common qw(Warning Debug);
 
 =head1 DESCRIPTIOPN
 
@@ -187,7 +187,7 @@ sub _addHeader {
 	my $result = shift;
 	my $header = shift;
 
-	#debug "Enter _addHeader";
+	#Debug "Enter _addHeader";
 
 	$result->{headCount}++;
 	if ( !$header ) {
@@ -198,7 +198,7 @@ sub _addHeader {
 		croak 'Internal Error: object is not HTTP::OAI::Header';
 	}
 
-	#debug "now " . $result->countHeaders . " headers";
+	#Debug "now " . $result->countHeaders . " headers";
 
 	$result->{headers}->identifier($header);
 }
@@ -223,7 +223,7 @@ sub _addRecord {
 		croak 'Internal Error: record is not HTTP::OAI::Record';
 	}
 
-	#debug "now" . $result->countRecords . "records";
+	#Debug "now" . $result->countRecords . "records";
 
 	push @{ $result->{records} }, $record;
 }
@@ -241,7 +241,7 @@ sub countHeaders {
 
 =method my $result->_responseCount
 
-Similar to countHeaders, but triggers debug output!
+Similar to countHeaders, but triggers Debug output!
 
 =cut
 
@@ -253,10 +253,10 @@ sub _responseCount {
 		$response = $result->getResponse;
 	}
 	if ( ref $response eq 'HTTP::OAI::ListIdentifiers' ) {
-		debug "HeadCount" . $result->countHeaders;
+		Debug "HeadCount" . $result->countHeaders;
 	}
 	else {
-		debug "RecCount" . $result->countRecords;
+		Debug "RecCount" . $result->countRecords;
 	}
 }
 
@@ -316,7 +316,7 @@ TODO: Should also recognize getRecord!
 sub getResponse {
 	my $result = shift;
 
-	#debug "Enter getResponse ".$result->{verb};
+	#Debug "Enter getResponse ".$result->{verb};
 
 	if ( $result->{verb} eq 'ListIdentifiers' ) {
 		return $result->toListIdentifiers;
@@ -327,7 +327,7 @@ sub getResponse {
 	if ( $result->{verb} eq 'ListRecords' ) {
 		return $result->toListRecords;
 	}
-	warning "Strange Error!";
+	Warning "Strange Error!";
 }
 
 =method my $number_of_records=$result->countRecords;
@@ -377,7 +377,7 @@ sub save {
 	my $result = shift or carp "Need myself!";
 	my %args   = @_;      #contains params, header, optional: $md
 
-	#debug "Enter save";
+	#Debug "Enter save";
 
 	$result->requiredFeatures( \%args, 'header' );
 	$result->requiredFeatures('params');
@@ -407,23 +407,23 @@ sub save {
 
 		my $prefix = $args{params}{metadataPrefix} or croak "still no prefix?";
 
-		#debug "prefix:$prefix-----------------------";
+		#Debug "prefix:$prefix-----------------------";
 
 		my $transformer = $result->{transformer};
 		if ($transformer) {
 			$dom = $transformer->toTargetPrefix( $prefix, $dom );
 
-			#debug "transformed dom" . $dom;
+			#Debug "transformed dom" . $dom;
 		}
 		else {
-			warning "Transformer not available";
+			Warning "Transformer not available";
 		}
 
-		#debug $dom->toString;
+		#Debug $dom->toString;
 		$args{metadata} = new HTTP::OAI::Metadata( dom => $dom );
 	}
 	else {
-		warning "metadata not available, but that might well be the case";
+		Warning "metadata not available, but that might well be the case";
 	}
 
 	my $record = new HTTP::OAI::Record(%args);
@@ -468,7 +468,7 @@ sub toListRecords {
 	my $result      = shift;
 	my $listRecords = new HTTP::OAI::ListRecords;
 
-	#debug "Enter toListRecords";
+	#Debug "Enter toListRecords";
 
 	if ( $result->countRecords == 0 ) {
 		croak "records2ListRecords: count doesn't fit";
@@ -497,7 +497,7 @@ $result.
 sub _resumptionToken {
 	my $result = shift;
 
-	#debug 'Enter _resumptionToken'.ref $result;
+	#Debug 'Enter _resumptionToken'.ref $result;
 
 	my $rt = new HTTP::OAI::ResumptionToken(
 		completeListSize => $result->{total},
@@ -520,7 +520,7 @@ it'll be applied to the ListRecord object.
 sub toListIdentifiers {
 	my $result = shift;
 
-	#debug "Enter toListIdentifiers";
+	#Debug "Enter toListIdentifiers";
 
 	#not sure if we tested this before
 	if ( $result->countHeaders == 0 ) {
@@ -531,7 +531,7 @@ sub toListIdentifiers {
 
 	if ( $result->{requestURL} ) {
 
-		#debug "requestURL:".$result->{requestURL};
+		#Debug "requestURL:".$result->{requestURL};
 		$listIdentifiers->requestURL( $result->requestURL );
 	}
 
@@ -556,7 +556,7 @@ Is _actually_ called in DataProvider.
 sub isError {
 	my $result = shift;
 
-	#debug "HTTP::OAI::DataProvider::Result::isError";
+	#Debug "HTTP::OAI::DataProvider::Result::isError";
 
 	if ( ref $result ne 'HTTP::OAI::DataProvider::Engine::Result' ) {
 		die "isError: Wrong class ";

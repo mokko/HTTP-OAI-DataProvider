@@ -4,7 +4,7 @@ package HTTP::OAI::DataProvider::SetLibrary;
 #use Dancer ':syntax';    #not absolutely necessary, only for debugging
 use strict;
 use warnings;
-use HTTP::OAI::DataProvider::Message qw/Debug Warning/;
+use HTTP::OAI::DataProvider::Common qw/Debug Warning/;
 use HTTP::OAI;
 use Carp qw/croak carp/;
 use Moose;

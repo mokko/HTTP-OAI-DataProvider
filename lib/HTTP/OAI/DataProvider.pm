@@ -16,7 +16,7 @@ use HTTP::OAI::DataProvider::Transformer;
 use HTTP::OAI::DataProvider::SQLite;
 
 #TODO: not sure if Message works.
-use HTTP::OAI::DataProvider::Message qw/Debug Warning/;
+use HTTP::OAI::DataProvider::Common qw/Debug Warning/;
 
 #use Data::Dumper qw/Dumper/; #for debugging
 

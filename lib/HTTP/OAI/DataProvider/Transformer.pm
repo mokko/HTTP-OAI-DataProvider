@@ -7,7 +7,7 @@ use Moose;
 use namespace::autoclean;
 
 use Carp qw/croak carp/;
-use HTTP::OAI::DataProvider::Message qw/Debug Warning/;
+use HTTP::OAI::DataProvider::Common qw/Debug Warning/;
 use XML::LibXSLT;
 
 #the currently compiled xsl, see _cache_stylesheet

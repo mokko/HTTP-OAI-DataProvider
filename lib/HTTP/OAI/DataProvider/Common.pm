@@ -1,4 +1,5 @@
 package HTTP::OAI::DataProvider::Common;
+
 # ABSTRACT: common FUNCTIONs for the dataProvider
 
 use strict;
@@ -11,11 +12,15 @@ use File::Spec;
 use base 'Exporter';
 our @EXPORT_OK;
 our $modDir = _modDir();
+our $Debug;
+our $Warning;
 
 @EXPORT_OK = qw(
+  Debug
   isScalar
   modDir
   valPackageName
+  Warning
 );
 
 sub argumentsLeft;
@@ -94,5 +99,46 @@ sub valPackageName {
 			croak "Error: Wrong type! Expected one of @expected, "
 			  . "but instead it's $type";
 		}
+	}
+}
+
+=sub Debug "debug message";
+
+First initialize Debug:
+	Debug (sub { my $msg=shift; print "$msg\n" if $msg});
+Then use it
+	Debug "debug message";
+
+=cut
+
+sub Debug {
+	my @orig = @_;
+	my $arg  = shift;
+	if ( defined &$arg ) {
+
+		#print "SEEMS TO BE CODEREF $arg\n";
+		$Debug = $arg;
+	}
+	else {
+		#print "NOT a CODEREF $arg\n";
+		$Debug ? &$Debug(@orig) : croak "Debug coderef not defined";
+	}
+}
+
+
+=sub Debug "debug message";
+
+Usage analogous to Debug. For details see there.
+
+=cut
+
+sub Warning {
+	my @orig = @_;
+	my $arg  = shift;
+	if ( defined &$arg ) {
+		$Warning = $arg;
+	}
+	else {
+		$Warning ? &$Warning(@orig) : croak "Warning coderef not defined";
 	}
 }

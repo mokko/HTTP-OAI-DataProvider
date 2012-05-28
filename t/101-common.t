@@ -1,8 +1,9 @@
 use strict;
 use warnings;
 use FindBin;
-use HTTP::OAI::DataProvider::Common qw(isScalar valPackageName modDir);
-use Test::More tests => 12;
+use HTTP::OAI::DataProvider::Common
+  qw(isScalar valPackageName modDir Warning Debug);
+use Test::More tests => 16;
 
 #use Data::Dumper qw(Dumper); #only for debugging tests
 
@@ -21,6 +22,7 @@ use Test::More tests => 12;
 }
 
 {
+
 	#diag "testing valPackageName";
 	eval { valPackageName(); };
 	ok( $@, 'valPackageName should die without params' );
@@ -59,8 +61,20 @@ use Test::More tests => 12;
 	}
 }
 
-{
 	#don't know how to test modir
 	#print "bin:$FindBin::Bin\n";
 	#print "modDir: ".modDir()."\n";
-}
+
+eval { Debug "bla" };
+ok( $@, 'expect Debug to croak' );
+
+Debug( sub { my $msg = shift; print ">>>>>>>>>>>>>>>>>>$msg\n" if $msg } );
+eval { Debug "bla" };
+ok( !$@, 'expect Debug to succeed' );
+
+eval { Warning "bla" };
+ok( $@, 'expect Warning to croak ' );
+
+Warning( sub { my $msg = shift; warn ">>>>>>>>>>>>>>>>>>$msg" if $msg } );
+eval { Warning "wla" };
+ok( !$@, 'expect Warning to succeed' );

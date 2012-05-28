@@ -13,7 +13,7 @@ use HTTP::OAI::DataProvider::Engine::Result;
 use XML::LibXML;
 use XML::LibXML::XPathContext;
 use XML::SAX::Writer;
-use Dancer::CommandLine qw/Debug Warning/;
+use HTTP::OAI::DataProvider::Common qw/Debug Warning/;
 use Carp qw/carp croak/;
 use DBI qw(:sql_types);    #new
 use DBIx::Connector;
