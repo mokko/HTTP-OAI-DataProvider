@@ -150,9 +150,10 @@ has 'Warning' => ( isa => 'CodeRef', is => 'ro', required => 0 );
 sub BUILD {
 	my $self = shift;
 
-	$self->{chunkCache} = new HTTP::OAI::DataProvider::ChunkCache(
-		maxSize => $self->chunkCacheMaxSize
-	) or croak "Cannot init chunkCache";
+	$self->{chunkCache} =
+	  new HTTP::OAI::DataProvider::ChunkCache(
+		maxSize => $self->chunkCacheMaxSize )
+	  or croak "Cannot init chunkCache";
 
 	#check if info complete
 	foreach my $prefix ( keys %{ $self->GlobalFormats } ) {
@@ -197,32 +198,28 @@ Errors
 sub GetRecord {
 	my $self    = shift;
 	my $request = shift;
-
-	my $params = _hashref(@_);    #my %params = @_; #todo
+	my %params  = @_;
 	my @errors;
 
-	if ( my $err = $self->_validateRequest( 'GetRecord', $params ) ) {
-		return $err;
-	}
-
-	#could be written as TODO
-	#$self->_validateRequest( 'GetRecord', $params ) or return $self->error;
+	#NEW (todo in other verbs plus testing!)
+	$params{verb} = 'GetRecord'; 
+	$self->_validateRequest2(%params) or return $self->errormsg;
 
 	Warning 'Enter GetRecord (id:'
-	  . $params->{identifier}
+	  . $params{identifier}
 	  . 'prefix:'
-	  . $params->{metadataPrefix} . ')';
+	  . $params{metadataPrefix} . ')';
 
 	my $engine        = $self->{engine};
 	my $globalFormats = $self->{globalFormats};
 
 	# Error handling
-	my $header = $engine->findByIdentifier( $params->{identifier} );
+	my $header = $engine->findByIdentifier( $params{identifier} );
 	if ( !$header ) {
 		push( @errors, new HTTP::OAI::Error( code => 'idDoesNotExist' ) );
 	}
 
-	if ( my $e = $self->checkFormatSupported( $params->{metadataPrefix} ) ) {
+	if ( my $e = $self->checkFormatSupported( $params{metadataPrefix} ) ) {
 		push @errors, $e;    #check if metadataFormat is supported
 	}
 
@@ -231,7 +228,7 @@ sub GetRecord {
 	}
 
 	# Metadata handling
-	my $response = $engine->query( $params, $request );
+	my $response = $engine->query( \%params, $request );
 
 	#todo: we still have to test if result has any result at all
 	#mk sure we don't lose requestURL in Starman
@@ -942,6 +939,24 @@ sub _validateRequest {
 		return $self->err2XML(@error);
 	}
 	return;
+}
+
+#$self->_validateRequest2( verb=>'GetRecord', %params ) or return $self->error;
+sub _validateRequest2 {
+	my $self   = shift or croak "Need myself!";
+	my %params = @_    or return;
+	if ( my @errors = validate_request(%params) ) {
+		$self->{errormsg} = $self->err2XML(@errors);
+		return;    #there was an error during validation
+	}
+	return 1;      #no validation error (success)
+}
+
+sub errormsg {
+	my $self = shift or croak "Need myself!";
+	if ( $self->{errormsg} ) {
+		return $self->{errormsg};
+	}
 }
 
 =head1 OAI DATA PROVIDER FEATURES
