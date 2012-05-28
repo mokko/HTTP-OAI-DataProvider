@@ -121,14 +121,15 @@ sub Debug {
 	}
 	else {
 		#print "NOT a CODEREF $arg\n";
-		$Debug ? &$Debug(@orig) : croak "Debug coderef not defined";
+		&$Debug(@orig) if $Debug;
+		#it is perfectly possible that Debug is not initialized, so don't croak
 	}
 }
 
 
-=sub Debug "debug message";
+=sub Warning "message";
 
-Usage analogous to Debug. For details see there.
+Usage analogous to C<Debug>. For details see there.
 
 =cut
 
@@ -139,6 +140,7 @@ sub Warning {
 		$Warning = $arg;
 	}
 	else {
-		$Warning ? &$Warning(@orig) : croak "Warning coderef not defined";
+		&$Warning(@orig) if $Warning;
+		#it is perfectly possible that Warning is not initialized, so don't croak
 	}
 }

@@ -14,8 +14,6 @@ use HTTP::OAI::DataProvider::SetLibrary;
 use HTTP::OAI::DataProvider::ChunkCache;
 use HTTP::OAI::DataProvider::Transformer;
 use HTTP::OAI::DataProvider::SQLite;
-
-#TODO: not sure if Message works.
 use HTTP::OAI::DataProvider::Common qw/Debug Warning/;
 
 #use Data::Dumper qw/Dumper/; #for debugging
@@ -24,20 +22,20 @@ use HTTP::OAI::DataProvider::Common qw/Debug Warning/;
 
 	#Init
 	use HTTP::OAI::DataProvider;
-	my $provider = HTTP::OAI::DataProvider->new($options);
-
+	my $provider = HTTP::OAI::DataProvider->new(%options);
+	
 	#Verbs: GetRecord, Identify ...
-	my $response=$provider->$verb($request, %params);
+	my $provider->requestURL($requestURL); 	#if you need overwrite the automatic setting
+	my $response=$provider->$verb(%params);
 
-	#Error checking
+	#Error checking CURRENT
 	my $e=$response->isError
 	if ($response->isError) {
 	 #do this
 	}
 
-	#Debugging (TODO)
-	Debug "message";
-	Warning "message";
+	#TODO: Error checking
+	my $response=$provider->$verb(%params) or return $provider->errorMessage;
 
 =method my $provider->new ($options);
 
@@ -147,7 +145,11 @@ has 'setLibrary'        => ( isa => 'HashRef', is => 'ro', required => 1 );
 #optional
 has 'debug'      => ( isa => 'CodeRef', is => 'ro', required => 0 );
 has 'warning'    => ( isa => 'CodeRef', is => 'ro', required => 0 );
-has 'requestURL' => ( isa => 'Str',     is => 'rw', required => 0 );    #todo!
+has 'requestURL' => ( isa => 'Str',     is => 'rw', required => 0 );
+has 'xslt'       => ( isa => 'Str',     is => 'ro', required => 0 );
+
+#TODO: separate out the ARGS for the engine into one HashRef
+#has 'engineArgs'         => ( isa => 'HashRef', is => 'ro', required => 1 );
 
 sub BUILD {
 	my $self = shift;
@@ -258,9 +260,9 @@ sub Identify {
 	my %params = @_;
 
 	$params{verb} = 'Identify';
-	$self->_validateRequest(%params) or return $self->errormsg;
+	$self->_validateRequest(%params) or return $self->errorMessage;
 
-	Debug "Enter Identify";    #.$self->requestURL;
+	Debug "Enter Identify";
 
 	# Metadata munging
 	my $obj = new HTTP::OAI::Identify(
@@ -313,7 +315,7 @@ sub ListMetadataFormats {
 	#
 	# Error handling
 	#
-	$self->_validateRequest(%params) or return $self->errormsg;
+	$self->_validateRequest(%params) or return $self->errorMessage;
 
 	#only if there is actually an identifier
 	if ( $params{identifier} ) {
@@ -406,11 +408,10 @@ sub ListIdentifiers {
 	my @errors;    #stores errors before there is a result object
 
 	$params{verb} = 'ListIdentifiers';
-	$self->_validateRequest(%params) or return $self->errormsg;
+	$self->_validateRequest(%params) or return $self->errorMessage;
 
-	my $request       = $self->requestURL();
-	my $engine        = $self->{engine};          #provider
-	my $globalFormats = $self->{globalFormats};
+	my $request = $self->requestURL();
+	my $engine  = $self->{engine};       #provider
 
 	#Warning 'Enter ListIdentifiers (prefix:' . $params->{metadataPrefix};
 	#Debug 'from:' . $params->{from}   if $params->{from};
@@ -427,11 +428,9 @@ sub ListIdentifiers {
 	if ( $params{resumptionToken} ) {
 
 		#chunk is response object here!
-		my $chunk = $self->chunkExists( \%params, $request );    #todo
+		my $chunk = $self->chunkExists(%params);    #todo
 
 		if ($chunk) {
-
-			#Debug "Get here";
 			return $self->_output($chunk);
 		}
 		else {
@@ -441,7 +440,7 @@ sub ListIdentifiers {
 	}
 
 	if ( my $e = $self->checkFormatSupported( $params{metadataPrefix} ) ) {
-		push @errors, $e;    #cannotDisseminateFormat
+		push @errors, $e;                           #cannotDisseminateFormat
 	}
 
 	if ( $params{Set} ) {
@@ -519,7 +518,7 @@ sub ListRecords {
 	my $self   = shift;
 	my %params = @_;
 	$params{verb} = 'ListRecords';
-	$self->_validateRequest(%params) or return $self->errormsg;
+	$self->_validateRequest(%params) or return $self->errorMessage;
 
 	#Warning 'Enter ListRecords (prefix:' . $params->{metadataPrefix};
 
@@ -538,7 +537,7 @@ sub ListRecords {
 	#
 
 	if ( $params{resumptionToken} ) {
-		my $chunk = $self->chunkExists( \%params, $request );    #todo!
+		my $chunk = $self->chunkExists(%params);
 		if ($chunk) {
 			return $self->_output($chunk);
 		}
@@ -599,7 +598,7 @@ sub ListSets {
 	my $request = $self->requestURL();    #check if this is still necessary!
 
 	$params{verb} = 'ListSets';
-	$self->_validateRequest(%params) or return $self->errormsg;
+	$self->_validateRequest(%params) or return $self->errorMessage;
 
 	#print "Enter ListSets $self\n";
 
@@ -744,7 +743,7 @@ sub err2XML {
 HTTP::OAI::DataProvider is to be used by frontend developers. What is not meant
 for them, is private.
 
-=head2 my $chunk=$self->chunkExists ($params, [$request]);
+=head2 my $chunk=$self->chunkExists ($params);
 
 TODO: should be called getChunkDesc
 
@@ -766,7 +765,7 @@ Usage:
 
 sub chunkExists {
 	my $self    = shift;
-	my $params  = shift;
+	my $params  = @_;
 	my $request = $self->requestURL;    #should be optional, but isn't, right?
 	my $token      = $params->{resumptionToken} or return;
 	my $chunkCache = $self->{chunkCache};
@@ -788,7 +787,7 @@ sub chunkExists {
 =head2 $self->_output($response);
 
 Expects a HTTP::OAI::Response object and returns it as xml string. It applies
-$self->{xslt} if set.
+$self->xslt if set.
 
 =cut
 
@@ -882,8 +881,8 @@ sub _init_xslt {
 	}
 
 	#Debug "Enter _init_xslt obj:$obj"; #beautify
-	if ( $self->{xslt} ) {
-		$obj->xslt( $self->{xslt} );
+	if ( $self->xslt ) {
+		$obj->xslt( $self->xslt );
 	}
 	else {
 		Warning "No beautify-xslt loaded!";
@@ -895,17 +894,30 @@ sub _validateRequest {
 	my $self   = shift or croak "Need myself!";
 	my %params = @_    or return;
 	if ( my @errors = validate_request(%params) ) {
-		$self->{errormsg} = $self->err2XML(@errors);
+		$self->{errorMessage}=$self->err2XML(@errors);
 		return;    #there was an error during validation
 	}
 	return 1;      #no validation error (success)
 }
 
-sub errormsg {
+=method return $provider->errorMessage;
+
+Returns an internal error message (if any). Error message is a single scalar 
+(string), ready for print.
+
+Just a getter, no setter! The error is set internally, e.g.
+
+	$provider->_validateRequest (%params) or return provider->errorMessage;
+	
+TODO: I am still transitioning from old to new error system!
+
+=cut
+
+sub errorMessage {
 	my $self = shift or croak "Need myself!";
-	if ( $self->{errormsg} ) {
-		return $self->{errormsg};
-	}
+	my $newMsg = shift; #a SINGLE string
+
+	return $self->{errormsg} if ( $self->{errormsg} );
 }
 
 =head1 OAI DATA PROVIDER FEATURES

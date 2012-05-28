@@ -3,7 +3,7 @@ use warnings;
 use FindBin;
 use HTTP::OAI::DataProvider::Common
   qw(isScalar valPackageName modDir Warning Debug);
-use Test::More tests => 16;
+use Test::More tests => 14;
 
 #use Data::Dumper qw(Dumper); #only for debugging tests
 
@@ -65,15 +65,17 @@ use Test::More tests => 16;
 	#print "bin:$FindBin::Bin\n";
 	#print "modDir: ".modDir()."\n";
 
-eval { Debug "bla" };
-ok( $@, 'expect Debug to croak' );
+#doesn't croak anymore and for good reason!
+#eval { Debug "bla" };
+#ok( $@, 'expect Debug to croak' );
 
 Debug( sub { my $msg = shift; print ">>>>>>>>>>>>>>>>>>$msg\n" if $msg } );
 eval { Debug "bla" };
 ok( !$@, 'expect Debug to succeed' );
 
-eval { Warning "bla" };
-ok( $@, 'expect Warning to croak ' );
+#doesn't croak anymore and for good reason!
+#eval { Warning "bla" };
+#ok( $@, 'expect Warning to croak ' );
 
 Warning( sub { my $msg = shift; warn ">>>>>>>>>>>>>>>>>>$msg" if $msg } );
 eval { Warning "wla" };

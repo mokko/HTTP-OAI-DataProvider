@@ -11,7 +11,7 @@
 
 	#dbfile value for test is not good...
 	dbfile        => "$FindBin::Bin/../t/db",
-	'debug' => sub { my $msg = shift; print "<<$msg\n" if $msg; },
+	debug => sub { my $msg = shift; print "<<$msg\n" if $msg; },
 
 	#capital letter important: GlobalFormats
 	GlobalFormats => {
@@ -54,5 +54,6 @@
 #       </oai_dc:dc>'
 		},
 	},	
-	'warning' => sub { my $msg = shift; warn ">>$msg" if $msg; },
+	warning => sub { my $msg = shift; warn ">>$msg" if $msg; },
+	xslt=>'/oai2.xsl',
 );
