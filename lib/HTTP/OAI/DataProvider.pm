@@ -5,6 +5,8 @@ package HTTP::OAI::DataProvider;
 use warnings;
 use strict;
 use Carp qw/croak carp/;
+use Moose;
+use namespace::autoclean;
 
 use HTTP::OAI;
 use HTTP::OAI::Repository qw/validate_request/;
@@ -128,66 +130,51 @@ records the data provider can return in one request.
 
 =cut
 
-sub new {
-	my $class = shift;
-	my $self  = shift;    #has Dancer's complete config, not secure
-	bless( $self, $class );
+#required
+has 'adminEmail'        => ( isa => 'Str',     is => 'ro', required => 1 );
+has 'baseURL'           => ( isa => 'Str',     is => 'ro', required => 1 );
+has 'chunkCacheMaxSize' => ( isa => 'Str',     is => 'ro', required => 1 );
+has 'chunkSize'         => ( isa => 'Int',     is => 'ro', required => 1 );
+has 'deletedRecord'     => ( isa => 'Str',     is => 'ro', required => 1 );
+has 'dbfile'            => ( isa => 'Str',     is => 'ro', required => 1 );
+has 'GlobalFormats'     => ( isa => 'HashRef', is => 'ro', required => 1 );
+has 'locateXSL'         => ( isa => 'CodeRef', is => 'ro', required => 1 );
+has 'nativePrefix'      => ( isa => 'Str',     is => 'ro', required => 1 );
+has 'native_ns_uri'     => ( isa => 'Str',     is => 'ro', required => 1 );
+has 'setLibrary'        => ( isa => 'HashRef', is => 'ro', required => 1 );
 
-	#check various required values
-	my @required = qw(
-	  adminEmail
-	  baseURL
-	  chunkCacheMaxSize
-	  chunkSize
-	  deletedRecord
-	  dbfile
-	  locateXSL
-	  nativePrefix
-	  native_ns_uri
-	  repositoryName
-	  setLibrary
-	  );    
+#optional
+has 'Debug'   => ( isa => 'CodeRef', is => 'ro', required => 0 );
+has 'Warning' => ( isa => 'CodeRef', is => 'ro', required => 0 );
 
-	foreach my $value (@required) {
-		if ( !$self->{$value} ) {
-			die "new: config value missing $value";
-		}
-	}
+sub BUILD {
+	my $self = shift;
 
-	#init chunker
 	$self->{chunkCache} = new HTTP::OAI::DataProvider::ChunkCache(
-		maxSize => $self->{chunkCacheMaxSize} )
-	  or croak "Cannot init chunkCache";
-
-	#init global metadata formats
-	#small camel is object, big camel is its description
-
-	if ( !exists $self->{GlobalFormats} ) {
-		croak 'GlobalFormats missing from $config';
-	}
-
-	my %cnf = %{ $self->{GlobalFormats} };
+		maxSize => $self->chunkCacheMaxSize
+	) or croak "Cannot init chunkCache";
 
 	#check if info complete
-	foreach my $prefix ( keys %cnf ) {
-		if ( !$cnf{$prefix}{ns_uri} or !$cnf{$prefix}{ns_schema} ) {
-			die "GlobalFormat $prefix in yaml configuration incomplete";
+	foreach my $prefix ( keys %{ $self->GlobalFormats } ) {
+		if (   !${ $self->GlobalFormats }{$prefix}{ns_uri}
+			or !${ $self->GlobalFormats }{$prefix}{ns_schema} )
+		{
+			die "GlobalFormat $prefix in configuration incomplete";
 		}
 	}
 
 	#init engine (todo: this is noT properly abstracted)
 	$self->{engine} = new HTTP::OAI::DataProvider::SQLite(
-		dbfile       => $self->{dbfile},
+		dbfile       => $self->dbfile,
 		chunkCache   => $self->{chunkCache},
-		chunkSize    => $self->{chunkSize},       # probably not necessary
-		nativePrefix => $self->{nativePrefix},
-		nativeURI    => $self->{native_ns_uri},
+		chunkSize    => $self->chunkSize,       # might not be necessary
+		nativePrefix => $self->nativePrefix,
+		nativeURI    => $self->native_ns_uri,
 		transformer => new HTTP::OAI::DataProvider::Transformer(
-			nativePrefix => $self->{nativePrefix},
-			locateXSL    => $self->{locateXSL},
+			nativePrefix => $self->nativePrefix,
+			locateXSL    => $self->locateXSL,
 		),
 	);
-	return $self;
 }
 
 =method my $result=$provider->GetRecord(%params);
@@ -211,12 +198,15 @@ sub GetRecord {
 	my $self    = shift;
 	my $request = shift;
 
-	my $params = _hashref(@_);
+	my $params = _hashref(@_);    #my %params = @_; #todo
 	my @errors;
 
 	if ( my $err = $self->_validateRequest( 'GetRecord', $params ) ) {
 		return $err;
 	}
+
+	#could be written as TODO
+	#$self->_validateRequest( 'GetRecord', $params ) or return $self->error;
 
 	Warning 'Enter GetRecord (id:'
 	  . $params->{identifier}
@@ -814,8 +804,8 @@ Usage:
 sub chunkExists {
 	my $self    = shift;
 	my $params  = shift;
-	my $request = shift; #should be optional, but isn't, right?
-	my $token   = $params->{resumptionToken} or return;
+	my $request = shift;    #should be optional, but isn't, right?
+	my $token      = $params->{resumptionToken} or return;
 	my $chunkCache = $self->{chunkCache};
 
 	if ( !$chunkCache ) {
@@ -824,7 +814,8 @@ sub chunkExists {
 
 	#Debug "Query chunkCache for " . $token;
 
-	my $chunkDesc = $chunkCache->get($token) or return; #possibly we need a return here!
+	my $chunkDesc = $chunkCache->get($token)
+	  or return;            #possibly we need a return here!
 
 	#chunk is a HTTP::OAI::Response object
 	my $response = $self->{engine}->queryChunk( $chunkDesc, $params, $request );
@@ -1043,5 +1034,5 @@ sub _processSetLibrary {
 	warn "no setLibrary found in Dancer's config file";
 
 }
-
-1;    # End of HTTP::OAI::DataProvider
+__PACKAGE__->meta->make_immutable;
+1;

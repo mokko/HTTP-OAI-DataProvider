@@ -1,5 +1,5 @@
 #options for testing the data provider
-$options = {
+%config = (
 	#required
 	adminEmail        => 'mauricemengel@gmail.com',
 	baseURL           => 'http://localhost:3000/oai',
@@ -26,7 +26,7 @@ $options = {
 	},
 	locateXSL      => sub  {
 		my $prefix       = shift;
-		my $nativeFormat = $options->{nativePrefix} or die "Info on nativeFormat missing";
+		my $nativeFormat = $config{nativePrefix} or die "Info on nativeFormat missing";
 		return "$FindBin::Bin/../t/$nativeFormat".'2'."$prefix.xsl";
 	},
 	nativePrefix   => 'mpx',
@@ -53,4 +53,4 @@ $options = {
 #       </oai_dc:dc>'
 		},
 	},	
-};
+);

@@ -216,13 +216,13 @@ sub okIfBadArgument {
 
 sub loadWorkingTestConfig {
 
-	my $config = do "$FindBin::Bin/test_config"
+	my %config = do "$FindBin::Bin/test_config"
 	  or croak "Error: Configuration not loaded";
 
 	#in lieu of proper validation
-	croak "Error: Not a hashref" if ref $config ne 'HASH';
+	#croak "Error: Not a hashref" if ref $config ne 'HASH';
 
-	return $config;
+	return %config;
 }
 
 =func my $err=oaiErrorResponse ($response)

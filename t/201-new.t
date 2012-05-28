@@ -9,13 +9,13 @@ use Test::More;
 
 
 #load a working standard test config which should have ONLY required values
-my $config=HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
+my %config=HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
 my @options = qw(debug xslt requestURL warning);
-plan tests => 1 + keys( %{$config} ) + scalar @options;
+plan tests => 1 + keys( %config ) + scalar @options;
 
 # 1. Does it work? Return value right?
 #
-my $provider = HTTP::OAI::DataProvider->new($config);
+my $provider = HTTP::OAI::DataProvider->new(%config);
 
 ok(
 	ref $provider eq 'HTTP::OAI::DataProvider',
@@ -43,8 +43,8 @@ my @required = qw(
 
 foreach my $value (@required) {
 	my $config=HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
-	undef $config->{$value};
-	eval { my $provider = HTTP::OAI::DataProvider->new($config) };
+	undef $config{$value};
+	eval { my $provider = HTTP::OAI::DataProvider->new(%config) };
 	ok( $@, "should fail without $value" );
 }
 
@@ -53,10 +53,10 @@ foreach my $value (@required) {
 #
 
 foreach my $value (@options) {
-	my $config=HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
-	undef $config->{$value};
+	my %config=HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
+	undef $config{$value};
 	my $provider;
-	eval { $provider = HTTP::OAI::DataProvider->new($config) };
+	eval { $provider = HTTP::OAI::DataProvider->new(%config) };
 
 	ok(
 		ref $provider eq 'HTTP::OAI::DataProvider',

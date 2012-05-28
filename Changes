@@ -13,6 +13,8 @@ TODO
 
 $next (0.07)
  -The first packages turned into moose classes.
+ Major Interface changes
+ -HTTP::OAI::DataProvider now wants arguments as HASH (instead of HashRef).
  New Tools
  -dp.pl - a command line interface to HTTP::OAI::DataProvider
  Bug Fixes

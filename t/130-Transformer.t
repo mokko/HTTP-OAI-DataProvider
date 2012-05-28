@@ -11,32 +11,32 @@ BEGIN {
 ";
 }
 
-my $config = HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
+my %config = HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
 
 {
-	my %config = ( nativePrefix => $config->{nativePrefix}, );
+	my %smallConfig = ( nativePrefix => $config{nativePrefix}, );
 
 	eval {
-		my $transformer = new HTTP::OAI::DataProvider::Transformer(%config);
+		my $transformer = new HTTP::OAI::DataProvider::Transformer(%smallConfig);
 	};
 	ok( $@, 'should fail: ' . $@ );
 }
 
 {
-	my %config = ( locateXSL => $config->{locateXSL}, );
+	my %smallConfig = ( locateXSL => $config{locateXSL}, );
 
 	eval {
-		my $transformer = new HTTP::OAI::DataProvider::Transformer(%config);
+		my $transformer = new HTTP::OAI::DataProvider::Transformer(%smallConfig);
 	};
 	ok( $@, 'should fail: ' . $@ );
 }
 
-my %config = (
-	nativePrefix => $config->{nativePrefix},
-	locateXSL    => $config->{locateXSL},
+my %smallConfig = (
+	nativePrefix => $config{nativePrefix},
+	locateXSL    => $config{locateXSL},
 );
 
-my $transformer = new HTTP::OAI::DataProvider::Transformer(%config);
+my $transformer = new HTTP::OAI::DataProvider::Transformer(%smallConfig);
 ok( blessed($transformer) eq 'HTTP::OAI::DataProvider::Transformer',
 	'transformer exists' );
 

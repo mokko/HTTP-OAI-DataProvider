@@ -43,9 +43,8 @@ Normally, you should never need any of the following functions.
 
 =cut
 
-my %params = getOpt();    #from command line
-our $config = loadConfig();    #from disk
-
+my %params   = getOpt();               #from command line
+my %config   = loadConfig();           #from disk
 my $response = executeVerb(%params);
 verbose "OAI response";
 print "$response\n";
@@ -75,11 +74,11 @@ sub loadConfig {
 		exit 1;
 	}
 
-	my $config = do $configFile or die "Error: Configuration not loaded";
+	my %config = do $configFile or die "Error: Configuration not loaded";
 
-	die "Error: Not a hashref" if ref $config ne 'HASH';
+	#die "Error: Not a hashref" if ref $config ne 'HASH';
 	verbose " Config file $configFile loaded";
-	return $config;
+	return %config;
 }
 
 =func my %params=getOpt();
@@ -139,13 +138,15 @@ sub executeVerb {
 	delete $params{verb};
 	verbose "About to execute $verb";
 
+	my %newConfig;
+
 	if ( $opts{d} ) {
-		$config->{debug} = sub { my $msg = shift; print "$msg\n" if $msg; };
-		$config->{warning} = sub { my $msg=shift; warn $msg if $msg; };
+		$config{debug}   = sub { my $msg = shift; print "$msg\n" if $msg; };
+		$config{warning} = sub { my $msg = shift; warn $msg      if $msg; };
 	}
 
 	#new might die on error
-	my $provider = new HTTP::OAI::DataProvider($config)
+	my $provider = new HTTP::OAI::DataProvider(%config)
 	  or die "Cant create new object";
 
 	#stupid requestURL

@@ -20,10 +20,10 @@ BEGIN {
 
 my $t;    #used in subsequent tests!
 {
-	my $config   = HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
+	my %config   = HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
 	my %t_config = (
-		nativePrefix => $config->{nativePrefix},
-		locateXSL    => $config->{locateXSL},
+		nativePrefix => $config{nativePrefix},
+		locateXSL    => $config{locateXSL},
 	);
 	$t = new HTTP::OAI::DataProvider::Transformer(%t_config);
 }
@@ -97,17 +97,17 @@ ok( $result->countHeaders() == 0, "head count is zero" );
 # 6-$result->chunkSize
 #
 {
-	my $config = HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
-	die "Need chunkSize" if ( !$config->{chunkSize} );
+	my %config = HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
+	die "Need chunkSize" if ( !$config{chunkSize} );
 
 	my %opts = (
 		transformer => $t,
 		verb        => 'GetRecord',
-		chunkSize   => $config->{chunkSize},
+		chunkSize   => $config{chunkSize},
 	);
 	$result = new HTTP::OAI::DataProvider::Engine::Result(%opts);
 	new HTTP::OAI::DataProvider::Engine::Result(%opts);
-	ok( $result->chunkSize == $config->{chunkSize}, 'chunkSize seems right' );
+	ok( $result->chunkSize == $config{chunkSize}, 'chunkSize seems right' );
 }
 
 #
@@ -135,10 +135,10 @@ ok( $@, '$r->getResponse should fail' );
 ###
 
 sub minimalResult {
-	my $config   = HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
+	my %config   = HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
 	my %t_config = (
-		nativePrefix => $config->{nativePrefix},
-		locateXSL    => $config->{locateXSL},
+		nativePrefix => $config{nativePrefix},
+		locateXSL    => $config{locateXSL},
 	);
 	my $t = new HTTP::OAI::DataProvider::Transformer(%t_config);
 
