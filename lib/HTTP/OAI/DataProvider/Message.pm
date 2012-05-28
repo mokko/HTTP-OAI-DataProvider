@@ -36,8 +36,7 @@ to me. TODO
 
 =cut
 
-sub new {
-	my $class = shift;
+sub init {
 	my %args  = @_;
 
 	if ( $args{Debug} ) {

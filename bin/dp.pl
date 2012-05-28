@@ -87,7 +87,6 @@ sub loadConfig {
 sub getOpt {
 	my %params;
 	GetOptions(
-		'debug'             => \$opts{d},
 		'identifier=s'      => \$params{identifier},
 		'from=s'            => \$params{from},
 		'metadataPrefix=s'  => \$params{metadataPrefix},
@@ -97,8 +96,6 @@ sub getOpt {
 		'verb=s'            => \$params{verb},
 		'verbose'           => \$opts{v},
 	);
-	verbose "Debug mode on" if $opts{d};
-
 	#cleanup the hash
 	verbose "Input params";
 	foreach my $key ( keys %params ) {
@@ -138,12 +135,7 @@ sub executeVerb {
 	delete $params{verb};
 	verbose "About to execute $verb";
 
-	my %newConfig;
 
-	if ( $opts{d} ) {
-		$config{debug}   = sub { my $msg = shift; print "$msg\n" if $msg; };
-		$config{warning} = sub { my $msg = shift; warn $msg      if $msg; };
-	}
 
 	#new might die on error
 	my $provider = new HTTP::OAI::DataProvider(%config)

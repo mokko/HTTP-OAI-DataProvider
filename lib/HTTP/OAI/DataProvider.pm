@@ -126,7 +126,7 @@ records the data provider can return in one request.
 	than HTTP::Server::Simple.
 
 * warning =>callback [OPTIONAL Todo]
-	If a callback is supplied use this callback for warning output
+	If a callback is supplied use this callback for Warning output
 
 =cut
 
@@ -145,12 +145,15 @@ has 'repositoryName'    => ( isa => 'Str',     is => 'ro', required => 1 );
 has 'setLibrary'        => ( isa => 'HashRef', is => 'ro', required => 1 );
 
 #optional
-has 'Debug'      => ( isa => 'CodeRef', is => 'ro', required => 0 );
-has 'Warning'    => ( isa => 'CodeRef', is => 'ro', required => 0 );
+has 'debug'      => ( isa => 'CodeRef', is => 'ro', required => 0 );
+has 'warning'    => ( isa => 'CodeRef', is => 'ro', required => 0 );
 has 'requestURL' => ( isa => 'Str',     is => 'rw', required => 0 );    #todo!
 
 sub BUILD {
 	my $self = shift;
+
+	HTTP::OAI::DataProvider::Message::init( Debug   => $self->debug );
+	HTTP::OAI::DataProvider::Message::init( Warning => $self->warning );
 
 	$self->{chunkCache} =
 	  new HTTP::OAI::DataProvider::ChunkCache(
@@ -198,8 +201,8 @@ Errors
 =cut
 
 sub GetRecord {
-	my $self    = shift;
-	my %params  = @_;
+	my $self   = shift;
+	my %params = @_;
 	my @errors;
 
 	#NEW (todo in other verbs plus testing!)
@@ -251,19 +254,20 @@ sub GetRecord {
 =cut
 
 sub Identify {
-	my $self = shift;
-	my %params     = @_;
+	my $self   = shift;
+	my %params = @_;
 
 	$params{verb} = 'Identify';
 	$self->_validateRequest(%params) or return $self->errormsg;
 
-	#Debug "Enter Identify ($request)";
+	Debug "Enter Identify";    #.$self->requestURL;
 
 	# Metadata munging
 	my $obj = new HTTP::OAI::Identify(
-		adminEmail        => $self->adminEmail,
-		baseURL           => $self->baseURL,
-		deletedRecord     => $self->deletedRecord,
+		adminEmail    => $self->adminEmail,
+		baseURL       => $self->baseURL,
+		deletedRecord => $self->deletedRecord,
+
 		#probably a demeter problem
 		earliestDatestamp => $self->{engine}->earliestDate(),
 		granularity       => $self->{engine}->granularity(),
@@ -299,18 +303,17 @@ ERRORS
 =cut
 
 sub ListMetadataFormats {
-	my $self    = shift;
+	my $self = shift;
 
 	Warning 'Enter ListMetadataFormats';
 	my %params = @_;
 	$params{verb} = 'ListMetadataFormats';
-	$self->_validateRequest(%params) or return $self->errormsg;
-
 	my $engine = $self->{engine};    #TODO test
 
 	#
 	# Error handling
 	#
+	$self->_validateRequest(%params) or return $self->errormsg;
 
 	#only if there is actually an identifier
 	if ( $params{identifier} ) {
@@ -333,11 +336,12 @@ sub ListMetadataFormats {
 		$list->metadataFormat($format);
 	}
 
-	#ListMetadataFormat has requestURL info, so recreate it from $params
+	#ListMetadataFormat has requestURL info, so recreate it
 	#mk sure we don't lose requestURL in Starman
-	if ($self->{requestURL}) {
-	$list->requestURL($self->{requestURL});
+	if ( $self->{requestURL} ) {
+		$list->requestURL( $self->{requestURL} );
 	}
+
 	#check if noMetadataFormats
 	if ( $list->metadataFormat() == 0 ) {
 		return $self->err2XML(
@@ -423,7 +427,7 @@ sub ListIdentifiers {
 	if ( $params{resumptionToken} ) {
 
 		#chunk is response object here!
-		my $chunk = $self->chunkExists( \%params, $request ); #todo
+		my $chunk = $self->chunkExists( \%params, $request );    #todo
 
 		if ($chunk) {
 
@@ -458,7 +462,7 @@ sub ListIdentifiers {
 
 	#Metadata handling: query returns response
 	#always only the first chunk
-	my $response = $engine->query( \%params, $request ); #todo!
+	my $response = $engine->query( \%params, $request );    #todo!
 
 	if ( !$response ) {
 		return $self->err2XML(
@@ -512,7 +516,7 @@ TODO
 =cut
 
 sub ListRecords {
-	my $self = shift;
+	my $self   = shift;
 	my %params = @_;
 	$params{verb} = 'ListRecords';
 	$self->_validateRequest(%params) or return $self->errormsg;
@@ -664,6 +668,7 @@ sub ListSets {
 	if ( $self->requestURL() ) {
 		$listSets->requestURL( $self->requestURL() );
 	}
+
 	#
 	#output fun!
 	#
@@ -676,7 +681,7 @@ sub ListSets {
 
 =head1 PUBLIC UTILITY FUNCTIONS / METHODS
 
-check error, display error, warning, debug etc.
+check error, display error, Warning, debug etc.
 
 =method checkFormatSupported ($prefixWanted);
 
@@ -773,7 +778,7 @@ sub chunkExists {
 	#Debug "Query chunkCache for " . $token;
 
 	my $chunkDesc = $chunkCache->get($token)
-	  or return;            #possibly we need a return here!
+	  or return;                        #possibly we need a return here!
 
 	#chunk is a HTTP::OAI::Response object
 	my $response = $self->{engine}->queryChunk( $chunkDesc, $params, $request );
@@ -933,13 +938,7 @@ routine via config, something like
 
 	my $provider = HTTP::OAI::DataProvider->new(
 		debug=>'SalsaOAI::Debug',
-		warning=>'SalsaOAI::Warning'
-	);
-
-	use HTTP::OAI::DataProvider::Message qw/Debug Warning/;
-	new HTTP::OAI::DataProvider::Message (
-		Debug =>'&callback',
-		Warning=>'&callback'
+		Warning=>'SalsaOAI::Warning'
 	);
 
 =cut
