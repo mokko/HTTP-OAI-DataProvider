@@ -20,25 +20,20 @@ use HTTP::OAI::DataProvider::Message qw/Debug Warning/;
 
 =head1 SYNOPSIS
 
-=head2 Init
-
+	#Init
 	use HTTP::OAI::DataProvider;
 	my $provider = HTTP::OAI::DataProvider->new($options);
 
-=head2 Verbs: GetRecord, Identify, ListSets, ListRecords ...
+	#Verbs: GetRecord, Identify ...
+	my $response=$provider->$verb($request, %params);
 
-	my $response=$provider->$verb($request, %params)
-	#response is xml ready for print/return
-
-=head2 Error checking
-
+	#Error checking
 	my $e=$response->isError
 	if ($response->isError) {
-		#in case of error do this
+	 #do this
 	}
 
-=head2 Debugging (TODO)
-
+	#Debugging (TODO)
 	Debug "message";
 	Warning "message";
 
@@ -49,19 +44,16 @@ Initialize the HTTP::OAI::DataProvider object with the options of your choice.
 On failure return nothing; in case this the error is likely to occur during
 development and not during runtime it may also croak.
 
-=head3 PARAMETERS (mandatory)
+=head3 Parameters
 
-=for :list
-* adminEmail =>'bla@email.com'
-	see OAI specification for details
+* adminEmail =>'bla@email.com': see OAI specification for details.
 
-* baseURL =>'http://base.url'
-	see OAI specification for details
+* baseURL =>'http://base.url': see OAI specification for details.
 
-* chunkCacheMaxSize => 4000
-	What is the maximum number of chunks I should store in memory before 
-	beginning to delete old chunks? chunkSize * chunkCacheMaxSize = the 
-	maximum number of records the data provider can return in one request.
+* chunkCacheMaxSize => 4000:
+What is the maximum number of chunks I should store in memory before beginning 
+to delete old chunks? chunkSize * chunkCacheMaxSize = the maximum number of 
+records the data provider can return in one request.
 	
 * chunkSize         => 10
 	How many records make up one chunk? See chunkCacheMaxSize.

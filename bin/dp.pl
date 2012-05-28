@@ -1,33 +1,39 @@
 #!/usr/bin/perl
-#APPNAME:
-#ABSTRACT:
+#APPNAME: dp.pl
+#ABSTRACT: command line interface to HTTP::OAI::DataProvider
 
 use strict;
 use warnings;
 
 use Getopt::Long;
 use FindBin;
-use HTTP::OAI;
+use File::Spec;
 
-#not strictly necessary, but may not be a bad idea to leave it here, right?
+#should make allow this script to the find the packages before install, like
+#perl -Ilib bin/dp.pl
 use lib File::Spec->catfile( $FindBin::Bin, '..', 'lib' );
+use HTTP::OAI;
 use HTTP::OAI::DataProvider;
 
 our %opts;
 sub verbose;
 
+=head1 DESCRIPTION
+A simple command line interface to HTTP::OAI::DataProvider to execute verbs 
+for testing and debugging. 
+
+Note: Neither HTTP::OAI::DataProvider nor this script provide a web front
+end.
+
 =head1 SYNOPSIS
 
-A simple command line interface to HTTP::OAI::DataProvider to execute verbs 
-for testing and debugging:
+	#OAI verbs and paramters
+	dp --verb Identify
+	dp --verb GetRecord --identifier 12342 --metadataPrefix oai_dc
 
-#OAI verbs and paramters
-dp --verb Identify
-dp --verb GetRecord --identifier 12342 --metadataPrefix oai_dc
-
-#other stuff
---verbose
-	more info
+	#other arguments
+	--verbose #more info from dp.pl
+	--debug #turn debug messages in HTTP::OAI::DataProvider on
 
 Currently this script loads t/test_config on start up as a config. 
 
@@ -37,8 +43,8 @@ Normally, you should never need any of the following functions.
 
 =cut
 
-my %params = getOpt();        #command line
-my $config = loadConfig();    #from disk
+my %params = getOpt();    #from command line
+our $config = loadConfig();    #from disk
 
 my $response = executeVerb(%params);
 verbose "OAI response";
@@ -62,7 +68,7 @@ Should I also use a yaml file?
 
 sub loadConfig {
 	my $configFile =
-	  File::Spec->catfile( 'Findbin::Bin', '..', 't', 'test_config' );
+	  File::Spec->catfile( "$FindBin::Bin", '..', 't', 'test_config' );
 
 	if ( !-f $configFile ) {
 		print "Error: Cant find test config at $configFile\n";
@@ -71,9 +77,8 @@ sub loadConfig {
 
 	my $config = do $configFile or die "Error: Configuration not loaded";
 
-	#in lieu of proper validation
 	die "Error: Not a hashref" if ref $config ne 'HASH';
-	verbose "Config file $configFile loaded";
+	verbose " Config file $configFile loaded";
 	return $config;
 }
 
@@ -83,6 +88,7 @@ sub loadConfig {
 sub getOpt {
 	my %params;
 	GetOptions(
+		'debug'             => \$opts{d},
 		'identifier=s'      => \$params{identifier},
 		'from=s'            => \$params{from},
 		'metadataPrefix=s'  => \$params{metadataPrefix},
@@ -92,6 +98,7 @@ sub getOpt {
 		'verb=s'            => \$params{verb},
 		'verbose'           => \$opts{v},
 	);
+	verbose "Debug mode on" if $opts{d};
 
 	#cleanup the hash
 	verbose "Input params";
@@ -103,6 +110,7 @@ sub getOpt {
 			verbose " $key: " . $params{$key};
 		}
 	}
+
 	validateRequest(%params);
 	return %params;
 }
@@ -119,7 +127,7 @@ sub validateRequest {
 		}
 		exit 1;
 	}
-	verbose " input validates";
+	verbose " Input params validate";
 }
 
 =func my $response=executeVerb (%params);
@@ -131,13 +139,23 @@ sub executeVerb {
 	delete $params{verb};
 	verbose "About to execute $verb";
 
+	if ( $opts{d} ) {
+		$config->{debug} = sub { my $msg = shift; print "$msg\n" if $msg; };
+		$config->{warning} = sub { my $msg=shift; warn $msg if $msg; };
+	}
+
 	#new might die on error
-	my $provider = new HTTP::OAI::DataProvider($config) or die "Cant create new object";
+	my $provider = new HTTP::OAI::DataProvider($config)
+	  or die "Cant create new object";
 
 	#stupid requestURL
 	my $response;
-	if ( $verb eq 'GetRecord' or $verb eq 'ListRecord' or $verb eq 'ListMetadataFormats') {
-		$response = $provider->$verb( undef, %params ) or die "Cant execute verb!";
+	if (   $verb eq 'GetRecord'
+		or $verb eq 'ListRecord'
+		or $verb eq 'ListMetadataFormats' )
+	{
+		$response = $provider->$verb( undef, %params )
+		  or die "Cant execute verb!";
 	}
 	else {
 		$response = $provider->$verb(%params) or die "Cant execute verb!";
@@ -151,5 +169,5 @@ sub executeVerb {
 
 sub verbose {
 	my $msg = shift;
-	print '*'.$msg . "\n" if ( $opts{v} );
+	print '*' . $msg . "\n" if ( $opts{v} );
 }

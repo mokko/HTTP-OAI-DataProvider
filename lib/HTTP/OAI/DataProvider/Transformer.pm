@@ -24,14 +24,14 @@ has 'locateXSL' => (is => 'ro', isa => 'CodeRef', required => 1,);
 	);
 	my $dom=$t->toTargetPrefix ($targetPrefix,$dom);
 
-=head2 new
+=method new
 
 	my $t=new HTTP::OAI::DataProvider::Transformer (
 		nativePrefix=> 'mpx',
 		locateXSL=>'Salsa_OAI::salsa_locateXSL', #callback
 	);
 
-=head2 	my $dom=$t->toTargetPrefix ($targetPrefix,$dom);
+=method 	my $dom=$t->toTargetPrefix ($targetPrefix,$dom);
 
 =cut
 

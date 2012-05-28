@@ -10,7 +10,9 @@ TODO
  -turn into moose
  -$baseURL in $provider->$verb($baseURL,%params) is about to go in new DataProvider (%params)
  -improve db interface so I can write alternative db implementations
+
 $next (0.07)
+ -The first packages turned into moose classes.
  New Tools
  -dp.pl - a command line interface to HTTP::OAI::DataProvider
  Bug Fixes
