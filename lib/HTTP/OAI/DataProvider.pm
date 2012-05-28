@@ -141,11 +141,13 @@ has 'GlobalFormats'     => ( isa => 'HashRef', is => 'ro', required => 1 );
 has 'locateXSL'         => ( isa => 'CodeRef', is => 'ro', required => 1 );
 has 'nativePrefix'      => ( isa => 'Str',     is => 'ro', required => 1 );
 has 'native_ns_uri'     => ( isa => 'Str',     is => 'ro', required => 1 );
+has 'repositoryName'    => ( isa => 'Str',     is => 'ro', required => 1 );
 has 'setLibrary'        => ( isa => 'HashRef', is => 'ro', required => 1 );
 
 #optional
-has 'Debug'   => ( isa => 'CodeRef', is => 'ro', required => 0 );
-has 'Warning' => ( isa => 'CodeRef', is => 'ro', required => 0 );
+has 'Debug'      => ( isa => 'CodeRef', is => 'ro', required => 0 );
+has 'Warning'    => ( isa => 'CodeRef', is => 'ro', required => 0 );
+has 'requestURL' => ( isa => 'Str',     is => 'rw', required => 0 );    #todo!
 
 sub BUILD {
 	my $self = shift;
@@ -197,13 +199,12 @@ Errors
 
 sub GetRecord {
 	my $self    = shift;
-	my $request = shift;
 	my %params  = @_;
 	my @errors;
 
 	#NEW (todo in other verbs plus testing!)
-	$params{verb} = 'GetRecord'; 
-	$self->_validateRequest2(%params) or return $self->errormsg;
+	$params{verb} = 'GetRecord';
+	$self->_validateRequest(%params) or return $self->errormsg;
 
 	Warning 'Enter GetRecord (id:'
 	  . $params{identifier}
@@ -228,7 +229,7 @@ sub GetRecord {
 	}
 
 	# Metadata handling
-	my $response = $engine->query( \%params, $request );
+	my $response = $engine->query( \%params, $self->requestURL() );
 
 	#todo: we still have to test if result has any result at all
 	#mk sure we don't lose requestURL in Starman
@@ -251,26 +252,23 @@ sub GetRecord {
 
 sub Identify {
 	my $self = shift;
+	my %params     = @_;
 
-	#under some servers e.g. Starman HTTP::OAI's auto-requestURL gets confused
-	my $requestURL = shift;
-	my $params     = _hashref(@_);
-
-	if ( my $err = $self->_validateRequest( 'Identify', $params ) ) {
-		return $err;
-	}
+	$params{verb} = 'Identify';
+	$self->_validateRequest(%params) or return $self->errormsg;
 
 	#Debug "Enter Identify ($request)";
 
 	# Metadata munging
 	my $obj = new HTTP::OAI::Identify(
-		adminEmail        => $self->{adminEmail},
-		baseURL           => $self->{baseURL},
-		deletedRecord     => $self->{deletedRecord},
+		adminEmail        => $self->adminEmail,
+		baseURL           => $self->baseURL,
+		deletedRecord     => $self->deletedRecord,
+		#probably a demeter problem
 		earliestDatestamp => $self->{engine}->earliestDate(),
 		granularity       => $self->{engine}->granularity(),
-		repositoryName    => $self->{repositoryName},
-		requestURL        => $requestURL,
+		repositoryName    => $self->repositoryName,
+		requestURL        => $self->requestURL,
 	) or return "Cannot create new HTTP::OAI::Identify";
 
 	# Output
@@ -302,14 +300,11 @@ ERRORS
 
 sub ListMetadataFormats {
 	my $self    = shift;
-	my $request = shift;
 
-	my $params = _hashref(@_);
 	Warning 'Enter ListMetadataFormats';
-
-	if ( my $err = $self->_validateRequest( 'ListMetadataFormats', $params ) ) {
-		return $err;
-	}
+	my %params = @_;
+	$params{verb} = 'ListMetadataFormats';
+	$self->_validateRequest(%params) or return $self->errormsg;
 
 	my $engine = $self->{engine};    #TODO test
 
@@ -318,8 +313,8 @@ sub ListMetadataFormats {
 	#
 
 	#only if there is actually an identifier
-	if ( $params->{identifier} ) {
-		my $header = $engine->findByIdentifier( $params->{identifier} );
+	if ( $params{identifier} ) {
+		my $header = $engine->findByIdentifier( $params{identifier} );
 		if ( !$header ) {
 			return $self->err2XML(
 				new HTTP::OAI::Error( code => 'idDoesNotExist' ) );
@@ -340,8 +335,9 @@ sub ListMetadataFormats {
 
 	#ListMetadataFormat has requestURL info, so recreate it from $params
 	#mk sure we don't lose requestURL in Starman
-	$list->requestURL($request);
-
+	if ($self->{requestURL}) {
+	$list->requestURL($self->{requestURL});
+	}
 	#check if noMetadataFormats
 	if ( $list->metadataFormat() == 0 ) {
 		return $self->err2XML(
@@ -401,15 +397,16 @@ TODO
 =cut
 
 sub ListIdentifiers {
-	my $self    = shift;
-	my $request = shift;
-
-	my $params = _hashref(@_);
+	my $self   = shift;
+	my %params = @_;
 	my @errors;    #stores errors before there is a result object
 
-	if ( my $err = $self->_validateRequest( 'ListIdentifiers', $params ) ) {
-		return $err;
-	}
+	$params{verb} = 'ListIdentifiers';
+	$self->_validateRequest(%params) or return $self->errormsg;
+
+	my $request       = $self->requestURL();
+	my $engine        = $self->{engine};          #provider
+	my $globalFormats = $self->{globalFormats};
 
 	#Warning 'Enter ListIdentifiers (prefix:' . $params->{metadataPrefix};
 	#Debug 'from:' . $params->{from}   if $params->{from};
@@ -418,23 +415,15 @@ sub ListIdentifiers {
 	#Debug 'resumption:' . $params->{resumptionToken}
 	#  if $params->{resumptionToken};
 
-	my $engine        = $self->{engine};          #provider
-	my $globalFormats = $self->{globalFormats};
-
 	# Error handling
 	if ( !$engine ) {
 		croak "Internal error: Data store missing!";
 	}
 
-	#check param syntax. Frontend will likely check it, but why not again?
-	if ( my $e = validate_request( %{$params} ) ) {
-		push @errors, $e;
-	}
-
-	if ( $params->{resumptionToken} ) {
+	if ( $params{resumptionToken} ) {
 
 		#chunk is response object here!
-		my $chunk = $self->chunkExists( $params, $request );
+		my $chunk = $self->chunkExists( \%params, $request ); #todo
 
 		if ($chunk) {
 
@@ -447,11 +436,11 @@ sub ListIdentifiers {
 		}
 	}
 
-	if ( my $e = $self->checkFormatSupported( $params->{metadataPrefix} ) ) {
+	if ( my $e = $self->checkFormatSupported( $params{metadataPrefix} ) ) {
 		push @errors, $e;    #cannotDisseminateFormat
 	}
 
-	if ( $params->{Set} ) {
+	if ( $params{Set} ) {
 
 		#sets defined in data store
 		my @used_sets = $engine->listSets;
@@ -469,7 +458,7 @@ sub ListIdentifiers {
 
 	#Metadata handling: query returns response
 	#always only the first chunk
-	my $response = $engine->query( $params, $request );
+	my $response = $engine->query( \%params, $request ); #todo!
 
 	if ( !$response ) {
 		return $self->err2XML(
@@ -523,14 +512,10 @@ TODO
 =cut
 
 sub ListRecords {
-	my $self    = shift;
-	my $request = shift;
-
-	my $params = _hashref(@_);
-	if ( my $err = $self->_validateRequest( 'ListRecords', $params ) ) {
-		return $err;
-	}
-	my @errors;
+	my $self = shift;
+	my %params = @_;
+	$params{verb} = 'ListRecords';
+	$self->_validateRequest(%params) or return $self->errormsg;
 
 	#Warning 'Enter ListRecords (prefix:' . $params->{metadataPrefix};
 
@@ -540,15 +525,16 @@ sub ListRecords {
 	#Debug 'resumption:' . $params->{resumptionToken}
 	#  if $params->{resumptionToken};
 
-	my $engine        = $self->{engine};
-	my $globalFormats = $self->{globalFormats};
+	my @errors;
+	my $engine  = $self->{engine};
+	my $request = $self->{requestURL};
 
 	#
 	# Error handling
 	#
 
-	if ( $params->{resumptionToken} ) {
-		my $chunk = $self->chunkExists( $params, $request );
+	if ( $params{resumptionToken} ) {
+		my $chunk = $self->chunkExists( \%params, $request );    #todo!
 		if ($chunk) {
 			return $self->_output($chunk);
 		}
@@ -558,19 +544,17 @@ sub ListRecords {
 		}
 	}
 
-	if ( my $e = $self->checkFormatSupported( $params->{metadataPrefix} ) ) {
+	if ( my $e = $self->checkFormatSupported( $params{metadataPrefix} ) ) {
 		push @errors, $e;    #cannotDisseminateFormat
 	}
 
-	if (@errors) {
-		return $self->err2XML(@errors);
-	}
+	return $self->err2XML(@errors) if (@errors);
 
 	#
 	# Metadata handling
 	#
 
-	my $response = $engine->query( $params, $request );
+	my $response = $engine->query( \%params, $request );    #todo!
 
 	if ( !$response ) {
 		return $self->err2XML(
@@ -604,11 +588,14 @@ ERRORS
 =cut
 
 sub ListSets {
-	my $self = shift;
-	my $request =
-	  shift;    #this is not good, it can create two warning messages...
-	my $params = _hashref(@_);
-	my $engine = $self->{engine};
+	my $self   = shift;
+	my %params = @_;
+
+	my $engine  = $self->{engine};
+	my $request = $self->requestURL();    #check if this is still necessary!
+
+	$params{verb} = 'ListSets';
+	$self->_validateRequest(%params) or return $self->errormsg;
 
 	#print "Enter ListSets $self\n";
 
@@ -617,21 +604,11 @@ sub ListSets {
 	#
 
 	#errors in using this package...
-	if ( !$engine ) {
-		croak "Engine missing!";
-	}
-
-	if ( !$self ) {
-		croak "Provider missing!";
-	}
-
-	#check general param syntax
-	if ( my $err = $self->_validateRequest( 'ListSets', $params ) ) {
-		return $err;
-	}
+	croak "Engine missing!"   if ( !$engine );
+	croak "Provider missing!" if ( !$self );
 
 	#resumptionTokens not supported/TODO
-	if ( $params->{resumptionToken} ) {
+	if ( $params{resumptionToken} ) {
 
 		#Debug "resumptionToken";
 		return $self->err2XML(
@@ -662,12 +639,6 @@ sub ListSets {
 	#	Debug "used_sets: $_\n";
 	#}
 
-	if ( !$self->{setLibrary} ) {
-
-	#test of $self->{setLibrary} is now part of new, so it is not necessary here
-		die "Configuration Error: setLibrary not defined";
-	}
-
 	my $listSets = $self->_processSetLibrary();
 
 	my $library = new HTTP::OAI::DataProvider::SetLibrary();
@@ -690,8 +661,9 @@ sub ListSets {
 	}
 
 	#mk sure we don't lose requestURL in Starman
-	$listSets->requestURL($request);
-
+	if ( $self->requestURL() ) {
+		$listSets->requestURL( $self->requestURL() );
+	}
 	#
 	#output fun!
 	#
@@ -767,17 +739,6 @@ sub err2XML {
 HTTP::OAI::DataProvider is to be used by frontend developers. What is not meant
 for them, is private.
 
-=head2 my $params=_hashref (@_);
-
-Little function that transforms array of parameters to hashref and returns it.
-
-=cut
-
-sub _hashref {
-	my %params = @_;
-	return \%params;
-}
-
 =head2 my $chunk=$self->chunkExists ($params, [$request]);
 
 TODO: should be called getChunkDesc
@@ -801,7 +762,7 @@ Usage:
 sub chunkExists {
 	my $self    = shift;
 	my $params  = shift;
-	my $request = shift;    #should be optional, but isn't, right?
+	my $request = $self->requestURL;    #should be optional, but isn't, right?
 	my $token      = $params->{resumptionToken} or return;
 	my $chunkCache = $self->{chunkCache};
 
@@ -924,25 +885,8 @@ sub _init_xslt {
 	}
 }
 
-# $self->_validateRequest ($verb, $params);
-# $params is hashref
-# returns true (0) if requests validates
-# returns false (1) if request does not validate
-
+#$self->_validateRequest( verb=>'GetRecord', %params ) or return $self->error;
 sub _validateRequest {
-	my $self   = shift or die "Error: Need myself!";
-	my $verb   = shift or die "Error: Need verb!";
-	my $params = shift or die "Error: Need params!";
-
-	$params->{verb} = $verb;
-	if ( my @error = validate_request( %{$params} ) ) {
-		return $self->err2XML(@error);
-	}
-	return;
-}
-
-#$self->_validateRequest2( verb=>'GetRecord', %params ) or return $self->error;
-sub _validateRequest2 {
 	my $self   = shift or croak "Need myself!";
 	my %params = @_    or return;
 	if ( my @errors = validate_request(%params) ) {
