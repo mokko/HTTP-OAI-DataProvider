@@ -11,3 +11,4 @@ db
 *.stackdump
 HTTP-*
 bak/*
+t/log/*

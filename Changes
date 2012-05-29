@@ -16,14 +16,15 @@ $next (0.07)
  Major Interface changes
  -HTTP::OAI::DataProvider now wants arguments as HASH (instead of HashRef).
  -requestURL is not a method of DataProvider and not any longer an argument of some verbs!
+ -new interface for error checking: $provider->errorMessage
  New Tools
  -dp.pl - a command line interface to HTTP::OAI::DataProvider
+ -eg-app.pl - a simple Dancer front end to the provider
  Bug Fixes
- -some small fixes i have forgotten about
+ -many small fixes 
  Tests
  -lots more tests for verbs, oai errors, validation etc.
  Feature Enhancements
- -more consistent param validation for most (all?) verbs
  API Changes
  -new packages DP::Test, DP::Common, DP::Valid
  -config value setLibraryCB is not necessary anymore

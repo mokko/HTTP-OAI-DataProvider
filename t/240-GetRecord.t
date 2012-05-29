@@ -36,12 +36,18 @@ my $baseURL = 'http://localhost:3000/oai';
 {
 	my %params = ( identifier => 'spk-berlin.de:EM-objId-40008', );
 	my $response = $provider->GetRecord( %params );
+	if (!$response) {
+		$response = $provider->errorMessage
+	}
 	isOAIerror($response, 'badArgument');
 }
 
 {
 	my %params = ( metadataPrefix => 'mpx', );
 	my $response = $provider->GetRecord( %params );
+	if (!$response) {
+		$response = $provider->errorMessage
+	}
 	isOAIerror($response, 'badArgument');
 }
 
@@ -52,6 +58,9 @@ my $baseURL = 'http://localhost:3000/oai';
 		meschugge      => 'schixe',
 	);
 	my $response = $provider->GetRecord( %params );
+	if (!$response) {
+		$response = $provider->errorMessage
+	}
 	isOAIerror($response, 'badArgument');
 }
 
@@ -61,6 +70,9 @@ my $baseURL = 'http://localhost:3000/oai';
 		identifier     => 'spk-berlin.de:EM-objId-meschugge',
 	);
 	my $response = $provider->GetRecord( %params );
+	if (!$response) {
+		$response = $provider->errorMessage
+	}
 	isOAIerror($response, 'idDoesNotExist');
 }
 
@@ -70,6 +82,9 @@ my $baseURL = 'http://localhost:3000/oai';
 		identifier     => 'spk-berlin.de:EM-objId-40008',
 	);
 	my $response = $provider->GetRecord( %params );
+	if (!$response) {
+		$response = $provider->errorMessage
+	}
 	isOAIerror($response, 'cannotDisseminateFormat');
 }
  

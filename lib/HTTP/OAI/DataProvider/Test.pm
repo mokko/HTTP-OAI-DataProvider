@@ -27,7 +27,7 @@ our @EXPORT;
   isLMFprefix
 
   isOAIerror
-  
+
   failOnRequestError
 
   loadWorkingTestConfig
@@ -111,15 +111,10 @@ sub _okType {
 	my $type     = shift or croak "Need type!";
 	my $msg = shift || "response validates and is of type $type\n";
 	isScalar($response);
-	if (
-		$type !~ /^Identify$|
-		^GetRecord$|
-		^ListIdentifiers$|
-		^ListMetadataFormats$|
-		^ListRecords$|
-		^ListSets$/x
-	  )
-	{
+	my @validVerbs = qw(Identify GetRecord ListIdentifiers ListMetadataFormats
+	  ListRecords ListSets);
+
+	if ( !grep ( $_ eq $type, @validVerbs ) ) {
 		croak "Error: Unknown type ($type)!";
 	}
 
@@ -179,8 +174,17 @@ sub isOAIerror {
 	my $code     = shift or croak "Need error type to look for!";
 	isScalar($response);
 	isScalar($code);
-	if ($code !~ /badArgument|cannotDisseminate|noRecordMatches|idDoesNotExist/) {
-		print "Unrecognized OAI error code\n"; 
+	my @errors = qw (
+	  badArgument
+	  badResumptionToken
+	  cannotDisseminateFormat
+	  idDoesNotExist
+	  noMetadataFormats
+	  noRecordsMatches
+	  noSetHierarchy);
+
+	if ( !grep ( $_ eq $code, @errors ) ) {
+		print "Unrecognized OAI error code ($code)\n";
 	}
 
 	my $dom = _response2dom($response);
@@ -216,8 +220,12 @@ sub okIfBadArgument {
 
 sub loadWorkingTestConfig {
 
-	my %config = do "$FindBin::Bin/test_config"
-	  or croak "Error: Configuration not loaded";
+	my $fileName=File::Spec->catfile($FindBin::Bin,'..','t','test_config');
+	if (!-e $fileName) {
+		carp "working test config not found!";
+	}
+
+	my %config = do $fileName or croak "Error: Configuration not loaded";
 
 	#in lieu of proper validation
 	#croak "Error: Not a hashref" if ref $config ne 'HASH';
@@ -286,11 +294,10 @@ valid. (Wrapper around HTTP::OAI::Repository::validate_request.)
 
 sub failOnRequestError {
 	if ( my @e = HTTP::OAI::Repository::validate_request(@_) ) {
-		fail "Query error: " . grep ($_->code, @e) . "\n";
+		fail "Query error: " . grep ( $_->code, @e ) . "\n";
 		exit 1;
 	}
 }
-
 
 =func my $xt=xpathTester($response);
 
@@ -383,7 +390,6 @@ sub _registerOAI {
 	return $xc;
 }
 
-
 =func _validateOAIresponse ($response, 'lax');
 
 	new version!
@@ -417,7 +423,6 @@ sub _validateOAIresponse {
 	carp "$msg\n";
 	return 0;
 }
-
 
 ###
 ###
@@ -460,7 +465,6 @@ sub _okIfXpathExists {
 	ok( $value, $msg );
 }
 
-
 =func isMetadataFormat ($response, $setSpec, $msg);
 
 TODO DOESNT WORK YET
@@ -500,7 +504,6 @@ sub isSetSpec {
 	$xt->is( $xpath, $setSpec, $msg );
 }
 
-
 =func _okOaiResponse ($dom);
 
 	ok if OAI response contains _no_ error.
@@ -532,7 +535,5 @@ sensible diagnostic message.
 DEPRECATED: use _validateOAIresponse($response, 'lax') instead
 
 =cut
-
-
 
 1;

@@ -28,42 +28,34 @@ use HTTP::OAI::DataProvider::Common qw/Debug Warning/;
 	my $provider->requestURL('http://newbase.url'); 	#overwrite the automatic setting
 	my $response=$provider->$verb(%params);
 
-	#Error checking CURRENT
-	my $e=$response->isError
-	if ($response->isError) {
-	 #do this
-	}
-
-	#TODO: Error checking
+	#New Error Checking
 	my $response=$provider->$verb(%params) or return $provider->errorMessage;
 
 =method my $provider->new ($options);
 
 Initialize the HTTP::OAI::DataProvider object with the options of your choice.
 
-On failure return nothing; in case this the error is likely to occur during
-development and not during runtime it may also croak.
+On failure return nothing. 
 
-=head3 Parameters
+=head3 OAI Parameters
+see OAI specification for details on the following parameters
 
-* adminEmail =>'bla@email.com': see OAI specification for details.
+* adminEmail =>'bla@email.com'
+* baseURL =>'http://base.url'
+* deletedRecord => 'transient'
+* repositoryName => 'Repo Name Example'
 
-* baseURL =>'http://base.url': see OAI specification for details.
+=head3 Chunking Parameters
 
-* chunkCacheMaxSize => 4000:
-What is the maximum number of chunks I should store in memory before beginning 
-to delete old chunks? chunkSize * chunkCacheMaxSize = the maximum number of 
-records the data provider can return in one request.
+* chunkCacheMaxSize => 4000
+Number of chunk descriptions to store in memory before old ones are deleted.
+Multiply with chunkSize to get number of records provider can return in one
+request.
 	
 * chunkSize         => 10
-	How many records make up one chunk? See chunkCacheMaxSize.
+Number of records per chunk. See chunkCacheMaxSize.
 
-* dbfile => 'path/to/dbfile'
-	TODO: DB stuff needs better abstraction
-
-* deletedRecord => 'transient'
-	TODO: deletedRecord should not be mandatory. It should default to a meaningful
-	default instead see OAI specification for details.
+=head3 Parameters for MetadataFormats and Transformation
 
 * GlobalFormats => {
 		oai_dc => {
@@ -76,55 +68,35 @@ records the data provider can return in one request.
 	my $prefix = shift or croak "Need prefix";
 	return "someDir/$prefix.xsl";
   }
-  callback which locates the xsl for a specific prefix. Expects a prefix and 
-  returns a path.
+
+Callback locating the xsl for a specific target prefix. Expects a prefix and 
+returns a path.
 
 * nativePrefix   => 'mpx'
-
 * native_ns_uri =>'http://bla'
-	TODO: should be called nativeURI
+	TODO: should be combined with nativePrefix: nativeNamespace => bla => { 'http://bla'};
 
-	TODO: should be combined with nativePrefix, e.g.
-	nativeNamespace => bla => { 'http://bla'};
-
-* repositoryName => 'Repo Name Example'
-	see OAI specification for details
-
-=head3 OPTIONS
-
-=for :list
-
-* debug=>callback [OPTIONAL TODO]
-	If a callback is supplied use this callback for debug output
-
-* isMetadaFormatSupported=>callback [OPTIONAL TODO]
-	The callback expects a single prefix and returns 1 if true and nothing
-	when not supported. Currently only global metadataFormats, i.e. for all
-	items in repository. This one seems to be obligatory, so croak when
-	missing.
-
-* xslt=>'path/to/style.xslt' [OPTIONAL TODO]
+* xslt=>'path/to/style.xslt' [OPTIONAL]
 	Adds this path to HTTP::OAI::Repsonse objects to modify output in browser.
 	[Doc TODO. Info should be here not in _init_xslt]
 
-	Except engine information, nothing no option seems to be required and it is
-	still uncertain, maybe even unlikely if engine will be option at all.
-	(Alternative would be to just to use the engine.)
+=head3 Parameters for the Database Engine
 
-* requestURL [OPTIONAL]
+* dbfile => 'path/to/dbfile'
+
+=head3 Other Parameters (optional)
+
+* debug=>callback
+	If a callback is supplied use this callback for debug output
+
+* warning =>callback 
+	If a callback is supplied use this callback for Warning output
+
+* requestURL => 'http://bla.url'
 	Overwrite normal requestURL, e.g. when using a reverse proxy cache etc.
-	Note that
-	a) requestURL specified during new is only the http://domain.com:port
+	Note that requestURL specified during new is only the http://domain.com:port
 	part (without ? followed by GET params), but that HTTP::OAI treats the
 	complete URL as requestURL
-	b) badVerb has no URL and no question mark
-	c) in modern OAI specification it is actually called request and requestURL
-
-	Currently, requestURL evaporates if Salsa_OAI is run under anything else
-	than HTTP::Server::Simple.
-
-* warning =>callback [OPTIONAL Todo]
-	If a callback is supplied use this callback for Warning output
 
 =cut
 
@@ -152,24 +124,13 @@ has 'xslt'       => ( isa => 'Str',     is => 'ro', required => 0 );
 #has 'engineArgs'         => ( isa => 'HashRef', is => 'ro', required => 1 );
 
 sub BUILD {
-	my $self = shift;
+	my $self = shift or die "Need myself!";
 
-	Debug( $self->debug );
-	Warning( $self->warning );
+	Debug( $self->debug )     if ( $self->debug );
+	Warning( $self->warning ) if ( $self->warning );
 
-	$self->{chunkCache} =
-	  new HTTP::OAI::DataProvider::ChunkCache(
-		maxSize => $self->chunkCacheMaxSize )
-	  or croak "Cannot init chunkCache";
-
-	#check if info complete
-	foreach my $prefix ( keys %{ $self->GlobalFormats } ) {
-		if (   !${ $self->GlobalFormats }{$prefix}{ns_uri}
-			or !${ $self->GlobalFormats }{$prefix}{ns_schema} )
-		{
-			die "GlobalFormat $prefix in configuration incomplete";
-		}
-	}
+	$self->_initChunkCache();
+	$self->_checkGlobalFormatsComplete();
 
 	#init engine (todo: this is noT properly abstracted)
 	$self->{engine} = new HTTP::OAI::DataProvider::SQLite(
@@ -187,18 +148,18 @@ sub BUILD {
 
 =method my $result=$provider->GetRecord(%params);
 
-Arguments
+All verbs expect params as hash and return a response as an xml string.
 
+Arguments
 =for :list
 * identifier (required)
 * metadataPrefix (required)
 
 Errors
-
 =for :list
-* DbadArgument: already tested
-* cannotDisseminateFormat: gets checked here
-* idDoesNotExist: gets checked here
+* badArgument
+* cannotDisseminateFormat
+* idDoesNotExist
 
 =cut
 
@@ -209,11 +170,6 @@ sub GetRecord {
 
 	$params{verb} = 'GetRecord';
 	$self->_validateRequest(%params) or return $self->errorMessage;
-
-	Warning 'Enter GetRecord (id:'
-	  . $params{identifier}
-	  . 'prefix:'
-	  . $params{metadataPrefix} . ')';
 
 	my $engine        = $self->{engine};
 	my $globalFormats = $self->{globalFormats};
@@ -230,7 +186,7 @@ sub GetRecord {
 
 	if (@errors) {
 		$self->raiseOAIerrors(@errors);
-		return; #failure
+		return;              #failure
 	}
 
 	# Metadata handling
@@ -240,8 +196,15 @@ sub GetRecord {
 	return $self->_output($response);    #success
 }
 
-=method my $response=$provider->Identify($params);
+=method my $response=$provider->Identify(%params);
 
+Arguments: none
+
+Errors: badArgument
+
+The information for the identify response is assembled from two sources: from
+configuration during new and from inspection of the system (earlierstDate, 
+granularity).
 
 =cut
 
@@ -252,7 +215,7 @@ sub Identify {
 	$params{verb} = 'Identify';
 	$self->_validateRequest(%params) or return $self->errorMessage;
 
-	Debug "Enter Identify";
+	#Debug "Enter Identify";
 
 	# Metadata munging
 	my $obj = new HTTP::OAI::Identify(
@@ -335,25 +298,14 @@ sub ListMetadataFormats {
 
 	#check if noMetadataFormats
 	if ( $list->metadataFormat() == 0 ) {
-		$self->raiseError( 'noMetadataFormats' );
+		$self->raiseError('noMetadataFormats');
 		return;
 	}
 
 	return $self->_output($list);    #success
 }
 
-=method my $xml=$provider->ListIdentifiers ($params);
-
-Returns xml as string, either one or multiple errors or a ListIdentifiers verb.
-
-The Spec in my words: This verb is an abbreviated form of ListRecords,
-retrieving only headers rather than headers and records. Optional arguments
-permit selective harvesting of headers based on set membership and/or
-datestamp.
-
-Depending on the repository's support for deletions, a returned header may have
-a status attribute of "deleted" if a record matching the arguments specified in
-the request has been deleted.
+=method my $response=$provider->ListIdentifiers (%params);
 
 ARGUMENTS
 
@@ -367,11 +319,16 @@ ARGUMENTS
 ERRORS
 
 =for :list
-* badArgument: already checked in validate_request
-* badResumptionToken: here
-* cannotDisseminateFormat: here
-* noRecordsMatch:here
-* noSetHierarchy: here. Can only appear if query has set
+* badArgument
+* badResumptionToken
+* cannotDisseminateFormat
+* noRecordsMatch
+* noSetHierarchy
+
+NOTE 
+Depending on the repository's support for deletions, a returned header may have
+a status attribute of "deleted" if a record matching the arguments specified in
+the request has been deleted.
 
 LIMITATIONS
 By making the metadataPrefix required, the specification suggests that
@@ -380,10 +337,7 @@ metadataPrefix is chose. HTTP:OAI::DataProvider assume, however, that there are
 only global metadata formats, so it will return the same set for all supported
 metadataFormats.
 
-TODO
-
-=for :list
-* Hierarchical sets
+TODO: Hierarchical sets
 
 =cut
 
@@ -392,19 +346,11 @@ sub ListIdentifiers {
 	my %params = @_;
 	my @errors;    #stores errors before there is a result object
 	$params{verb} = 'ListIdentifiers';
-	$self->_validateRequest(%params) or return $self->errorMessage;
+
+	$self->_validateRequest(%params) or return;
 
 	my $request = $self->requestURL();
 	my $engine  = $self->{engine};       #provider
-
-	#Warning 'Enter ListIdentifiers';
-	#Debug 'prefix:' . $params{metadataPrefix}
-	#  if $params{metadataPrefix};
-	#Debug 'from:' . $params{from}   if $params{from};
-	#Debug 'until:' . $params{until} if $params{'until'};
-	#Debug 'set:' . $params{set}     if $params{set};
-	#Debug 'resumption:' . $params{resumptionToken}
-	#  if $params{resumptionToken};
 
 	# Error handling
 	if ( !$engine ) {
@@ -419,9 +365,9 @@ sub ListIdentifiers {
 		if ($chunk) {
 			return $self->_output($chunk);    #success
 		}
-
-		$self->raiseError( 'badResumptionToken' );
+		$self->raiseError('badResumptionToken');
 		return;                               #error
+
 	}
 
 	if ( my $e = $self->checkFormatSupported( $params{metadataPrefix} ) ) {
@@ -440,7 +386,6 @@ sub ListIdentifiers {
 	}
 
 	if (@errors) {
-		#Debug "@errors" . @errors;
 		$self->raiseOAIerrors(@errors);
 		return;    #failure
 	}
@@ -471,8 +416,8 @@ to GetRecord.
 ARGUMENTS
 
 =for :list
-* from (optional, UTCdatetime value) TODO: Check if it works
-* until (optional, UTCdatetime value)  TODO: Check if it works
+* from (optional, UTCdatetime value) 
+* until (optional, UTCdatetime value) 
 * metadataPrefix (required unless resumptionToken)
 * set (optional)
 * resumptionToken (exclusive)
@@ -480,16 +425,11 @@ ARGUMENTS
 ERRORS
 
 =for :list
-* badArgument: checked for before you get here
-* badResumptionToken - TODO
-* cannotDisseminateFormat - TODO
-* noRecordsMatch - here
+* badArgument
+* badResumptionToken 
+* cannotDisseminateFormat
+* noRecordsMatch
 * noSetHierarchy - TODO
-
-TODO
-
-=for :list
-* Check if error appears as excepted when non-supported metadataFormat
 
 =cut
 
@@ -544,13 +484,6 @@ sub ListRecords {
 		return;
 	}
 
-	#checkRecordsMatch is now done inside query
-	# Check result
-	#if ( $result->isError ) {
-	#	return $self->err2XML( $result->isError );
-	#}
-
-	# Return
 	return $self->_output($response);
 }
 
@@ -564,9 +497,9 @@ ARGUMENTS
 ERRORS
 
 =for :list
-* badArgument -> HTTP::OAI::Repository
-* badResumptionToken  -> here
-* noSetHierarchy --> here
+* badArgument 
+* badResumptionToken  
+* noSetHierarchy 
 
 =cut
 
@@ -581,10 +514,6 @@ sub ListSets {
 
 	#print "Enter ListSets $self\n";
 
-	#
-	# Check for errors
-	#
-
 	#errors in using this package...
 	croak "Engine missing!"   if ( !$engine );
 	croak "Provider missing!" if ( !$self );
@@ -595,27 +524,15 @@ sub ListSets {
 		return;
 	}
 
-	#
 	# Get the setSpecs from engine/store
-	#
-
-	#TODO:test for noSetHierarchy has to be in SetLibrary
+	# TODO:test for noSetHierarchy has to be in SetLibrary
 	my @used_sets = $engine->listSets;
-
-	#
-	# Check results
-	#
 
 	#if none then noSetHierarchy (untested)
 	if ( !@used_sets ) {
 		$self->raiseError('noSetHierarchy');
 		return;
 	}
-
-	# just for debug
-	#foreach (@used_sets) {
-	#	Debug "used_sets: $_\n";
-	#}
 
 	my $listSets = $self->_processSetLibrary();
 
@@ -646,13 +563,29 @@ sub ListSets {
 	return $self->_output($listSets);
 }
 
+=method return $provider->errorMessage;
+
+Returns an internal error message (if any). Error message is a single scalar 
+(string) ready for print.
+
+Just a getter, no setter! The error is set internally, e.g.
+	$provider->_validateRequest (%params) or return provider->errorMessage;
+
+=cut
+
+sub errorMessage {
+	my $self = shift or croak "Need myself!";
+	return $self->{errorMessage} if ( $self->{errorMessage} );
+}
+
 #
 #
 #
 
-=head1 PUBLIC UTILITY FUNCTIONS / METHODS
+=head1 PRIVATE METHODS
 
-check error, display error, Warning, debug etc.
+You should not need any of the stuff below whether it starts with an underline
+or not.
 
 =method checkFormatSupported ($prefixWanted);
 
@@ -676,16 +609,15 @@ sub checkFormatSupported {
 
 =method my $xml=$provider->err2XML(@obj);
 
-Parameter is an array of HTTP::OAI::Error objects. O
+Parameter is an array of HTTP::OAI::Error objects. 
 
-TODO: Currently, HTTP::OAI::Error seems to be handle only one error, so 
-currently err2XML also handles only one.
+(Now works with multiple OAI errors.)
 
 =cut
 
 sub err2XML {
 	my $self = shift;
-
+	return if ( !@_ );
 	my $response = new HTTP::OAI::Response;
 	foreach (@_) {
 		$response->errors($_) if ( ref $_ eq 'HTTP::OAI::Error' );
@@ -703,12 +635,10 @@ sub err2XML {
 Expects a list of HTTP::OAI errors. Sets xml string version of the error 
 message which can be retrieved using $self->errorMessage.
 
-Primarily for internal use.
-
 =cut
 
 sub raiseOAIerrors {
-	my $self=shift or die "Need myself";
+	my $self = shift or die "Need myself";
 	if (@_) {
 		$self->{errorMessage} = $self->err2XML(@_);
 	}
@@ -718,8 +648,6 @@ sub raiseOAIerrors {
 
 Expects an OAI error code as string. The error message is optional. Sets the 
 error message which can be retrieved using $self->errorMessage.
-
-Primarily for internal use.
 
 =cut
 
@@ -735,30 +663,12 @@ sub raiseError {
 	$self->{errorMessage} = $self->err2XML( new HTTP::OAI::Error(%opts) );
 }
 
+=method my $chunk=$self->chunkExists (%params);
 
-#
-# PRIVATE STUFF
-#
-
-=head1 PRIVATE METHODS
-
-HTTP::OAI::DataProvider is to be used by frontend developers. What is not meant
-for them, is private.
-
-=head2 my $chunk=$self->chunkExists ($params);
-
-TODO: should be called getChunkDesc
-
-Tests whether
-
-=for :list
-* whether a resumptionToken is in params and
-* there is a chunkDesc with that token in the cache.
-
-It returns either a chunkDesc or nothing.
+returns a chunk description (if one with this resumptionToken exists) or nothing.
 
 Usage:
-	my $chunk=$self->chunkExists ($params)
+	my $chunk=$self->chunkExists (%params);
 	if (!$chunk) {
 		return new HTTP::OAI::Error (code=>'badResumptionToken');
 	}
@@ -772,25 +682,20 @@ sub chunkExists {
 	my $token      = $params{resumptionToken} or return;
 	my $chunkCache = $self->{chunkCache};
 
-	if ( !$chunkCache ) {
-		carp "No chunkCache!";
-	}
-
 	Debug "Query chunkCache for " . $token;
 
-	my $chunkDesc = $chunkCache->get($token)
-	  or return;                        #possibly we need a return here!
+	my $chunkDesc = $chunkCache->get($token) or return;
 
-	#chunk is a HTTP::OAI::Response object
+	#todo: eliminate $request from this method call
 	my $response =
 	  $self->{engine}->queryChunk( $chunkDesc, \%params, $request );
 	return $response;
 }
 
-=head2 $self->_output($response);
+=method my $xml=$self->_output($response);
 
 Expects a HTTP::OAI::Response object and returns it as xml string. It applies
-$self->xslt if set.
+$self->{xslt} if set.
 
 =cut
 
@@ -815,7 +720,7 @@ sub _output {
 	return $xml;
 }
 
-=head2 $obj= $self->overwriteRequestURL($obj)
+=method $obj= $self->overwriteRequestURL($obj)
 
 If $provider->{requestURL} exists take that value and overwrite the requestURL
 in the responseURL. requestURL specified in this module consists only of
@@ -861,7 +766,7 @@ sub overwriteRequestURL {
 	}
 }
 
-=head2 $obj= $self->_init_xslt($obj)
+=method $obj= $self->_init_xslt($obj)
 
 For an HTTP::OAI::Response object ($obj), sets the stylesheet to the value
 specified during init. This assume that there is only one stylesheet.
@@ -900,67 +805,14 @@ sub _validateRequest {
 	return 1;      #no validation error (success)
 }
 
-=method return $provider->errorMessage;
-
-Returns an internal error message (if any). Error message is a single scalar 
-(string), ready for print.
-
-Just a getter, no setter! The error is set internally, e.g.
-
-	$provider->_validateRequest (%params) or return provider->errorMessage;
-	
-TODO: I am still transitioning from old to new error system!
-
-=cut
-
-sub errorMessage {
-	my $self = shift or croak "Need myself!";
-	return $self->{errorMessage} if ( $self->{errorMessage} );
-}
-
-=head1 OAI DATA PROVIDER FEATURES
-
-SUPPORTED
-
-=begin :list
-
-* the six OAI verbs (getRecord, identify, listRecords, listMetadataFormats,
- listIdentifiers, listSets) and all errors from OAI-PMH v2 specification
-* resumptionToken
-* sets
-* deletedRecords (only transiently?)
-
-=end :list
-
-NOT SUPPORTED
-
-=begin :list
-
-* hierarchical sets
-
-=end :list
-
-=head1 TODO
-
-Currently, I use Dancer::CommandLine. Maybe I should build such a mechanism
-into DataProvider which would also allow to choose a Debug and Warning
-routine via config, something like
-
-	my $provider = HTTP::OAI::DataProvider->new(
-		debug=>'SalsaOAI::Debug',
-		Warning=>'SalsaOAI::Warning'
-	);
-
-=cut
-
-=func processSetLibrary
+=method $self->_processSetLibrary
 
 debugging...
 
 =cut
 
 sub _processSetLibrary {
-	my $self = shift;
+	my $self = shift or croak "Need myself!";
 
 	#debug "Enter salsa_setLibrary";
 	my $setLibrary = $self->{setLibrary};
@@ -1000,7 +852,26 @@ sub _processSetLibrary {
 		return $listSets;
 	}
 	warn "no setLibrary found in Dancer's config file";
-
 }
+
+sub _checkGlobalFormatsComplete {
+	my $self = shift or croak "Need myself!";
+	foreach my $prefix ( keys %{ $self->GlobalFormats } ) {
+		if (   !${ $self->GlobalFormats }{$prefix}{ns_uri}
+			or !${ $self->GlobalFormats }{$prefix}{ns_schema} )
+		{
+			croak "GlobalFormat $prefix in configuration incomplete";
+		}
+	}
+}
+
+sub _initChunkCache {
+	my $self = shift or croak "Need myself!";
+	$self->{chunkCache} =
+	  new HTTP::OAI::DataProvider::ChunkCache(
+		maxSize => $self->chunkCacheMaxSize )
+	  or croak "Cannot init chunkCache";
+}
+
 __PACKAGE__->meta->make_immutable;
 1;

@@ -23,7 +23,8 @@ my $baseURL = 'http://localhost:3000/oai';
 		metadataPrefix => 'oai_dc',
 	);
 	validateRequest(%params);
-	my $response = $provider->ListIdentifiers(%params);
+	my $response = $provider->ListIdentifiers(%params)
+	  or die $provider->errorMessage;
 	okListIdentifiers($response);
 }
 
@@ -33,7 +34,8 @@ my $baseURL = 'http://localhost:3000/oai';
 		metadataPrefix => 'mpx',
 	);
 	validateRequest(%params);
-	my $response = $provider->ListIdentifiers(%params);
+	my $response = $provider->ListIdentifiers(%params)
+	  or die $provider->errorMessage;
 	okListIdentifiers( $response, 'different format' );
 }
 
@@ -44,7 +46,8 @@ my $baseURL = 'http://localhost:3000/oai';
 		set            => 'MIMO',
 	);
 	validateRequest(%params);
-	my $response = $provider->ListIdentifiers(%params);
+	my $response = $provider->ListIdentifiers(%params)
+	  or die $provider->errorMessage;
 	okListIdentifiers( $response, 'with set' );
 }
 
@@ -57,7 +60,8 @@ my $baseURL = 'http://localhost:3000/oai';
 	);
 	validateRequest(%params);
 
-	my $response = $provider->ListIdentifiers(%params);
+	my $response = $provider->ListIdentifiers(%params)
+	  or die $provider->errorMessage;
 	okListIdentifiers( $response, 'with from' );
 }
 {
@@ -70,7 +74,8 @@ my $baseURL = 'http://localhost:3000/oai';
 
 	validateRequest(%params);
 
-	my $response = $provider->ListIdentifiers(%params);
+	my $response = $provider->ListIdentifiers(%params)
+	  or die $provider->errorMessage;
 	okListIdentifiers( $response, 'with until' );
 }
 {
@@ -83,7 +88,8 @@ my $baseURL = 'http://localhost:3000/oai';
 		'until'        => '2011-05-22T02:34:23Z',
 	);
 	validateRequest(%params);
-	my $response = $provider->ListIdentifiers(%params);
+	my $response = $provider->ListIdentifiers(%params)
+	  or die $provider->errorMessage;
 	okListIdentifiers( $response, 'with from and until' );
 }
 
@@ -96,13 +102,10 @@ my $baseURL = 'http://localhost:3000/oai';
 		resumptionToken => 'abc',
 	);
 	validateRequest(%params);
-	my $response = $provider->ListIdentifiers(%params)
-	  or
-	  if ( !$response )
-	{
-		$response = $provider->errorMessage;
-		isOAIerror( $response, 'badResumptionToken' );
-	}
+	my $response = $provider->ListIdentifiers(%params);
+	die "that wasn't supposed to happen" if ($response);
+	$response = $provider->errorMessage;
+	isOAIerror( $response, 'badResumptionToken' );
 }
 
 {
@@ -114,25 +117,23 @@ my $baseURL = 'http://localhost:3000/oai';
 	validateRequest(%params);
 	my $response = $provider->ListIdentifiers(%params);
 
-	if ( !$response ) {
-		$response = $provider->errorMessage;
-		isOAIerror( $response, 'cannotDisseminateFormat' );
-	}
+	die "that wasn't supposed to happen" if ($response);
+	$response = $provider->errorMessage;
+	isOAIerror( $response, 'cannotDisseminateFormat' );
 }
 
 {
 	my %params = (
 		verb => 'ListIdentifiers',
 		set  => 'MIMO',
+		#metadataPreix missing
 	);
 
 	#validateRequest(%params);
 	my $response = $provider->ListIdentifiers(%params);
-	if ( !$response ) {
-		$response = $provider->errorMessage;
-		isOAIerror( $response, 'badArgument' );
-	}
-
+	die "that wasn't supposed to happen ($response)" if ($response);
+	$response = $provider->errorMessage;
+	isOAIerror( $response, 'badArgument' );
 }
 
 {
@@ -140,10 +141,9 @@ my $baseURL = 'http://localhost:3000/oai';
 
 	#validateRequest(%params);
 	my $response = $provider->ListIdentifiers(%params);
-	if ( !$response ) {
-		$response = $provider->errorMessage;
-		isOAIerror( $response, 'badArgument' );
-	}
+	die "that wasn't supposed to happen" if ($response);
+	$response = $provider->errorMessage;
+	isOAIerror( $response, 'badArgument' );
 }
 
 {
@@ -155,10 +155,9 @@ my $baseURL = 'http://localhost:3000/oai';
 
 	#validateRequest(%params);
 	my $response = $provider->ListIdentifiers(%params);
-	if ( !$response ) {
-		$response = $provider->errorMessage;
-		isOAIerror( $response, 'noRecordsMatch' );
-	}
+	die "that wasn't supposed to happen" if ($response);
+	$response = $provider->errorMessage;
+	isOAIerror( $response, 'noRecordsMatch' );
 }
 
 #TODO: noSetHierarchy
