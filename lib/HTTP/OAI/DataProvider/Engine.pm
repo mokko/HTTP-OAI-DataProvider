@@ -2,16 +2,34 @@ package HTTP::OAI::DataProvider::Engine;
 # ABSTRACT: interface between data store and data provider
 use strict;
 use warnings;
+use Moose;
+use namespace::autoclean;
 use Time::HiRes qw(gettimeofday);    #to generate unique tokens
-use Dancer ':syntax';
-use Carp qw/croak/;
+use Carp qw(carp croak);
+use HTTP::OAI::DataProvider::Common qw/Debug Warning/;
+
+=head1 TODO
+
+We want some better abstraction, so we need two classes.
+a) everything that actually talks to the DB (SQLite in this case) is called 
+   'basic'.
+b) Everything that consists of calls to basic methods, but doesn't require
+   direct communication is called 'complex'.
+
+At the end of the day, we need only basic methods in SQLite. Complex stuff can
+go in the Engine. The generic Engine will require the rest with as per role
+I assume.
+
+Basic stuff:
+	my $granularity=$engine->granularity();
+	my $date=$engine->earliestDate();
+Complex (generic engine)
 
 =head2 SYNOPSIS
 
 What does the engine need?
 
 	my $header=findByIdentifier ($identifier);
-	my $date=$engine->earliestDate();
 	my $granuality=$engine->granularity();
 	my @used_sets=$engine->listSets();
 
@@ -20,15 +38,13 @@ What does the engine need?
 
 =head2 my $token=$engine->mkToken;
 
-Returns an arbitrary token. The only problem is that no token should ever
-repeat. I could use the current milisecond. That will never repeat, right?
-And it should be unique, right?
+Returns a fairly arbitrary unique token (miliseconds since epoch). 
 
 =cut
 
 sub mkToken {
 	my ( $sec, $msec ) = gettimeofday;
-	return time . $msec;    #time returns seconds since epoch
+	return time . $msec; 
 }
 
 =head2 my $chunk_size=$result->chunkSize;
@@ -40,81 +56,44 @@ determines how big (number of records per chunk) the chunks are.
 
 sub chunkSize {
 	my $self = shift;
-	debug "chunkSize" . $self->{chunkSize};
+	Debug "chunkSize" . $self->{chunkSize};
 	if ( $self->{chunkSize} ) {
 		return $self->{chunkSize};
 	}
 }
 
-=head2 $self->requiredType ('HTTP::OAI::DataProvider');
+=head1 BASIC PARAMETER VALIDATION
 
-Tests if $self is of specified type and croaks if not.
+While we are waiting that perl gets method signatures (see Method::Sigatures),
+we work with very simple hand-made parameter validation.
 
-=cut
-
-sub requiredType {
-	my $self = shift;
-	my $type = shift;
-
-	if ( !$type ) {
-		croak "requiredType called with type";
-	}
-
-	if ( ref $self ne $type ) {
-		croak "Wrong type: " . ref $self;
-	}
-
-}
-
-=head2 $self->requiredFeatures ($hashref, 'a', b');
+=head2 $self->requireAttributes ($hashref, 'a', b');
 
 Feature is a key of a hashref, either the object itself or another hashref
 object.
 
 Croaks if a or b are not present. If hashref is omitted, checks in $self:
-	$self->requiredFeatures ('a', b');
+	$self->requireAttributes ('a', b');
 
 =cut
 
-sub requiredFeatures {
+sub requireAttributes {
 	my $self = shift;    #hashref
-	#my $args;            #string or hashref
 	if (ref $_[0] eq 'HASH') {
 		my $args = shift;
 		foreach my $key (@_) {
 			if ( !$args->{$key} ) {
-				croak "Feature $key missing";
+				croak "Attribute $key missing";
 			}
 		}
 	} else {
 		foreach my $key (@_) {
 			if ( !$self->{$key} ) {
-				croak "Feature $key missing";
+				croak "Attribute $key missing";
 			}
 		}
-
 	}
 }
 
-=method $self->argumentExists ($arg);
-
-	Returns nothing is argument exists, croaks if no argument,
-
-=cut
-
-
-sub argumentExists {
-	my $self = shift;
-	my $arg  = shift;
-
-	if ( !$arg ) {
-		croak "Argument missing!";
-	}
-}
-
-sub _hashref {
-	my %params = @_;
-	return \%params;
-}
-
-1;    #HTTP::OAI::DataProvider::Engine
+__PACKAGE__->meta->make_immutable;
+1;   

@@ -139,10 +139,7 @@ sub BUILD {
 		chunkSize    => $self->chunkSize,       # might not be necessary
 		nativePrefix => $self->nativePrefix,
 		nativeURI    => $self->native_ns_uri,
-		transformer => new HTTP::OAI::DataProvider::Transformer(
-			nativePrefix => $self->nativePrefix,
-			locateXSL    => $self->locateXSL,
-		),
+		locateXSL    => $self->locateXSL,
 	);
 }
 

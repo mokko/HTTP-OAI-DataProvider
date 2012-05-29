@@ -16,6 +16,7 @@ our $Debug;
 our $Warning;
 
 @EXPORT_OK = qw(
+  argumentExists
   Debug
   isScalar
   modDir
@@ -24,6 +25,27 @@ our $Warning;
 );
 
 sub argumentsLeft;
+
+
+=method argumentExists ($arg);
+
+	Returns success if argument exists, croaks if no argument.
+	
+	function/method validation while we are waiting for method signatures.
+
+=cut
+
+
+sub argumentExists {
+	my $self = shift;
+	my $arg  = shift;
+
+	if ( !$arg ) {
+		croak "Argument missing!";
+	}
+	return 1;
+}
+
 
 =func carp argumentsLeft if @_;
 

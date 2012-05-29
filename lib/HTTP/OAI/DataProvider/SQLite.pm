@@ -4,20 +4,23 @@ package HTTP::OAI::DataProvider::SQLite;
 
 use warnings;
 use strict;
-use YAML::Syck qw/Dump LoadFile/;
+#use YAML::Syck qw/Dump LoadFile/;
+
+use Moose;
+use namespace::autoclean;
 
 use HTTP::OAI;
 use HTTP::OAI::Repository qw/validate_date/;
 use HTTP::OAI::DataProvider::Engine::Result;
+use parent qw(HTTP::OAI::DataProvider::Engine);
 
 use XML::LibXML;
-use XML::LibXML::XPathContext;
+#use XML::LibXML::XPathContext;
 use XML::SAX::Writer;
 use HTTP::OAI::DataProvider::Common qw/Debug Warning/;
-use Carp qw/carp croak/;
+use Carp qw(carp croak);
 use DBI qw(:sql_types);    #new
 use DBIx::Connector;
-use parent qw(HTTP::OAI::DataProvider::Engine);
 
 =head1 SYNOPSIS
 
@@ -57,6 +60,32 @@ it would be
 TODO: See if I want to use base or parent?
 only for debug during development
 
+
+=method my $cache=HTTP::OAI::DataRepository::SQLite::new (@args);
+
+Am currently not sure about the arguments. Currently i accept everything,
+so invocation has to be selective.
+
+=cut
+
+has 'dbfile'       => ( isa => 'Str',     is => 'ro', required => 1 );
+has 'chunkCache'   => ( isa => 'Object', is => 'ro', required => 1 );
+has 'chunkSize'    => ( isa => 'Str', is => 'ro', required => 1 );
+has 'nativePrefix' => ( isa => 'Str', is => 'ro', required => 1 );
+has 'nativeURI'    => ( isa => 'Str', is => 'ro', required => 1 );
+has 'locateXSL'    => ( isa => 'CodeRef', is => 'ro', required => 1 );
+
+sub BUILD {
+	my $self = shift or croak 'Need myself!';
+	$self->{transformer} = new HTTP::OAI::DataProvider::Transformer(
+		nativePrefix => $self->nativePrefix,
+		locateXSL    => $self->locateXSL,
+	);
+	$self->_connect_db( $self->{dbfile} );
+	$self->_init_db();
+
+}
+
 =head2 	my $err=$engine->digest_single (source=>$xml_fn, mapping=>&mapping);
 =cut
 
@@ -89,43 +118,23 @@ sub digest_single {
 
 =head2 my $response=$engine->queryChunk($chunkDescription);
 
-Takes a chunkDescription, queries the db with it, parses the answer in a result
-object and transforms the result to a response and returns to dancer.
+Expects a chunkDescription and outputs xml string response fit for output.
 
-Expects a chunkDescription. (A chunkDesc is SQL statement and some other
-contextual info). It returns that chunk as a HTTP::OAI::Response object
-(either HTTP::OAI::ListIdentifiers or HTTP::OAI::ListRecords.)
+In the meantime it queries the db, parses the answer in a result
+object.
 
-The chunkDescription is a hashref which is structured like this, see
-HTTP::OAI::DataProvider::ChunkCache:
-	$chunkDescription={
-			chunkNo=>$chunkNo,
-			maxChunkNo=>$maxChunkNo,
-			[ next=>$tokenN, ]
-			sql=>$sql,
-			targetPrefix=>$prefix,
-			token=>$token,
-			total=>$total
-	};
+A chunk descrition is basically an SQL statement and some other contextual info
+in an HTTP::OAI::DataProvider::ChunkCache::ChunkDescription. 
 
-The last chunk doesn't have a next key. (?)
-
-Gets called in queryChunk and in (the badly named) data provider's chunkExist.
+[gets called in queryChunk and in data provider's (the badly named) chunkExist]
 
 =cut
 
 sub queryChunk {
-	my $self      = shift;
-	my $chunkDesc = shift;
-	my $params    = shift;
+	my $self      = shift or croak "Need myself!";
+	my $chunkDesc = shift or croak "Need chunkDesc!";
+	my $params    = shift or croak "Need params!";
 	my $request   = shift;    #optional
-
-	$self->argumentExists($chunkDesc);
-	$self->argumentExists($params);
-
-	#use Data::Dumper qw(Dumper);
-	#print Dumper ($params);
-
 
 	#Debug "Enter queryChunk";
 
@@ -138,7 +147,7 @@ sub queryChunk {
 		#for resumptionToken
 		chunkSize    => $self->{chunkSize},
 		chunkNo      => $chunkDesc->chunkNo,
-		targetPrefix => $chunkDesc->{targetPrefix}, #why here?
+		targetPrefix => $chunkDesc->{targetPrefix},    #why here?
 		token        => $chunkDesc->token,
 		total        => $chunkDesc->total,
 	);
@@ -160,7 +169,7 @@ sub queryChunk {
 	}
 
 	#SQL
-	my $dbh = $self->{connection}->dbh()         or die $DBI::errstr;
+	my $dbh = $self->{connection}->dbh()       or die $DBI::errstr;
 	my $sth = $dbh->prepare( $chunkDesc->sql ) or croak $dbh->errstr();
 	$sth->execute() or croak $dbh->errstr();
 
@@ -187,7 +196,7 @@ sub queryChunk {
 				$result->save(
 					header => $header,
 					md     => $md,
-					params=>$params, #doesn't it need params?
+					params => $params,    #doesn't it need params?
 				);
 
 				#Debug "md".$md;
@@ -224,7 +233,7 @@ sub queryChunk {
 	$result->save(
 		header => $header,
 		md     => $md,
-		params=>$params, #doesn't it need params?
+		params => $params,    #doesn't it need params?
 	);
 
 	# Check result
@@ -235,34 +244,6 @@ sub queryChunk {
 	#transform result to response
 	my $response = $result->getResponse;
 	return $response;
-}
-
-=head2 my $cache=HTTP::OAI::DataRepository::SQLite::new (@args);
-
-Am currently not sure about the arguments. Currently i accept everything,
-so invocation has to be selective.
-
-=cut
-
-sub new {
-	my $class = shift;
-	my %args  = @_;
-	my $self  = \%args;
-	bless $self, $class;
-
-	$self->checkRequired( 'dbfile', 'chunkSize' );
-
-	#Debug "Enter HTTP::OAI::DataProvider::Engine::_new";
-	#i could check if directory in $dbfile exists; if not provide
-	#intelligble warning that path is strange
-
-	$self->_connect_db( $self->{dbfile} );
-	$self->_init_db();
-
-	#I cannot test earlierstDate since non existant in new db
-	#$self->earliestDate();    #just to see if this creates an error;
-
-	return $self;
 }
 
 =head2 my $date=$engine->earliestDate();
@@ -371,11 +352,12 @@ sub findByIdentifier {
 	records.identifier = sets.identifier WHERE records.identifier=?/;
 
 	my $sth = $dbh->prepare($sql) or croak $dbh->errstr();
+
 	#print "$sql ($identifier)\n";
 	$sth->execute($identifier) or croak $dbh->errstr();
 	my $aref = $sth->fetchall_arrayref or carp "difficult fetch";
-	if ($sth->err) {
-		carp "DBI error:".$sth->err;
+	if ( $sth->err ) {
+		carp "DBI error:" . $sth->err;
 	}
 
 	#there should be exactly one record with that id or none and I will trust
@@ -399,8 +381,9 @@ sub findByIdentifier {
 		}
 		return $h;
 	}
+
 	#carp "Return empty handed!";
-	return; #failure
+	return;    #failure
 
 }
 
@@ -452,18 +435,16 @@ if ($result->isError) {
 =cut
 
 sub query {
-	my $self    = shift;
-	my $params  = shift;
+	my $self    = shift or croak "Need myself!";
+	my $params  = shift or croak "Need params!";
 	my $request = shift;    #optional?
-
-	$self->argumentExists($params);
 
 	#get here if called without resumptionToken
 	my $first = $self->planChunking($params);
 
 	#if there are no results there is no first chunk
 	if ( !$first ) {
-		return ();
+		return;
 	}
 
 	my $response = $self->queryChunk( $first, $params, $request );
@@ -569,7 +550,7 @@ my $dbh=$connection->dbh;
 =cut
 
 sub _connect_db {
-	my $self   = shift;
+	my $self = shift;
 	my $dbfile = shift or die "Need dbfile!";
 
 	if ( !-f $dbfile ) {
@@ -936,21 +917,6 @@ sub _storeRecord {
 		}
 	}
 }
-
-=method $self->checkRequired ('a','b');
-
-	Carps if 'a' or 'b' are not exist (as $self->{a} and $self->{b}).
-
-=cut
-
-sub checkRequired {
-	my $self = shift;
-	foreach (@_) {
-		if ( !$self->{$_} ) {
-			carp "Error: need $_";
-		}
-	}
-}
-
+__PACKAGE__->meta->make_immutable;
 1;
 
