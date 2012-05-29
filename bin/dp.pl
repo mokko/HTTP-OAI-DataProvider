@@ -19,11 +19,12 @@ our %opts;
 sub verbose;
 
 =head1 DESCRIPTION
+
 A simple command line interface to HTTP::OAI::DataProvider to execute verbs 
 for testing and debugging. 
 
 Note: Neither HTTP::OAI::DataProvider nor this script provide a web front
-end.
+end. See bin/eg-app.pl for an example implementation of a webapp.
 
 =head1 SYNOPSIS
 
@@ -32,10 +33,19 @@ end.
 	dp --verb GetRecord --identifier 12342 --metadataPrefix oai_dc
 
 	#other arguments
-	--verbose #more info from dp.pl
-	--debug #turn debug messages in HTTP::OAI::DataProvider on
+	--verbose #more info from dp.pl [optional]
+	--config '/path/to/config.pl' [optional]
+	
+	If --config is not specified, this script loads t/test_config. 
 
-Currently this script loads t/test_config on start up as a config. 
+=head1 CONFIG FILE FORMAT
+
+Current format is pure perl, see t/test_config for example.
+
+=head1 KNOWN BUGS
+
+After being install using 'make install' this script won't find the config in t 
+anymore. Use --config parameter instead.
 
 =head1 INTERNAL INTERFACE
 
@@ -66,11 +76,15 @@ Should I also use a yaml file?
 =cut
 
 sub loadConfig {
-	my $configFile =
-	  File::Spec->catfile( "$FindBin::Bin", '..', 't', 'test_config' );
-
+my $configFile;
+	if ($opts{c}){
+		$configFile=$opts{c};
+	} else {
+		$configFile=File::Spec->catfile( "$FindBin::Bin", '..', 't', 'test_config' );				
+	}
+	
 	if ( !-f $configFile ) {
-		print "Error: Cant find test config at $configFile\n";
+		print "Error: Cant find config file ($configFile)\n";
 		exit 1;
 	}
 
@@ -87,6 +101,7 @@ sub loadConfig {
 sub getOpt {
 	my %params;
 	GetOptions(
+		'config=s'			=> \$opts{c},
 		'identifier=s'      => \$params{identifier},
 		'from=s'            => \$params{from},
 		'metadataPrefix=s'  => \$params{metadataPrefix},
