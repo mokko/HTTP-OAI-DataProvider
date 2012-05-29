@@ -25,7 +25,7 @@ use HTTP::OAI::DataProvider::Common qw/Debug Warning/;
 	my $provider = HTTP::OAI::DataProvider->new(%options);
 	
 	#Verbs: GetRecord, Identify ...
-	my $provider->requestURL($requestURL); 	#if you need overwrite the automatic setting
+	my $provider->requestURL('http://newbase.url'); 	#overwrite the automatic setting
 	my $response=$provider->$verb(%params);
 
 	#Error checking CURRENT
@@ -229,24 +229,15 @@ sub GetRecord {
 	}
 
 	if (@errors) {
-		return $self->err2XML(@errors);
+		$self->raiseOAIerrors(@errors);
+		return; #failure
 	}
 
 	# Metadata handling
 	my $response = $engine->query( \%params, $self->requestURL() );
 
-	#todo: we still have to test if result has any result at all
-	#mk sure we don't lose requestURL in Starman
-	#$result->requestURL($request);
-
-	# Check result
-
-	#Debug "check results";
-	#checkRecordsMatch is now done inside query
-
-	# Return
-	return $self->_output($response);
-
+	#noRecordsMatch is now done inside query
+	return $self->_output($response);    #success
 }
 
 =method my $response=$provider->Identify($params);
@@ -276,8 +267,7 @@ sub Identify {
 		requestURL        => $self->requestURL,
 	) or return "Cannot create new HTTP::OAI::Identify";
 
-	# Output
-	return $self->_output($obj);
+	return $self->_output($obj);    #success
 }
 
 =method ListMetadataFormats (identifier);
@@ -320,8 +310,8 @@ sub ListMetadataFormats {
 	if ( $params{identifier} ) {
 		my $header = $engine->findByIdentifier( $params{identifier} );
 		if ( !$header ) {
-			return $self->err2XML(
-				new HTTP::OAI::Error( code => 'idDoesNotExist' ) );
+			$self->raiseError('idDoesNotExist');
+			return;
 		}
 	}
 
@@ -345,15 +335,11 @@ sub ListMetadataFormats {
 
 	#check if noMetadataFormats
 	if ( $list->metadataFormat() == 0 ) {
-		return $self->err2XML(
-			new HTTP::OAI::Error( code => 'noMetadataFormats' ) );
+		$self->raiseError( 'noMetadataFormats' );
+		return;
 	}
 
-	#
-	# Return
-	#
-
-	return $self->_output($list);
+	return $self->_output($list);    #success
 }
 
 =method my $xml=$provider->ListIdentifiers ($params);
@@ -411,14 +397,14 @@ sub ListIdentifiers {
 	my $request = $self->requestURL();
 	my $engine  = $self->{engine};       #provider
 
-	Warning 'Enter ListIdentifiers';
-	Debug 'prefix:' . $params{metadataPrefix}
-	  if $params{metadataPrefix};
-	Debug 'from:' . $params{from}   if $params{from};
-	Debug 'until:' . $params{until} if $params{'until'};
-	Debug 'set:' . $params{set}     if $params{set};
-	Debug 'resumption:' . $params{resumptionToken}
-	  if $params{resumptionToken};
+	#Warning 'Enter ListIdentifiers';
+	#Debug 'prefix:' . $params{metadataPrefix}
+	#  if $params{metadataPrefix};
+	#Debug 'from:' . $params{from}   if $params{from};
+	#Debug 'until:' . $params{until} if $params{'until'};
+	#Debug 'set:' . $params{set}     if $params{set};
+	#Debug 'resumption:' . $params{resumptionToken}
+	#  if $params{resumptionToken};
 
 	# Error handling
 	if ( !$engine ) {
@@ -428,19 +414,18 @@ sub ListIdentifiers {
 	if ( $params{resumptionToken} ) {
 
 		#chunk is response object here!
-		my $chunk = $self->chunkExists(%params);    #todo
+		my $chunk = $self->chunkExists(%params);
 
 		if ($chunk) {
-			return $self->_output($chunk);
+			return $self->_output($chunk);    #success
 		}
-		else {
-			return $self->err2XML(
-				new HTTP::OAI::Error( code => 'badResumptionToken' ) );
-		}
+
+		$self->raiseError( 'badResumptionToken' );
+		return;                               #error
 	}
 
 	if ( my $e = $self->checkFormatSupported( $params{metadataPrefix} ) ) {
-		push @errors, $e;                           #cannotDisseminateFormat
+		push @errors, $e;                     #cannotDisseminateFormat
 	}
 
 	if ( $params{Set} ) {
@@ -455,8 +440,9 @@ sub ListIdentifiers {
 	}
 
 	if (@errors) {
-		Debug "@errors" . @errors;
-		return $self->err2XML(@errors);
+		#Debug "@errors" . @errors;
+		$self->raiseOAIerrors(@errors);
+		return;    #failure
 	}
 
 	#Metadata handling: query returns response
@@ -464,21 +450,14 @@ sub ListIdentifiers {
 	my $response = $engine->query( \%params, $request );    #todo!
 
 	if ( !$response ) {
-		return $self->err2XML(
-			new HTTP::OAI::Error( code => 'noRecordsMatch' ) );
+		$self->{errorMessage} =
+		  $self->err2XML( new HTTP::OAI::Error( code => 'noRecordsMatch' ) );
+		return;                                             #error
 	}
 
 	#Debug "RESPONSE:".$response;
 	#todo: check if at least one record. On which level?
-	# Return
 	return $self->_output($response);
-}
-
-#where is it called?
-sub _badResumptionToken {
-	my $self = shift;
-	return $self->err2XML(
-		new HTTP::OAI::Error( code => 'badResumptionToken' ) );
 }
 
 =method ListRecords
@@ -540,17 +519,19 @@ sub ListRecords {
 		if ($chunk) {
 			return $self->_output($chunk);
 		}
-		else {
-			return $self->err2XML(
-				new HTTP::OAI::Error( code => 'badResumptionToken' ) );
-		}
+		$self->{errorMessage} = $self->err2XML(
+			new HTTP::OAI::Error( code => 'badResumptionToken' ) );
+		return;    #error
 	}
 
 	if ( my $e = $self->checkFormatSupported( $params{metadataPrefix} ) ) {
 		push @errors, $e;    #cannotDisseminateFormat
 	}
 
-	return $self->err2XML(@errors) if (@errors);
+	if (@errors) {
+		$self->{errorMessage} = $self->err2XML(@errors);
+		return;              #errors
+	}
 
 	#
 	# Metadata handling
@@ -559,8 +540,8 @@ sub ListRecords {
 	my $response = $engine->query( \%params, $self->requestURL );    #todo!
 
 	if ( !$response ) {
-		return $self->err2XML(
-			new HTTP::OAI::Error( code => 'noRecordsMatch' ) );
+		$self->raiseError('noRecordsMatch');
+		return;
 	}
 
 	#checkRecordsMatch is now done inside query
@@ -610,10 +591,8 @@ sub ListSets {
 
 	#resumptionTokens not supported/TODO
 	if ( $params{resumptionToken} ) {
-
-		#Debug "resumptionToken";
-		return $self->err2XML(
-			new HTTP::OAI::Error( code => 'badResumptionToken' ) );
+		$self->raiseError('badResumptionToken');
+		return;
 	}
 
 	#
@@ -629,10 +608,8 @@ sub ListSets {
 
 	#if none then noSetHierarchy (untested)
 	if ( !@used_sets ) {
-
-		#		debug "no sets";
-		return $self->err2XML(
-			new HTTP::OAI::Error( code => 'noSetHierarchy' ) );
+		$self->raiseError('noSetHierarchy');
+		return;
 	}
 
 	# just for debug
@@ -666,9 +643,6 @@ sub ListSets {
 		$listSets->requestURL( $self->requestURL() );
 	}
 
-	#
-	#output fun!
-	#
 	return $self->_output($listSets);
 }
 
@@ -724,6 +698,44 @@ sub err2XML {
 	#return _output($response);
 }
 
+=method $self->raiseOAIerrors (@errors);
+
+Expects a list of HTTP::OAI errors. Sets xml string version of the error 
+message which can be retrieved using $self->errorMessage.
+
+Primarily for internal use.
+
+=cut
+
+sub raiseOAIerrors {
+	my $self=shift or die "Need myself";
+	if (@_) {
+		$self->{errorMessage} = $self->err2XML(@_);
+	}
+}
+
+=method $self->raiseError('noRecordsMatch', 'optional message');
+
+Expects an OAI error code as string. The error message is optional. Sets the 
+error message which can be retrieved using $self->errorMessage.
+
+Primarily for internal use.
+
+=cut
+
+sub raiseError {
+	my $self = shift or croak "Need myself!";
+	my $code = shift or croak "Need code!";
+	my %opts = ( code => $code );
+
+	if ( my $msg = shift ) {
+		$opts{message} = $msg;
+	}
+
+	$self->{errorMessage} = $self->err2XML( new HTTP::OAI::Error(%opts) );
+}
+
+
 #
 # PRIVATE STUFF
 #
@@ -754,8 +766,8 @@ Usage:
 =cut
 
 sub chunkExists {
-	my $self    = shift or croak "Need myself!";
-	my %params  = @_;
+	my $self = shift or croak "Need myself!";
+	my %params = @_;
 	my $request = $self->requestURL;    #should be optional, but isn't, right?
 	my $token      = $params{resumptionToken} or return;
 	my $chunkCache = $self->{chunkCache};
@@ -770,7 +782,8 @@ sub chunkExists {
 	  or return;                        #possibly we need a return here!
 
 	#chunk is a HTTP::OAI::Response object
-	my $response = $self->{engine}->queryChunk( $chunkDesc, \%params, $request );
+	my $response =
+	  $self->{engine}->queryChunk( $chunkDesc, \%params, $request );
 	return $response;
 }
 

@@ -5,8 +5,8 @@ use HTTP::OAI::DataProvider;
 use HTTP::OAI::DataProvider::Test;
 use HTTP::OAI::Repository qw(validate_request);
 use XML::LibXML;
-#use Data::Dumper; #debugging the test
 
+#use Data::Dumper; #debugging the test
 
 #
 # $baseURL is not tested since it is deprecated anyway.
@@ -23,7 +23,7 @@ my $baseURL = 'http://localhost:3000/oai';
 		metadataPrefix => 'oai_dc',
 	);
 	validateRequest(%params);
-	my $response = $provider->ListIdentifiers( %params );
+	my $response = $provider->ListIdentifiers(%params);
 	okListIdentifiers($response);
 }
 
@@ -33,8 +33,8 @@ my $baseURL = 'http://localhost:3000/oai';
 		metadataPrefix => 'mpx',
 	);
 	validateRequest(%params);
-	my $response = $provider->ListIdentifiers( %params );
-	okListIdentifiers($response, 'different format');
+	my $response = $provider->ListIdentifiers(%params);
+	okListIdentifiers( $response, 'different format' );
 }
 
 {
@@ -44,8 +44,8 @@ my $baseURL = 'http://localhost:3000/oai';
 		set            => 'MIMO',
 	);
 	validateRequest(%params);
-	my $response = $provider->ListIdentifiers( %params );
-	okListIdentifiers($response, 'with set');
+	my $response = $provider->ListIdentifiers(%params);
+	okListIdentifiers( $response, 'with set' );
 }
 
 {
@@ -53,11 +53,11 @@ my $baseURL = 'http://localhost:3000/oai';
 		verb           => 'ListIdentifiers',
 		metadataPrefix => 'oai_dc',
 		set            => 'MIMO',
-		'from' => '2011-05-22T02:34:23Z',
+		'from'         => '2011-05-22T02:34:23Z',
 	);
 	validateRequest(%params);
-	
-	my $response = $provider->ListIdentifiers( %params );
+
+	my $response = $provider->ListIdentifiers(%params);
 	okListIdentifiers( $response, 'with from' );
 }
 {
@@ -65,12 +65,12 @@ my $baseURL = 'http://localhost:3000/oai';
 		verb           => 'ListIdentifiers',
 		metadataPrefix => 'oai_dc',
 		set            => 'MIMO',
-		until => '2012-05-22',
+		until          => '2012-05-22',
 	);
-	
+
 	validateRequest(%params);
 
-	my $response = $provider->ListIdentifiers( %params );
+	my $response = $provider->ListIdentifiers(%params);
 	okListIdentifiers( $response, 'with until' );
 }
 {
@@ -79,11 +79,11 @@ my $baseURL = 'http://localhost:3000/oai';
 		verb           => 'ListIdentifiers',
 		metadataPrefix => 'oai_dc',
 		set            => 'MIMO',
-		'from' => '1900-05-22T02:34:23Z',
-		'until' => '2011-05-22T02:34:23Z',
+		'from'         => '1900-05-22T02:34:23Z',
+		'until'        => '2011-05-22T02:34:23Z',
 	);
 	validateRequest(%params);
-	my $response = $provider->ListIdentifiers( %params );
+	my $response = $provider->ListIdentifiers(%params);
 	okListIdentifiers( $response, 'with from and until' );
 }
 
@@ -92,12 +92,17 @@ my $baseURL = 'http://localhost:3000/oai';
 #
 {
 	my %params = (
-		verb           => 'ListIdentifiers',
-		resumptionToken           => 'abc',
+		verb            => 'ListIdentifiers',
+		resumptionToken => 'abc',
 	);
 	validateRequest(%params);
-	my $response = $provider->ListIdentifiers( %params );
-	isOAIerror( $response, 'badResumptionToken' );
+	my $response = $provider->ListIdentifiers(%params)
+	  or
+	  if ( !$response )
+	{
+		$response = $provider->errorMessage;
+		isOAIerror( $response, 'badResumptionToken' );
+	}
 }
 
 {
@@ -107,27 +112,38 @@ my $baseURL = 'http://localhost:3000/oai';
 		set            => 'MIMO',
 	);
 	validateRequest(%params);
-	my $response = $provider->ListIdentifiers( %params );
-	isOAIerror( $response, 'cannotDisseminateFormat' );
+	my $response = $provider->ListIdentifiers(%params);
+
+	if ( !$response ) {
+		$response = $provider->errorMessage;
+		isOAIerror( $response, 'cannotDisseminateFormat' );
+	}
 }
 
 {
 	my %params = (
-		verb           => 'ListIdentifiers',
-		set            => 'MIMO',
+		verb => 'ListIdentifiers',
+		set  => 'MIMO',
 	);
+
 	#validateRequest(%params);
-	my $response = $provider->ListIdentifiers( %params );
-	isOAIerror( $response, 'badArgument' );
+	my $response = $provider->ListIdentifiers(%params);
+	if ( !$response ) {
+		$response = $provider->errorMessage;
+		isOAIerror( $response, 'badArgument' );
+	}
+
 }
 
 {
-	my %params = (
-		verb           => 'ListIdentifiers',
-	);
+	my %params = ( verb => 'ListIdentifiers', );
+
 	#validateRequest(%params);
-	my $response = $provider->ListIdentifiers( %params );
-	isOAIerror( $response, 'badArgument' );
+	my $response = $provider->ListIdentifiers(%params);
+	if ( !$response ) {
+		$response = $provider->errorMessage;
+		isOAIerror( $response, 'badArgument' );
+	}
 }
 
 {
@@ -136,9 +152,13 @@ my $baseURL = 'http://localhost:3000/oai';
 		metadataPrefix => 'oai_dc',
 		set            => 'bla',
 	);
+
 	#validateRequest(%params);
-	my $response = $provider->ListIdentifiers( %params );
-	isOAIerror( $response, 'noRecordsMatch' );
+	my $response = $provider->ListIdentifiers(%params);
+	if ( !$response ) {
+		$response = $provider->errorMessage;
+		isOAIerror( $response, 'noRecordsMatch' );
+	}
 }
 
 #TODO: noSetHierarchy
@@ -146,6 +166,7 @@ my $baseURL = 'http://localhost:3000/oai';
 #
 #
 #
+
 =func validateRequest(%params);
 
 Fails with intelligble error message if %params are not correct. Why test this

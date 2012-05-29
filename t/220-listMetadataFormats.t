@@ -50,7 +50,9 @@ my $baseURL = 'http://localhost:3000/oai';
 {
 	my $response = $provider->ListMetadataFormats(
 		identifier => 'spk-berlin.de:EM-objId-01234567890A' );
-	isOAIerror( $response, 'idDoesNotExist' );
+	if ( !$response ) {
+		isOAIerror( $provider->errorMessage, 'idDoesNotExist' );
+	}
 }
 
 #DataProvider with globalFormats cant really respond with noMetadataFormats
