@@ -527,16 +527,16 @@ sub querySQL {
 		$sql .= qq/records.identifier = '$params->{identifier}' AND /;
 	}
 
-	if ( $params->{from} ) {
-		$sql .= qq/ datestamp > '$params->{from}' AND /;
+	if ( $params->{'from'} ) {
+		$sql .= qq/ datestamp > '$params->{'from'}' AND /;
 	}
 
-	if ( $params->{until} ) {
-		$sql .= qq/ datestamp < '$params-> {until}' AND /;
+	if ( $params->{'until'} ) {
+		$sql .= qq/ datestamp < '$params->{'until'}' AND /;
 	}
 
 	if ( $params->{set} ) {
-		$sql .= qq/setSpec = '$params->{set}' AND /;
+		$sql .= qq/setSpec = '$params->{'set'}' AND /;
 	}
 
 	$sql .= qq/ 1=1 LIMIT $limit OFFSET $offset/;
@@ -802,7 +802,7 @@ sub _queryCount {
 	}
 
 	if ( $params->{'until'} ) {
-		$sql .= qq/ datestamp < '$params-> {until}' AND /;
+		$sql .= qq/ datestamp < '$params->{'until'}' AND /;
 	}
 
 	if ( $params->{set} ) {

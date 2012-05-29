@@ -3,15 +3,14 @@ use strict;
 use warnings;
 use HTTP::OAI::DataProvider;
 use HTTP::OAI::DataProvider::Test;
-use Test::More;
+use Test::More tests => 14;
 
 #use Data::Dumper qw(Dumper); #only for debugging tests
 
 
 #load a working standard test config which should have ONLY required values
 my %config=HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
-my @options = qw(debug xslt requestURL warning);
-plan tests => 1 + keys( %config ) + scalar @options;
+my @options = qw(requestURL);
 
 # 1. Does it work? Return value right?
 #
@@ -54,17 +53,12 @@ foreach my $value (@required) {
 
 foreach my $value (@options) {
 	my %config=HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
-	undef $config{$value};
+	delete $config{$value};
 	my $provider;
-	eval { $provider = HTTP::OAI::DataProvider->new(%config) };
+	eval { $provider = HTTP::OAI::DataProvider->new(%config); };
 
-	ok(
-		ref $provider eq 'HTTP::OAI::DataProvider',
-		"should succeed without $value"
-	);
+	my $msg="should succeed without $value ";
+	$msg.=$@ if ($@);
+	ok(ref $provider eq 'HTTP::OAI::DataProvider', $msg);
 }
 
-#
-#TODO test validations of parameters/options
-#for that to happen with need validation first. Where should validation happen? 
-#Before we start to validate we should correct the db-layer abstraction

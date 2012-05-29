@@ -12,8 +12,8 @@ use XML::LibXML;
 # $baseURL is not tested since it is deprecated anyway.
 #
 
-my $config   = HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
-my $provider = new HTTP::OAI::DataProvider($config);
+my %config   = HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
+my $provider = new HTTP::OAI::DataProvider(%config);
 
 my $baseURL = 'http://localhost:3000/oai';
 
@@ -23,7 +23,7 @@ my $baseURL = 'http://localhost:3000/oai';
 		metadataPrefix => 'oai_dc',
 	);
 	validateRequest(%params);
-	my $response = $provider->ListIdentifiers( $baseURL, %params );
+	my $response = $provider->ListIdentifiers( %params );
 	okListIdentifiers($response);
 }
 
@@ -33,7 +33,7 @@ my $baseURL = 'http://localhost:3000/oai';
 		metadataPrefix => 'mpx',
 	);
 	validateRequest(%params);
-	my $response = $provider->ListIdentifiers( $baseURL, %params );
+	my $response = $provider->ListIdentifiers( %params );
 	okListIdentifiers($response, 'different format');
 }
 
@@ -44,7 +44,7 @@ my $baseURL = 'http://localhost:3000/oai';
 		set            => 'MIMO',
 	);
 	validateRequest(%params);
-	my $response = $provider->ListIdentifiers( $baseURL, %params );
+	my $response = $provider->ListIdentifiers( %params );
 	okListIdentifiers($response, 'with set');
 }
 
@@ -57,7 +57,7 @@ my $baseURL = 'http://localhost:3000/oai';
 	);
 	validateRequest(%params);
 	
-	my $response = $provider->ListIdentifiers( $baseURL, %params );
+	my $response = $provider->ListIdentifiers( %params );
 	okListIdentifiers( $response, 'with from' );
 }
 {
@@ -70,7 +70,7 @@ my $baseURL = 'http://localhost:3000/oai';
 	
 	validateRequest(%params);
 
-	my $response = $provider->ListIdentifiers( $baseURL, %params );
+	my $response = $provider->ListIdentifiers( %params );
 	okListIdentifiers( $response, 'with until' );
 }
 {
@@ -83,7 +83,7 @@ my $baseURL = 'http://localhost:3000/oai';
 		'until' => '2011-05-22T02:34:23Z',
 	);
 	validateRequest(%params);
-	my $response = $provider->ListIdentifiers( $baseURL, %params );
+	my $response = $provider->ListIdentifiers( %params );
 	okListIdentifiers( $response, 'with from and until' );
 }
 
@@ -93,10 +93,10 @@ my $baseURL = 'http://localhost:3000/oai';
 {
 	my %params = (
 		verb           => 'ListIdentifiers',
-		resumptionToken           => '01234',
+		resumptionToken           => 'abc',
 	);
 	validateRequest(%params);
-	my $response = $provider->ListIdentifiers( $baseURL, %params );
+	my $response = $provider->ListIdentifiers( %params );
 	isOAIerror( $response, 'badResumptionToken' );
 }
 
@@ -107,7 +107,7 @@ my $baseURL = 'http://localhost:3000/oai';
 		set            => 'MIMO',
 	);
 	validateRequest(%params);
-	my $response = $provider->ListIdentifiers( $baseURL, %params );
+	my $response = $provider->ListIdentifiers( %params );
 	isOAIerror( $response, 'cannotDisseminateFormat' );
 }
 
@@ -117,7 +117,7 @@ my $baseURL = 'http://localhost:3000/oai';
 		set            => 'MIMO',
 	);
 	#validateRequest(%params);
-	my $response = $provider->ListIdentifiers( $baseURL, %params );
+	my $response = $provider->ListIdentifiers( %params );
 	isOAIerror( $response, 'badArgument' );
 }
 
@@ -126,7 +126,7 @@ my $baseURL = 'http://localhost:3000/oai';
 		verb           => 'ListIdentifiers',
 	);
 	#validateRequest(%params);
-	my $response = $provider->ListIdentifiers( $baseURL, %params );
+	my $response = $provider->ListIdentifiers( %params );
 	isOAIerror( $response, 'badArgument' );
 }
 
@@ -137,7 +137,7 @@ my $baseURL = 'http://localhost:3000/oai';
 		set            => 'bla',
 	);
 	#validateRequest(%params);
-	my $response = $provider->ListIdentifiers( $baseURL, %params );
+	my $response = $provider->ListIdentifiers( %params );
 	isOAIerror( $response, 'noRecordsMatch' );
 }
 

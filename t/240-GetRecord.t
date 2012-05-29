@@ -12,8 +12,8 @@ use FindBin;
 # init (taken for granted)
 #
 
-my $config   = HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
-my $provider = new HTTP::OAI::DataProvider($config);
+my %config   = HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
+my $provider = new HTTP::OAI::DataProvider(%config);
 
 my $baseURL = 'http://localhost:3000/oai';
 
@@ -25,7 +25,7 @@ my $baseURL = 'http://localhost:3000/oai';
 		metadataPrefix => 'mpx',
 		identifier     => 'spk-berlin.de:EM-objId-40008',
 	);
-	my $response = $provider->GetRecord( $baseURL, %params );
+	my $response = $provider->GetRecord( %params );
 	okGetRecord($response);
 }
 
@@ -35,13 +35,13 @@ my $baseURL = 'http://localhost:3000/oai';
 
 {
 	my %params = ( identifier => 'spk-berlin.de:EM-objId-40008', );
-	my $response = $provider->GetRecord( $baseURL, %params );
+	my $response = $provider->GetRecord( %params );
 	isOAIerror($response, 'badArgument');
 }
 
 {
 	my %params = ( metadataPrefix => 'mpx', );
-	my $response = $provider->GetRecord( $baseURL, %params );
+	my $response = $provider->GetRecord( %params );
 	isOAIerror($response, 'badArgument');
 }
 
@@ -51,7 +51,7 @@ my $baseURL = 'http://localhost:3000/oai';
 		identifier     => 'spk-berlin.de:EM-objId-40008',
 		meschugge      => 'schixe',
 	);
-	my $response = $provider->GetRecord( $baseURL, %params );
+	my $response = $provider->GetRecord( %params );
 	isOAIerror($response, 'badArgument');
 }
 
@@ -60,7 +60,7 @@ my $baseURL = 'http://localhost:3000/oai';
 		metadataPrefix => 'mpx',
 		identifier     => 'spk-berlin.de:EM-objId-meschugge',
 	);
-	my $response = $provider->GetRecord( $baseURL, %params );
+	my $response = $provider->GetRecord( %params );
 	isOAIerror($response, 'idDoesNotExist');
 }
 
@@ -69,7 +69,7 @@ my $baseURL = 'http://localhost:3000/oai';
 		metadataPrefix => 'meschugge',
 		identifier     => 'spk-berlin.de:EM-objId-40008',
 	);
-	my $response = $provider->GetRecord( $baseURL, %params );
+	my $response = $provider->GetRecord( %params );
 	isOAIerror($response, 'cannotDisseminateFormat');
 }
  

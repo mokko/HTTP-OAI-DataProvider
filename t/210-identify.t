@@ -2,7 +2,7 @@
 
 use strict;
 use warnings;
-use Test::More tests => 10;
+use Test::More tests => 9;
 use HTTP::OAI::DataProvider;
 use HTTP::OAI::DataProvider::Test;
 use XML::LibXML;
@@ -11,8 +11,8 @@ use Test::Xpath;
 #use Data::Dumper qw(Dumper);
 
 # new is taken for granted
-my $config   = HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
-my $provider = new HTTP::OAI::DataProvider($config);
+my %config   = HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
+my $provider = new HTTP::OAI::DataProvider(%config);
 
 #
 # execute verb: test if things work
@@ -35,7 +35,7 @@ my $from_config_test = {
 my $xt = xpathTester($response);
 
 foreach my $key ( keys %{$from_config_test} ) {
-	$xt->is( $from_config_test->{$key}, $config->{$key}, "$key correct" );
+	$xt->is( $from_config_test->{$key}, $config{$key}, "$key correct" );
 }
 
 #
@@ -57,10 +57,8 @@ my $expected = {
 };
 
 foreach my $key ( keys %{$expected} ) {
-	$xt->is(
-		$other_config_values->{$key},
-		$expected->{$key}, "$key as expected"
-	);
+	$xt->is( $other_config_values->{$key},
+		$expected->{$key}, "$key as expected" );
 }
 
 #
@@ -68,15 +66,10 @@ foreach my $key ( keys %{$expected} ) {
 #
 
 {
-	my $response = $provider->Identify( bla => 'meschugge', 1 );                                  
+	my $response;
+	$response = $provider->Identify( bla => 'meschugge' );
 	isOAIerror($response, 'badArgument');
 }
-
-{
-	my $response = $provider->Identify( 1, identifier => 'meschugge' );                                  
-	isOAIerror($response, 'badArgument');
-}
-
 
 #
 # todo: at this point we have just tested if test configuration works as expected

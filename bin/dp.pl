@@ -96,6 +96,7 @@ sub getOpt {
 		'verb=s'            => \$params{verb},
 		'verbose'           => \$opts{v},
 	);
+
 	#cleanup the hash
 	verbose "Input params";
 	foreach my $key ( keys %params ) {
@@ -135,25 +136,11 @@ sub executeVerb {
 	delete $params{verb};
 	verbose "About to execute $verb";
 
-
-
 	#new might die on error
 	my $provider = new HTTP::OAI::DataProvider(%config)
 	  or die "Cant create new object";
 
-	#stupid requestURL
-	my $response;
-	if (   $verb eq 'GetRecord'
-		or $verb eq 'ListRecord'
-		or $verb eq 'ListMetadataFormats' )
-	{
-		$response = $provider->$verb( undef, %params )
-		  or die "Cant execute verb!";
-	}
-	else {
-		$response = $provider->$verb(%params) or die "Cant execute verb!";
-	}
-	return $response;
+	return $provider->$verb(%params) or die "Cant execute verb!";
 }
 
 =func verbose "bla";

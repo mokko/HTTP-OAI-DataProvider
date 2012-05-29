@@ -114,7 +114,7 @@ Then use it
 sub Debug {
 	my @orig = @_;
 	my $arg  = shift;
-	if ( defined &$arg ) {
+	if ( $arg && defined &$arg ) {
 
 		#print "SEEMS TO BE CODEREF $arg\n";
 		$Debug = $arg;
@@ -136,7 +136,7 @@ Usage analogous to C<Debug>. For details see there.
 sub Warning {
 	my @orig = @_;
 	my $arg  = shift;
-	if ( defined &$arg ) {
+	if ($arg && defined &$arg ) {
 		$Warning = $arg;
 	}
 	else {

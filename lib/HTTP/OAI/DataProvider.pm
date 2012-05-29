@@ -154,8 +154,8 @@ has 'xslt'       => ( isa => 'Str',     is => 'ro', required => 0 );
 sub BUILD {
 	my $self = shift;
 
-	HTTP::OAI::DataProvider::Message::init( Debug   => $self->debug );
-	HTTP::OAI::DataProvider::Message::init( Warning => $self->warning );
+	Debug( $self->debug );
+	Warning( $self->warning );
 
 	$self->{chunkCache} =
 	  new HTTP::OAI::DataProvider::ChunkCache(
@@ -207,9 +207,8 @@ sub GetRecord {
 	my %params = @_;
 	my @errors;
 
-	#NEW (todo in other verbs plus testing!)
 	$params{verb} = 'GetRecord';
-	$self->_validateRequest(%params) or return $self->errormsg;
+	$self->_validateRequest(%params) or return $self->errorMessage;
 
 	Warning 'Enter GetRecord (id:'
 	  . $params{identifier}
@@ -250,7 +249,7 @@ sub GetRecord {
 
 }
 
-=method my $response=$provider->Identify($requestURL,$params);
+=method my $response=$provider->Identify($params);
 
 
 =cut
@@ -340,8 +339,8 @@ sub ListMetadataFormats {
 
 	#ListMetadataFormat has requestURL info, so recreate it
 	#mk sure we don't lose requestURL in Starman
-	if ( $self->{requestURL} ) {
-		$list->requestURL( $self->{requestURL} );
+	if ( $self->requestURL ) {
+		$list->requestURL( $self->requestURL );
 	}
 
 	#check if noMetadataFormats
@@ -406,19 +405,20 @@ sub ListIdentifiers {
 	my $self   = shift;
 	my %params = @_;
 	my @errors;    #stores errors before there is a result object
-
 	$params{verb} = 'ListIdentifiers';
 	$self->_validateRequest(%params) or return $self->errorMessage;
 
 	my $request = $self->requestURL();
 	my $engine  = $self->{engine};       #provider
 
-	#Warning 'Enter ListIdentifiers (prefix:' . $params->{metadataPrefix};
-	#Debug 'from:' . $params->{from}   if $params->{from};
-	#Debug 'until:' . $params->{until} if $params->{until};
-	#Debug 'set:' . $params->{set}     if $params->{set};
-	#Debug 'resumption:' . $params->{resumptionToken}
-	#  if $params->{resumptionToken};
+	Warning 'Enter ListIdentifiers';
+	Debug 'prefix:' . $params{metadataPrefix}
+	  if $params{metadataPrefix};
+	Debug 'from:' . $params{from}   if $params{from};
+	Debug 'until:' . $params{until} if $params{'until'};
+	Debug 'set:' . $params{set}     if $params{set};
+	Debug 'resumption:' . $params{resumptionToken}
+	  if $params{resumptionToken};
 
 	# Error handling
 	if ( !$engine ) {
@@ -529,8 +529,7 @@ sub ListRecords {
 	#  if $params->{resumptionToken};
 
 	my @errors;
-	my $engine  = $self->{engine};
-	my $request = $self->{requestURL};
+	my $engine = $self->{engine};
 
 	#
 	# Error handling
@@ -557,7 +556,7 @@ sub ListRecords {
 	# Metadata handling
 	#
 
-	my $response = $engine->query( \%params, $request );    #todo!
+	my $response = $engine->query( \%params, $self->requestURL );    #todo!
 
 	if ( !$response ) {
 		return $self->err2XML(
@@ -594,8 +593,7 @@ sub ListSets {
 	my $self   = shift;
 	my %params = @_;
 
-	my $engine  = $self->{engine};
-	my $request = $self->requestURL();    #check if this is still necessary!
+	my $engine = $self->{engine};
 
 	$params{verb} = 'ListSets';
 	$self->_validateRequest(%params) or return $self->errorMessage;
@@ -704,34 +702,26 @@ sub checkFormatSupported {
 
 =method my $xml=$provider->err2XML(@obj);
 
-Parameter is an array of HTTP::OAI::Error objects. Of course, also a single
-value.
+Parameter is an array of HTTP::OAI::Error objects. O
 
-Includes the nicer output stylesheet setting from init.
+TODO: Currently, HTTP::OAI::Error seems to be handle only one error, so 
+currently err2XML also handles only one.
 
 =cut
 
 sub err2XML {
 	my $self = shift;
 
-	if (@_) {
-		my $response = new HTTP::OAI::Response;
-		my @errors;
-		foreach (@_) {
-			if ( ref $_ ne 'HTTP::OAI::Error' ) {
-				croak ref $_;
-				croak "Internal Error: Error has wrong format!";
-			}
-			$response->errors($_);
-			push @errors, $response;
-		}
-
-		$self->overwriteRequestURL($response);
-		$self->_init_xslt($response);
-		return $response->toDOM->toString;
-
-		#return _output($response);
+	my $response = new HTTP::OAI::Response;
+	foreach (@_) {
+		$response->errors($_) if ( ref $_ eq 'HTTP::OAI::Error' );
 	}
+
+	$self->overwriteRequestURL($response);
+	$self->_init_xslt($response);
+	return $response->toDOM->toString;
+
+	#return _output($response);
 }
 
 #
@@ -764,23 +754,23 @@ Usage:
 =cut
 
 sub chunkExists {
-	my $self    = shift;
-	my $params  = @_;
+	my $self    = shift or croak "Need myself!";
+	my %params  = @_;
 	my $request = $self->requestURL;    #should be optional, but isn't, right?
-	my $token      = $params->{resumptionToken} or return;
+	my $token      = $params{resumptionToken} or return;
 	my $chunkCache = $self->{chunkCache};
 
 	if ( !$chunkCache ) {
 		carp "No chunkCache!";
 	}
 
-	#Debug "Query chunkCache for " . $token;
+	Debug "Query chunkCache for " . $token;
 
 	my $chunkDesc = $chunkCache->get($token)
 	  or return;                        #possibly we need a return here!
 
 	#chunk is a HTTP::OAI::Response object
-	my $response = $self->{engine}->queryChunk( $chunkDesc, $params, $request );
+	my $response = $self->{engine}->queryChunk( $chunkDesc, \%params, $request );
 	return $response;
 }
 
@@ -827,17 +817,13 @@ sub overwriteRequestURL {
 	my $self     = shift;    #$provider
 	my $response = shift;    #e.g. HTTP::OAI::ListRecord
 
-	if ( !$response ) {
-		carp "Cannot overwrite without a response!";
-	}
-
-	if ( $self->{requestURL} ) {
+	if ( $self->requestURL ) {
 
 		#replace part before question mark
 		if ( $response->requestURL =~ /\?/ ) {
 			my @f = split( /\?/, $response->requestURL, 2 );
 			if ( $f[1] ) {
-				my $new = $self->{requestURL} . '?' . $f[1];
+				my $new = $self->requestURL . '?' . $f[1];
 
 				#very dirty
 				if ( $new =~ /verb=/ ) {
@@ -856,7 +842,7 @@ sub overwriteRequestURL {
 			else {
 
 				#requestURL has no ? in case of an badVerb
-				$response->requestURL( $self->{requestURL} );
+				$response->requestURL( $self->requestURL );
 			}
 		}
 	}
@@ -893,8 +879,9 @@ sub _init_xslt {
 sub _validateRequest {
 	my $self   = shift or croak "Need myself!";
 	my %params = @_    or return;
-	if ( my @errors = validate_request(%params) ) {
-		$self->{errorMessage}=$self->err2XML(@errors);
+	my @errors = validate_request(%params);
+	if (@errors) {
+		$self->{errorMessage} = $self->err2XML(@errors);
 		return;    #there was an error during validation
 	}
 	return 1;      #no validation error (success)
@@ -915,9 +902,7 @@ TODO: I am still transitioning from old to new error system!
 
 sub errorMessage {
 	my $self = shift or croak "Need myself!";
-	my $newMsg = shift; #a SINGLE string
-
-	return $self->{errormsg} if ( $self->{errormsg} );
+	return $self->{errorMessage} if ( $self->{errorMessage} );
 }
 
 =head1 OAI DATA PROVIDER FEATURES
