@@ -12,13 +12,15 @@ use namespace::autoclean;
 use HTTP::OAI;
 use HTTP::OAI::Repository qw/validate_date/;
 use HTTP::OAI::DataProvider::Engine::Result;
+use HTTP::OAI::DataProvider::Common qw/Debug Warning/;
+use HTTP::OAI::DataProvider::Transformer;
 #use HTTP::OAI::DataProvider::ChunkCache::Description; #why does it seem to work so far?
 use parent qw(HTTP::OAI::DataProvider::Engine);
 
 use XML::LibXML;
 #use XML::LibXML::XPathContext;
 use XML::SAX::Writer;
-use HTTP::OAI::DataProvider::Common qw/Debug Warning/;
+
 use Carp qw(carp croak);
 use DBI qw(:sql_types);    #new
 use DBIx::Connector;
@@ -68,10 +70,11 @@ Am currently not sure about the arguments. Currently i accept everything,
 so invocation has to be selective.
 
 =cut
-
+#optional: do i need cache info if I am only digesting?
+has 'chunkCache'   => ( isa => 'Object', is => 'ro', required => 0 );
+has 'chunkSize'    => ( isa => 'Str', is => 'ro', required => 0 );
+#required
 has 'dbfile'       => ( isa => 'Str',     is => 'ro', required => 1 );
-has 'chunkCache'   => ( isa => 'Object', is => 'ro', required => 1 );
-has 'chunkSize'    => ( isa => 'Str', is => 'ro', required => 1 );
 has 'nativePrefix' => ( isa => 'Str', is => 'ro', required => 1 );
 has 'nativeURI'    => ( isa => 'Str', is => 'ro', required => 1 );
 has 'locateXSL'    => ( isa => 'CodeRef', is => 'ro', required => 1 );
@@ -88,6 +91,7 @@ sub BUILD {
 
 }
 
+=method my $err=$engine->ingest (source=>$xml_fn, mapping=>&mapping);
 =method my $err=$engine->digest_single (source=>$xml_fn, mapping=>&mapping);
 
 Mapping is a callback which expects a record as LibXML::Document and returns a 
@@ -108,6 +112,8 @@ my $mapping=sub {
 }	
 
 =cut
+
+sub ingest {goto &digest_single;}
 
 sub digest_single {
 	my $self = shift;

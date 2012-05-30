@@ -9,7 +9,7 @@ use XML::LibXML;
 use Carp qw(carp croak);
 
 #use Scalar::Util;
-use HTTP::OAI::DataProvider::Common qw(valPackageName isScalar);
+use HTTP::OAI::DataProvider::Common qw(valPackageName isScalar testEnvironment);
 use HTTP::OAI::DataProvider::Valid;
 use base 'Exporter';
 our @EXPORT_OK;
@@ -27,12 +27,13 @@ our @EXPORT;
   isLMFprefix
 
   isOAIerror
+  oaiErrorResponse
 
   failOnRequestError
 
   loadWorkingTestConfig
+  testEnvironment
   xpathTester
-  oaiErrorResponse
 );
 
 #old stuff deprecated? Should be removed?

@@ -11,7 +11,6 @@ use File::Spec;
 use lib File::Spec->catfile( $FindBin::Bin, '..', 'lib' );
 
 use HTTP::OAI::DataProvider::SQLite;
-use HTTP::OAI::DataProvider::CLI;
 use HTTP::OAI::DataProvider::Common qw(say);
 use Pod::Usage;
 
