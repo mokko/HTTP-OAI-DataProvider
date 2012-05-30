@@ -16,40 +16,20 @@ our $Debug;
 our $Warning;
 
 @EXPORT_OK = qw(
-  argumentExists
   Debug
   isScalar
   modDir
+  say
+  testEnvironment
   valPackageName
   Warning
 );
 
 sub argumentsLeft;
 
-
-=method argumentExists ($arg);
-
-	Returns success if argument exists, croaks if no argument.
-	
-	function/method validation while we are waiting for method signatures.
-
-=cut
-
-
-sub argumentExists {
-	my $self = shift;
-	my $arg  = shift;
-
-	if ( !$arg ) {
-		croak "Argument missing!";
-	}
-	return 1;
-}
-
-
 =func carp argumentsLeft if @_;
 
-argumentsLeft stores just an error message in an attempt to unify the message
+argumentsLeft (in @_) stores just an error message in an attempt to unify the message
 printed if the same error occurs.
 
 =cut
@@ -142,12 +122,13 @@ sub Debug {
 		$Debug = $arg;
 	}
 	else {
+
 		#print "NOT a CODEREF $arg\n";
 		&$Debug(@orig) if $Debug;
+
 		#it is perfectly possible that Debug is not initialized, so don't croak
 	}
 }
-
 
 =sub Warning "message";
 
@@ -158,11 +139,32 @@ Usage analogous to C<Debug>. For details see there.
 sub Warning {
 	my @orig = @_;
 	my $arg  = shift;
-	if ($arg && defined &$arg ) {
+	if ( $arg && defined &$arg ) {
 		$Warning = $arg;
 	}
 	else {
 		&$Warning(@orig) if $Warning;
-		#it is perfectly possible that Warning is not initialized, so don't croak
+
+	   #it is perfectly possible that Warning is not initialized, so don't croak
 	}
+}
+
+sub say {
+	print "@_\n";
+}
+
+sub testEnvironment {
+	my $arg=shift;
+	my $dir = File::Spec->catfile( $FindBin::Bin, '..', 't', 'environment' );
+	my $config = File::Spec->catfile( $dir, 'config.pl' );
+	if ( !$arg ) { 
+		return $dir; 
+	}
+	if ($arg eq 'dir') {
+		return $dir; 
+	}
+	if ($arg eq 'config') {
+		return $config; 
+	}
+	croak "Unknown argument!";
 }

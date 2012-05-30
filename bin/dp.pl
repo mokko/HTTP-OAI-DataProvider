@@ -14,6 +14,8 @@ use File::Spec;
 use lib File::Spec->catfile( $FindBin::Bin, '..', 'lib' );
 use HTTP::OAI;
 use HTTP::OAI::DataProvider;
+use HTTP::OAI::DataProvider::Common;
+use Pod::Usage;
 
 our %opts;
 sub verbose;
@@ -43,7 +45,6 @@ end. See bin/eg-app.pl for an example implementation of a webapp.
 Current format is pure perl, see t/test_config for example.
 
 =head1 KNOWN BUGS
-
 After being install using 'make install' this script won't find the config in t 
 anymore. Use --config parameter instead.
 
@@ -76,13 +77,14 @@ Should I also use a yaml file?
 =cut
 
 sub loadConfig {
-my $configFile;
-	if ($opts{c}){
-		$configFile=$opts{c};
-	} else {
-		$configFile=File::Spec->catfile( "$FindBin::Bin", '..', 't', 'test_config' );				
+	my $configFile;
+	if ( $opts{c} ) {
+		$configFile = $opts{c};
 	}
-	
+	else {
+		$configFile = HTTP::OAI::DataProvider::Common::testEnvironment('config');
+	}
+
 	if ( !-f $configFile ) {
 		print "Error: Cant find config file ($configFile)\n";
 		exit 1;
@@ -91,7 +93,7 @@ my $configFile;
 	my %config = do $configFile or die "Error: Configuration not loaded";
 
 	#die "Error: Not a hashref" if ref $config ne 'HASH';
-	verbose " Config file $configFile loaded";
+	verbose (" Config file $configFile loaded");
 	return %config;
 }
 
@@ -101,7 +103,8 @@ my $configFile;
 sub getOpt {
 	my %params;
 	GetOptions(
-		'config=s'			=> \$opts{c},
+		'config=s'          => \$opts{c},
+		'help'              => \$opts{h},
 		'identifier=s'      => \$params{identifier},
 		'from=s'            => \$params{from},
 		'metadataPrefix=s'  => \$params{metadataPrefix},
@@ -111,6 +114,7 @@ sub getOpt {
 		'verb=s'            => \$params{verb},
 		'verbose'           => \$opts{v},
 	);
+	pod2usage(1) if ( $opts{h} );
 
 	#cleanup the hash
 	verbose "Input params";
@@ -163,6 +167,6 @@ sub executeVerb {
 =cut
 
 sub verbose {
-	my $msg = shift;
+	my $msg = shift or return;
 	print '*' . $msg . "\n" if ( $opts{v} );
 }

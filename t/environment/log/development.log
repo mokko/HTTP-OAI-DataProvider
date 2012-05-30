@@ -1,0 +1,49 @@
+[3896] debug @0.000009>  in bin/eg-app.pl l. 44
+[3896]  warn @0.000341>  in bin/eg-app.pl l. 45
+[444] debug @0.000013>  in bin/eg-app.pl l. 44
+[444]  warn @0.000425>  in bin/eg-app.pl l. 45
+[4708] debug @0.000010>  in bin/eg-app.pl l. 44
+[4708]  warn @0.000298>  in bin/eg-app.pl l. 45
+[2268] debug @0.000010>  in bin/eg-app.pl l. 44
+[2268]  warn @0.000295>  in bin/eg-app.pl l. 45
+[5720] debug @0.001381> [hit #1]_countTotals: SELECT COUNT (records.identifier) FROM records LEFT JOIN sets ON records.identifier = sets.identifier
+	WHERE 1=1 in /home/maurice/projects/HTTP-OAI-DataProvider/bin/../lib/HTTP/OAI/DataProvider/Common.pm l. 124
+[5720] debug @0.154331> [hit #1]chunkSize10 in /home/maurice/projects/HTTP-OAI-DataProvider/bin/../lib/HTTP/OAI/DataProvider/Engine.pm l. 43
+[5720] debug @0.154625> [hit #1]planChunking: total records:11133, maxChunkNo:1114 in /home/maurice/projects/HTTP-OAI-DataProvider/bin/../lib/HTTP/OAI/DataProvider/Common.pm l. 124
+[5720] debug @0.217804> [hit #1]2nd CHUNK FOUND1338305944704074 in /home/maurice/projects/HTTP-OAI-DataProvider/bin/../lib/HTTP/OAI/DataProvider/Common.pm l. 124
+[4904] debug @0.153640> [hit #1]chunkSize10 in /home/maurice/projects/HTTP-OAI-DataProvider/bin/../lib/HTTP/OAI/DataProvider/Engine.pm l. 43
+[3628] debug @0.156367> [hit #1]chunkSize10 in /home/maurice/projects/HTTP-OAI-DataProvider/bin/../lib/HTTP/OAI/DataProvider/Engine.pm l. 43
+[5848] debug @0.000010>  in bin/eg-app.pl l. 47
+[5848]  warn @0.000303>  in bin/eg-app.pl l. 48
+[4960] debug @0.000009>  in bin/eg-app.pl l. 47
+[4960]  warn @0.000301>  in bin/eg-app.pl l. 48
+[3544] debug @0.001465> [hit #1]_countTotals: SELECT COUNT (records.identifier) FROM records LEFT JOIN sets ON records.identifier = sets.identifier
+	WHERE 1=1 in /home/maurice/projects/HTTP-OAI-DataProvider/bin/../lib/HTTP/OAI/DataProvider/Common.pm l. 124
+[3544] debug @0.165064> [hit #1]chunkSize10 in /home/maurice/projects/HTTP-OAI-DataProvider/bin/../lib/HTTP/OAI/DataProvider/Engine.pm l. 43
+[3544] debug @0.165352> [hit #1]planChunking: total records:11133, maxChunkNo:1114 in /home/maurice/projects/HTTP-OAI-DataProvider/bin/../lib/HTTP/OAI/DataProvider/Common.pm l. 124
+[3544] debug @0.227273> [hit #1]2nd CHUNK FOUND1338306351132044 in /home/maurice/projects/HTTP-OAI-DataProvider/bin/../lib/HTTP/OAI/DataProvider/Common.pm l. 124
+[3544] debug @0.001563> [hit #3]_countTotals: SELECT COUNT (records.identifier) FROM records LEFT JOIN sets ON records.identifier = sets.identifier
+	WHERE 1=1 in /home/maurice/projects/HTTP-OAI-DataProvider/bin/../lib/HTTP/OAI/DataProvider/Common.pm l. 124
+[3544] debug @0.156597> [hit #3]chunkSize10 in /home/maurice/projects/HTTP-OAI-DataProvider/bin/../lib/HTTP/OAI/DataProvider/Engine.pm l. 43
+[3544] debug @0.156987> [hit #3]planChunking: total records:11133, maxChunkNo:1114 in /home/maurice/projects/HTTP-OAI-DataProvider/bin/../lib/HTTP/OAI/DataProvider/Common.pm l. 124
+[3544] debug @0.222840> [hit #3]2nd CHUNK FOUND1338306366291594 in /home/maurice/projects/HTTP-OAI-DataProvider/bin/../lib/HTTP/OAI/DataProvider/Common.pm l. 124
+[6528] debug @0.001516> [hit #4]_countTotals: SELECT COUNT (records.identifier) FROM records LEFT JOIN sets ON records.identifier = sets.identifier
+	WHERE 1=1 in /home/maurice/projects/HTTP-OAI-DataProvider/bin/../lib/HTTP/OAI/DataProvider/Common.pm l. 124
+[6528] debug @0.163081> [hit #4]chunkSize10 in /home/maurice/projects/HTTP-OAI-DataProvider/bin/../lib/HTTP/OAI/DataProvider/Engine.pm l. 43
+[6528] debug @0.163383> [hit #4]planChunking: total records:11133, maxChunkNo:1114 in /home/maurice/projects/HTTP-OAI-DataProvider/bin/../lib/HTTP/OAI/DataProvider/Common.pm l. 124
+[6528] debug @0.229169> [hit #4]2nd CHUNK FOUND1338306519713719 in /home/maurice/projects/HTTP-OAI-DataProvider/bin/../lib/HTTP/OAI/DataProvider/Common.pm l. 124
+[6528] debug @0.001339> [hit #7]_countTotals: SELECT COUNT (records.identifier) FROM records LEFT JOIN sets ON records.identifier = sets.identifier
+	WHERE 1=1 in /home/maurice/projects/HTTP-OAI-DataProvider/bin/../lib/HTTP/OAI/DataProvider/Common.pm l. 124
+[6528] debug @0.147487> [hit #7]chunkSize10 in /home/maurice/projects/HTTP-OAI-DataProvider/bin/../lib/HTTP/OAI/DataProvider/Engine.pm l. 43
+[6528] debug @0.147876> [hit #7]planChunking: total records:11133, maxChunkNo:1114 in /home/maurice/projects/HTTP-OAI-DataProvider/bin/../lib/HTTP/OAI/DataProvider/Common.pm l. 124
+[6528] debug @0.213509> [hit #7]2nd CHUNK FOUND1338306538622314 in /home/maurice/projects/HTTP-OAI-DataProvider/bin/../lib/HTTP/OAI/DataProvider/Common.pm l. 124
+[6528] debug @0.056477> [hit #17]_countTotals: SELECT COUNT (records.identifier) FROM records LEFT JOIN sets ON records.identifier = sets.identifier
+	WHERE records.identifier = 'spk-berlin.de:EM-objId-40008' AND 1=1 in /home/maurice/projects/HTTP-OAI-DataProvider/bin/../lib/HTTP/OAI/DataProvider/Common.pm l. 124
+[6528] debug @0.062250> [hit #17]chunkSize10 in /home/maurice/projects/HTTP-OAI-DataProvider/bin/../lib/HTTP/OAI/DataProvider/Engine.pm l. 43
+[6528] debug @0.062531> [hit #17]planChunking: total records:1, maxChunkNo:1 in /home/maurice/projects/HTTP-OAI-DataProvider/bin/../lib/HTTP/OAI/DataProvider/Common.pm l. 124
+[6528] debug @0.062903> [hit #17]queryChunk: this is the last chunk! in /home/maurice/projects/HTTP-OAI-DataProvider/bin/../lib/HTTP/OAI/DataProvider/Common.pm l. 124
+[6528] debug @0.008000> [hit #20]_countTotals: SELECT COUNT (records.identifier) FROM records LEFT JOIN sets ON records.identifier = sets.identifier
+	WHERE records.identifier = 'spk-berlin.de:EM-objId-40008' AND 1=1 in /home/maurice/projects/HTTP-OAI-DataProvider/bin/../lib/HTTP/OAI/DataProvider/Common.pm l. 124
+[6528] debug @0.013459> [hit #20]chunkSize10 in /home/maurice/projects/HTTP-OAI-DataProvider/bin/../lib/HTTP/OAI/DataProvider/Engine.pm l. 43
+[6528] debug @0.013719> [hit #20]planChunking: total records:1, maxChunkNo:1 in /home/maurice/projects/HTTP-OAI-DataProvider/bin/../lib/HTTP/OAI/DataProvider/Common.pm l. 124
+[6528] debug @0.014093> [hit #20]queryChunk: this is the last chunk! in /home/maurice/projects/HTTP-OAI-DataProvider/bin/../lib/HTTP/OAI/DataProvider/Common.pm l. 124

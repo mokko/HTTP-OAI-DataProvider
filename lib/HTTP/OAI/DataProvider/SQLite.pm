@@ -12,6 +12,7 @@ use namespace::autoclean;
 use HTTP::OAI;
 use HTTP::OAI::Repository qw/validate_date/;
 use HTTP::OAI::DataProvider::Engine::Result;
+#use HTTP::OAI::DataProvider::ChunkCache::Description; #why does it seem to work so far?
 use parent qw(HTTP::OAI::DataProvider::Engine);
 
 use XML::LibXML;
@@ -74,6 +75,7 @@ has 'chunkSize'    => ( isa => 'Str', is => 'ro', required => 1 );
 has 'nativePrefix' => ( isa => 'Str', is => 'ro', required => 1 );
 has 'nativeURI'    => ( isa => 'Str', is => 'ro', required => 1 );
 has 'locateXSL'    => ( isa => 'CodeRef', is => 'ro', required => 1 );
+#has 'requestURL'    => ( isa => 'Str', is => 'rw', required => 1 ); #todo
 
 sub BUILD {
 	my $self = shift or croak 'Need myself!';
@@ -86,7 +88,25 @@ sub BUILD {
 
 }
 
-=head2 	my $err=$engine->digest_single (source=>$xml_fn, mapping=>&mapping);
+=method my $err=$engine->digest_single (source=>$xml_fn, mapping=>&mapping);
+
+Mapping is a callback which expects a record as LibXML::Document and returns a 
+record as HTTP::OAI::Record (complete with HTTP::OAI::Header etc. inside). 
+
+my $mapping=sub {
+	my $self=shift or die "Need myself";
+	my $doc=shift or die "Expect a XML::LibXML::Document object";
+
+	my $headerInfo=$doc->findvalue('/some/xpath');
+
+	...	
+
+	return new HTTP::OAI::Record(
+		header   => new HTTP::OAI::Header(%optsA),
+		metadata => new HTTP::OAI::Metadata(%optsB),
+	);
+}	
+
 =cut
 
 sub digest_single {

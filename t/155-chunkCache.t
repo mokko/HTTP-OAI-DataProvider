@@ -1,5 +1,7 @@
 #should I use -
 #T
+use strict;
+use warnings;
 use FindBin;
 use Test::More tests => 10;
 use HTTP::OAI::DataProvider::ChunkCache;

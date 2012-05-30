@@ -220,7 +220,7 @@ sub okIfBadArgument {
 
 sub loadWorkingTestConfig {
 
-	my $fileName=File::Spec->catfile($FindBin::Bin,'..','t','test_config');
+	my $fileName=HTTP::OAI::DataProvider::Common::testEnvironment('config');
 	if (!-e $fileName) {
 		carp "working test config not found!";
 	}
