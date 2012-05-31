@@ -1,53 +1,55 @@
 package HTTP::OAI::DataProvider::Engine::SQLite;
 
-# ABSTRACT: A sqlite engine for HTTP::OAI::DataProvider
+# ABSTRACT: A simple and fairly generic SQLite engine for HTTP::OAI::DataProvider
 
 use warnings;
 use strict;
 
-use Moose;
-use namespace::autoclean;
+use Moose::Role;
 
-with 'HTTP::OAI::DataProvider::Database';
+#use namespace::autoclean;
+
+#make sure that this engine complies with the interface
+with 'HTTP::OAI::DataProvider::Engine::Interface';
 
 use HTTP::OAI;
 use HTTP::OAI::Repository qw/validate_date/;
 use HTTP::OAI::DataProvider::Engine::Result;
+
+#shouldn't I be talking to ChunkCache instead of ChunkCache Description?
+#what about Demeter?
+use HTTP::OAI::DataProvider::ChunkCache::Description;
 use HTTP::OAI::DataProvider::Common qw/Debug Warning/;
 use HTTP::OAI::DataProvider::Transformer;
 
 #use HTTP::OAI::DataProvider::ChunkCache::Description; #why does it seem to work so far?
-use parent qw(HTTP::OAI::DataProvider::Engine);
 
 use XML::LibXML;
 
 #use XML::LibXML::XPathContext;
-use XML::SAX::Writer;
+#use XML::SAX::Writer;
 
 use Carp qw(carp croak);
 use DBI qw(:sql_types);    #new
 use DBIx::Connector;
 
 =head1 SYNOPSIS
-
-1) Fill db
 	use HTTP::OAI::DataProvider::SQLite;
-	my $engine=new HTTP::OAI::DataProvider::SQLite (ns_prefix=>$prefix,
-		ns_uri=$uri);
-	my $err=$engine->digest_single (...);
 
-2) Use engine
-	use HTTP::OAI::DataProvider::SQLite;
-	my $engine=new HTTP::OAI::DataProvider::SQLite(
-		ns_prefix=>$prefix, ns_uri=$uri,
-		transformer=>$transformer,
+	#1) initialize (todo: update options)
+		my $engine=new HTTP::OAI::DataProvider::SQLite (
+			ns_prefix=>$prefix,
+			ns_uri=$uri
 		);
 
-	my $header=$engine->findByIdentifier($identifier);
-	my $result=$engine->queryHeaders($params);
-	my $result=$engine->queryRecords($params);
+	#2) Use query engine
 
-	TODO
+		my $header=$engine->findByIdentifier($identifier);
+		my $result=$engine->query($params);
+		my $result=$engine->queryHeaders($params);
+		my $result=$engine->queryRecords($params);
+
+	#inherits additional methods from L<DP::Engine::Interface>,
 
 =head1 DESCRIPTION
 
@@ -66,6 +68,8 @@ it would be
 TODO: See if I want to use base or parent?
 only for debug during development
 
+TODO: consider using SQL::Abstract to make code look nice.
+
 
 =method my $cache=HTTP::OAI::DataRepository::SQLite::new (@args);
 
@@ -74,28 +78,20 @@ so invocation has to be selective.
 
 =cut
 
-#optional: do i need cache info if I am only digesting?
 has 'chunkCache' => ( isa => 'Object', is => 'ro', required => 0 );
 has 'chunkSize'  => ( isa => 'Str',    is => 'ro', required => 0 );
+has 'locateXSL'    => ( isa => 'CodeRef', is => 'ro', required => 0 );
 
 #required
 has 'dbfile'       => ( isa => 'Str',     is => 'ro', required => 1 );
 has 'nativePrefix' => ( isa => 'Str',     is => 'ro', required => 1 );
 has 'nativeURI'    => ( isa => 'Str',     is => 'ro', required => 1 );
-has 'locateXSL'    => ( isa => 'CodeRef', is => 'ro', required => 1 );
 
 #has 'requestURL'    => ( isa => 'Str', is => 'rw', required => 1 ); #todo
 
-sub BUILD {
-	my $self = shift or croak 'Need myself!';
-	$self->{transformer} = new HTTP::OAI::DataProvider::Transformer(
-		nativePrefix => $self->nativePrefix,
-		locateXSL    => $self->locateXSL,
-	);
-	$self->_connect_db( $self->{dbfile} );
-	$self->init_db();
+=head1 INTERFACE METHODS
 
-}
+In the following, I list the methods which fulfill the interface.
 
 =head2 my $response=$engine->queryChunk($chunkDescription);
 
@@ -111,11 +107,13 @@ in an HTTP::OAI::DataProvider::ChunkCache::ChunkDescription.
 
 =cut
 
+=head2 QUERY
+=cut
+
 sub queryChunk {
 	my $self      = shift or croak "Need myself!";
 	my $chunkDesc = shift or croak "Need chunkDesc!";
 	my $params    = shift or croak "Need params!";
-	my $request = shift;    #optional
 
 	#Debug "Enter queryChunk";
 
@@ -143,13 +141,11 @@ sub queryChunk {
 	}
 
 	my $result = new HTTP::OAI::DataProvider::Engine::Result(%opts);
-
-	if ($request) {
-		$result->{requestURL} = $request;    #overwrites value from above!
-		     #Debug ":requestURL:".$result->{requestURL};
+	if ( $self->requestURL ) {
+		$result->requestURL = $self->requestURL;
 	}
 
-	#SQL
+    #SQL
 	my $dbh = $self->{connection}->dbh()       or die $DBI::errstr;
 	my $sth = $dbh->prepare( $chunkDesc->sql ) or croak $dbh->errstr();
 	$sth->execute() or croak $dbh->errstr();
@@ -368,7 +364,7 @@ sub findByIdentifier {
 
 }
 
-=head2 my @setSpecs=$provider->listSets();
+=method my @setSpecs=$provider->listSets();
 
 Return those setSpecs which are actually used in the store. Expects nothing,
 returns an array of setSpecs as string. Called from DataProvider::ListSets.
@@ -395,46 +391,6 @@ sub listSets {
 	return @setSpecs;
 }
 
-=head2 $result=$provider->query ($params);
-
-Gets called from GetRecord, ListRecords, ListIdentifiers. Possible parameters
-are metadataPrefix, from, until and Set. (Queries including a resumptionToken
-should not get here.)
-
-Plans chunking, save request chunks in cache and returns the first chunk as
-HTTP::OAI::DataProvider::Result object.
-
-TODO: What to do on failure?
-TODO: Deal with a GetRecord request. Should this take place in planChunking?
-
-TODO: do i still need isError?
-Test for failure:
-if ($result->isError) {
-	#do this
-}
-
-=cut
-
-sub query {
-	my $self   = shift or croak "Need myself!";
-	my $params = shift or croak "Need params!";
-	my $request = shift;    #optional?
-
-	#get here if called without resumptionToken
-	my $first = $self->planChunking($params);
-
-	#if there are no results there is no first chunk
-	if ( !$first ) {
-		return;
-	}
-
-	my $response = $self->queryChunk( $first, $params, $request );
-
-	#todo: we still have to test if result has any result at all
-
-	return $response;
-}
-
 =head2 my $i=$self->parseHeaders ($result, $sth);
 
 Expects an empty result object and a statement handle. Returns number of
@@ -448,14 +404,17 @@ will re-enter this loop at a later point in time.
 
 =cut
 
-=head2 my $sql=$self->querySQL ($params,$limit, $offset);
+=head2 my $sql=$self->_querySQL ($params,$limit, $offset);
 
 Returns the sql for the query (includes metadata for GetRecord and
 ListRecords).
 
+Used in planChunking. Since it is only called from inside this package I 
+consider it private.
+
 =cut
 
-sub querySQL {
+sub _querySQL {
 	my $self = shift;
 	my %args = @_;
 
@@ -516,42 +475,6 @@ sub querySQL {
 
 }
 
-#
-#
-#
-
-=head1 Internal Methods - to be called from other inside this module
-
-=head2 my $connection=_connectDb ($dbfile);
-
-Connects to database and saves DBIx::Connector object in 
-	$self->{connection} 
-
-Normally, _connectDb should be called during object initialization, so 
-normally the module user doesn't need to know about it.
-
-=cut
-
-sub _connectDb {
-	my $self = shift;
-	my $dbfile = shift or die "Need dbfile!";
-
-	if ( !-f $dbfile ) {
-		carp "Warning: No dbfile exists; will create new db";
-	}
-
-	#Debug "Connecting to $dbfile...";
-
-	$self->{connection} = DBIx::Connector->new(
-		"dbi:SQLite:dbname=$dbfile",
-		'', '',
-		{
-			sqlite_unicode => 1,
-			RaiseError     => 1
-		}
-	) or croak "Problems with DBIx::connector";
-}
-
 =head2 my $first=$self->planChunking($params);
 
 Counts the results for this request to split the response in chunks if
@@ -572,26 +495,27 @@ sub planChunking {
 
 	#do NOT test if provider was born with chunking ability on intention!
 	#total: total # of responses
+	#maxChunkNo ???
 	my ( $total, $maxChunkNo ) = $self->_mk_numbers($params);
 
 	Debug "planChunking: total records:$total, maxChunkNo:$maxChunkNo";
 
 	#what about an empty database?
 	if ( $total == 0 ) {
-		return ();
+		return;
 	}
 
 	my $first;
 	my $chunkNo      = 1;
 	my $currentToken = $self->mkToken();
-	my $chunkSize    = $self->{chunkSize};
-	my $chunkCache   = $self->{chunkCache};
+	my $chunkSize    = $self->chunkSize;
+	my $chunkCache   = $self->chunkCache;
 
 	#create all chunkDescriptions in chunkCache
 	while ( $chunkNo <= $maxChunkNo ) {
 		my $offset = ( $chunkNo - 1 ) * $chunkSize;    #or with +1?
 		     #Debug "OFFSET: $offset CHUNKSIZE: $chunkSize";
-		my $sql = $self->querySQL(
+		my $sql = $self->_querySQL(
 			limit  => $chunkSize,
 			offset => $offset,
 			params => $params,
@@ -646,6 +570,47 @@ sub planChunking {
 	return $first;
 }
 
+###
+### INTERNAL STUFF - STUFF SPECIFIC TO THiS SQLITE IMPLEMENTATION
+###
+
+=head1 Internal Methods 
+
+They are meant to be called from other methods inside this module. They are
+relevant for the author of this SQLite implementation, but not to its user.
+
+=head2 my $connection=_connectDB();
+
+Connects to database and saves DBIx::Connector object in 
+	$self->{connection} 
+
+Takes connection info from $self->dbfile and sets database handel in 
+$self->connector.
+
+Is now called from initDB. 
+
+=cut
+
+sub _connectDB {
+	my $self = shift;
+	my $dbfile = $self->dbfile or croak "Need dbfile!";
+
+	$self->valFileExists($dbfile) or return;
+	$self->{connection} = DBIx::Connector->new(
+		"dbi:SQLite:dbname=$dbfile",
+		'', '',
+		{
+			sqlite_unicode => 1,
+			RaiseError     => 1
+		}
+	) or $self->{error} = "Problems with DBIx::connector";
+
+	if ( !$self->{connection} ) {
+		return;    #error
+	}
+	return 1;      #success
+}
+
 =head2 my $count=$self->_countTotals ($params);
 
 For chunking I need to know the total number of results (headers or records)
@@ -675,24 +640,46 @@ sub _countTotals {
 	return $aref->[0];
 }
 
-sub _init_db {
+=method $self->_initDB()
 
-	#Debug "Enter _init_db";
+Expects nothing and returns nothing (via the method call and return value). 
+Instead, it takes a database handle from $self->{connection}, checks if 
+database schema exists and creates it if it doesn't.
+
+Schema has only two tables
+table:sets with columns 
+: setSpec
+: identifier (expects the OAI identifier)
+table:records with columns
+: identifier (expects the OAI identifier)
+: datestamp (either in small or long format)
+: status (might have string 'deleted')
+: native_md (xml for one record)
+
+TODO: currently I mix croaking and error messages. Decide what you want!
+
+=cut
+
+sub initDB {
 	my $self = shift;
-	my $dbh = $self->{connection}->dbh() or die $DBI::errstr;
+	$self->_connectDB or croak "Connecting problems";
+	my $dbh = $self->{connection}->dbh() or croak $DBI::errstr;
 
 	if ( !$dbh ) {
-		carp "Error: database handle missing";
+		$self->{error} = "Error: database handle missing";
+		return;
 	}
+
 	$dbh->do("PRAGMA foreign_keys");
-	$dbh->do("PRAGMA cache_size = 8000");    #doesn't make a big difference
-	                                         #default is 2000
+
+	#doesn't seem to make a big difference; default is 2000
+	$dbh->do("PRAGMA cache_size = 8000");
 
 	my $sql = q / CREATE TABLE IF NOT EXISTS sets( 'setSpec' STRING NOT NULL,
 			'identifier' TEXT NOT NULL REFERENCES records(identifier) ) /;
 
 	#Debug $sql. "\n";
-	$dbh->do($sql) or die $dbh->errstr;
+	$dbh->do($sql) or carp $dbh->errstr;
 
 	#TODO: Status not yet implemented
 	$sql = q/CREATE TABLE IF NOT EXISTS records (
@@ -703,10 +690,9 @@ sub _init_db {
 
 	# -- null or 1
 	#Debug $sql. "\n";
-	$dbh->do($sql) or die $dbh->errstr;
-}
+	$dbh->do($sql) or carp $dbh->errstr;
 
-#my $doc=$cache->_loadXML ($file);
+}
 
 =method my $doc=$self->_loadXML($xmlFile);
 
@@ -714,6 +700,7 @@ Expects a path to an XML file, registers native namespace and returns a
 XML::LibXML::Document.
 
 =cut
+
 sub _loadXML {
 	my $self     = shift or carp "Need myself";
 	my $location = shift or return;
@@ -728,7 +715,12 @@ sub _loadXML {
 	return $doc;
 }
 
-#hide that ugly code
+=method my ( $total, $maxChunkNo ) =$self->_mk_numbers($params);
+
+Expects the params as hashRef (todo: turn into hash). Returns
+
+=cut
+
 sub _mk_numbers {
 	my $self   = shift;
 	my $params = shift;
@@ -881,6 +873,6 @@ sub storeRecord {
 		}
 	}
 }
-__PACKAGE__->meta->make_immutable;
+
 1;
 

@@ -3,12 +3,15 @@ use strict;
 use warnings;
 use Moose;
 use Carp qw(carp croak confess);
-use Module::Loader;
+
+#use Module::Loader;
 use XML::LibXML;
-use HTTP::OAI::DataProvider::Common qw(hashRef2hash);
+#use HTTP::OAI::DataProvider::Common qw(hashRef2hash);
 
 has 'engine'     => ( isa => 'Str',     is => 'ro', required => 1 );
-has 'engineOpts' => ( isa => 'HashRef', is => 'ro', required => 1 );
+has 'nativePrefix' => ( isa => 'Str', is => 'ro', required => 1 );
+has 'nativeURI'    => ( isa => 'Str', is => 'ro', required => 1 );
+has 'dbfile'    => ( isa => 'Str', is => 'ro', required => 1 );
 
 =head1 SYNOPSIS
 
@@ -98,17 +101,18 @@ c) I could tell either DataProvider or its engine which
 =cut
 
 sub BUILD {
-	my $self   = shift or die "Need myself!";
-	my %opts   = hashRef2hash( $self->engineOpts );
+	my $self = shift or croak "Need myself";
 	my $engine = $self->engine;
-	load_module $engine or croak "Cant load engine ($engine)!";
 
-	#save the new engine object in $self->{_engine};
-	eval { $self->{_engine} = new $engine (%opts) };
+	#dynamically consume a role and inherit from it
+	with $engine;
 
-	if ( !$self->{_engine} ) {
-		confess "Can't make engine ($engine)";
-	}
+	#$self->{transformer} = new HTTP::OAI::DataProvider::Transformer(
+	#	nativePrefix => $self->nativePrefix,
+	#	locateXSL    => $self->locateXSL,
+	#);
+	$self->initDB() or croak "Cant init database";
+
 }
 
 =method $ingester->digest($file,$mapping);
@@ -123,27 +127,77 @@ The digest method calls $engine->storeRecord($record).
 sub digest {
 	my $self = shift;
 	my %args = @_;
-	my $engine=$self->{_engine} or croak "Need engine!";
+
+	if ( valFileExists( $args{source} ) ) {
+		return;    #failure
+	}
+	if ( !$args{source} ) {
+		$self->{errorMessage} = 'no source';
+		return;
+	}
 
 	if ( !-e $args{source} ) {
-		return "Source file not found";
+		$self->{errorMessage} = 'Source file not found';
+		return;
 	}
 
 	if ( !$args{mapping} ) {
 		croak "No mapping callback specified";
 	}
 
-	my $doc = XML::LibXML->load_xml( location => $args{source});
+	my $doc = $self->loadXML( $args{source} );
 
-	if ( !$doc ) {
-		croak "No document";
-	}
+	croak "No document" if ( !$doc );
 
 	my $mapping = $args{mapping};
 	no strict "refs";
 	while ( my $record = $self->$mapping($doc) ) {
-		$engine->storeRecord($record);
+		$self->storeRecord($record);
 	}
+}
+
+#
+# NOT SURE ABOUT THIS
+#
+
+sub registerNS {
+	my $self = shift;
+	my $doc  = shift;
+
+	#Debug 'Enter _registerNS';
+
+	if ( $self->{nativePrefix} ) {
+		if ( !$self->{nativeURI} ) {
+			croak "ns_prefix specified, but ns_uri missing";
+		}
+
+		#Debug 'ns: ' . $self->{nativePrefix} . ':' . $self->{nativeURI};
+
+		$doc = XML::LibXML::XPathContext->new($doc);
+		$doc->registerNs( $self->{nativePrefix}, $self->{nativeURI} );
+	}
+	return $doc;
+}
+
+=method my $doc=$self->_loadXML($xmlFile);
+
+Expects a path to an XML file, registers native namespace and returns a
+XML::LibXML::Document.
+
+=cut
+
+sub loadXML {
+	my $self     = shift or carp "Need myself";
+	my $location = shift or return;
+
+	#Debug "Enter _loadXML ($location)";
+
+	my $doc = XML::LibXML->load_xml( location => $location )
+	  or croak "Could not load " . $location;
+
+	$doc = _registerNS( $self, $doc );
+
+	return $doc;
 }
 
 1;
