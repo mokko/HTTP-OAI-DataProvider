@@ -8,6 +8,7 @@ use Scalar::Util;
 use Carp qw(carp croak);
 use Cwd qw(realpath);
 use File::Spec;
+use FindBin;
 
 use base 'Exporter';
 our @EXPORT_OK;
@@ -17,6 +18,7 @@ our $Warning;
 
 @EXPORT_OK = qw(
   Debug
+  hashRef2hash
   isScalar
   modDir
   say
@@ -49,6 +51,7 @@ sub modDir {
 	return $modDir;
 }
 
+#load this once when the module is loaded
 sub _modDir {
 	my $_modDir = __FILE__;
 	$_modDir =~ s,\.pm$,,;
@@ -168,3 +171,14 @@ sub testEnvironment {
 	}
 	croak "Unknown argument!";
 }
+
+#a candidate for Common
+sub hashRef2hash {
+	my $hashRef = shift or croak "Need a hashRef";
+	my %opts;
+	while ( my ( $key, $value ) = each %$hashRef ) {
+		$opts{$key} = $value;
+	}
+	return %opts;
+}
+
