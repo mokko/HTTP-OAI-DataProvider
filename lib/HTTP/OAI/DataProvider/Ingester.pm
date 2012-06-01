@@ -6,12 +6,13 @@ use Carp qw(carp croak confess);
 
 #use Module::Loader;
 use XML::LibXML;
+
 #use HTTP::OAI::DataProvider::Common qw(hashRef2hash);
 
-has 'engine'     => ( isa => 'Str',     is => 'ro', required => 1 );
+has 'engine'       => ( isa => 'Str', is => 'ro', required => 1 );
 has 'nativePrefix' => ( isa => 'Str', is => 'ro', required => 1 );
 has 'nativeURI'    => ( isa => 'Str', is => 'ro', required => 1 );
-has 'dbfile'    => ( isa => 'Str', is => 'ro', required => 1 );
+has 'dbfile'       => ( isa => 'Str', is => 'ro', required => 1 );
 
 =head1 SYNOPSIS
 
@@ -65,7 +66,7 @@ SQLite->digest_single ($file,&$mapping);
 I want a solution where I have a clearly defined interface to write multiple
 DB backends. My current implementation of SQLite, for example, uses a very
 simple and not very efficient database layout, where a lot of perKor 
-information exists multiple times.
+information exists multiple times (for instance).
 
 Or somebody else might want to use a different database altogether.
 
@@ -75,28 +76,6 @@ called OAI::DP::MySql. How would the dataProvider know which package to load?
 Obviously, we have to have a new config value which tells him.
 
 But OAI::DP::MySQL might also come with it own configuration
-
-new OAI::DP::SQLite(%opts1);
-new OAI::DP::MySQL(%opts2);
-
-OAI::DP::Database (generic = not db-specific);
--defines a role/interface for the db-specific implementations
-
-
-Which possibilities do I have?
-
-a) callback: I have used this to separate out MPX-specific stuff which goes into
-	the Salsa package. As a result OAI::DataProvider is independent of 
-	metadataFormat.  
-b) I have a separate package X which inherits from DataProvider
-
-	package X
-	base OAI::DataProvider
-	use OAI::DataProvider::MySQL;
-
-
-
-c) I could tell either DataProvider or its engine which 
 
 =cut
 
@@ -111,11 +90,11 @@ sub BUILD {
 	#	nativePrefix => $self->nativePrefix,
 	#	locateXSL    => $self->locateXSL,
 	#);
-	$self->initDB() or croak "Cant init database";
+	$self->initDB() or confess "Cant init database";
 
 }
 
-=method $ingester->digest($file,$mapping);
+=method $ingester->digest(source=>$file,mapping=>$mapping);
 
 Expects the location of an XML file and a mapping, i.e. a callback to code 
 which parses XML into HTTP::OAI::Records. 
@@ -127,33 +106,19 @@ The digest method calls $engine->storeRecord($record).
 sub digest {
 	my $self = shift;
 	my %args = @_;
-
-	if ( valFileExists( $args{source} ) ) {
-		return;    #failure
-	}
-	if ( !$args{source} ) {
-		$self->{errorMessage} = 'no source';
-		return;
-	}
-
-	if ( !-e $args{source} ) {
-		$self->{errorMessage} = 'Source file not found';
-		return;
-	}
-
-	if ( !$args{mapping} ) {
-		croak "No mapping callback specified";
-	}
-
-	my $doc = $self->loadXML( $args{source} );
-
-	croak "No document" if ( !$doc );
+	
+	return if ( !$self->valFileExists( $args{source} ) );
+	return if ( !$self->valIfExists( $args{mapping} ) );
 
 	my $mapping = $args{mapping};
+	my $doc = $self->loadXML( $args{source} );
+	return if ( !$self->valIfExists($doc) );
+
 	no strict "refs";
 	while ( my $record = $self->$mapping($doc) ) {
-		$self->storeRecord($record);
+			$self->storeRecord($record) or croak "storeRecord problem";
 	}
+	return 1; #success
 }
 
 #
@@ -179,7 +144,7 @@ sub registerNS {
 	return $doc;
 }
 
-=method my $doc=$self->_loadXML($xmlFile);
+=method my $doc=$self->loadXML($xmlFile);
 
 Expects a path to an XML file, registers native namespace and returns a
 XML::LibXML::Document.
@@ -195,7 +160,7 @@ sub loadXML {
 	my $doc = XML::LibXML->load_xml( location => $location )
 	  or croak "Could not load " . $location;
 
-	$doc = _registerNS( $self, $doc );
+	$doc = registerNS( $self, $doc );
 
 	return $doc;
 }

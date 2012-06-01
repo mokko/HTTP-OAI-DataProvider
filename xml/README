@@ -1,3 +1,0 @@
-This directory contains a few example responses (in OAI-PMH xml). There are not
-strictly necessary for HTTP::OAI::DataProvider or any of the tests, but might 
-be good to have in some cases, mainly when debugging.

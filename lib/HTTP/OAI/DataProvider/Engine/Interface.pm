@@ -4,6 +4,7 @@ use warnings;
 use Moose::Role;
 use Carp qw(carp croak confess);
 
+
 =head1 INTERFACE OVERVIEW
 
 	#basic
@@ -84,6 +85,7 @@ Database specific stuff (like SQL queries) goes into the specific engine.
 
 requires 'planChunking';
 requires 'queryChunk';
+
 
 =head2 INGEST INTERFACE 
 
@@ -176,7 +178,6 @@ count as found.
 
 =cut
 
-#should be part of Interface
 sub valFileExists {
 	my $self = shift or die "Need myself";
 	my $file = shift;    #path to file, of course
@@ -191,6 +192,17 @@ sub valFileExists {
 		return;    #failure
 	}
 	return 1;      #success
+}
+
+sub valIfExists {
+	my $self = shift or die "Need myself";
+	my $scalar = shift;    
+	
+	if (!$scalar) {
+		$self->{error}='Scalar not specified';
+		return;
+	}
+	return 1;
 }
 
 =method $msg=$self->error;

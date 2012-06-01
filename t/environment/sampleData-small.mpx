@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<museumPlusExport xmlns="http://www.mpx.org/mpx"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  xsi:schemaLocation="http://www.mpx.org/mpx">
+   <multimediaobjekt exportdatum="2011-02-15T10:03:46" typ="Bild" mulId="3184204" freigabe="intern">
+      <bearbDatum>17.01.2011</bearbDatum>
+      <multimediaAnfertDat>14.01.2011</multimediaAnfertDat>
+      <multimediaDateiname>I C 16546 -KK RS</multimediaDateiname>
+      <multimediaErweiterung>jpg</multimediaErweiterung>
+      <multimediaFunktion>Repro Digitalisat</multimediaFunktion>
+      <multimediaPfadangabe>M:\MuseumPlus\Produktiv\Multimedia\EM\Musikethnologie\Karteikarten\Instrumente\01-
+   I Asien
+  </multimediaPfadangabe>
+      <verknüpftesObjekt>255072</verknüpftesObjekt>
+   </multimediaobjekt>
+   <multimediaobjekt exportdatum="2011-02-15T10:03:46" typ="Bild" mulId="3184205" freigabe="intern">
+      <bearbDatum>17.01.2011</bearbDatum>
+      <multimediaAnfertDat>14.01.2011</multimediaAnfertDat>
+      <multimediaDateiname>I C 16546 -KK</multimediaDateiname>
+      <multimediaErweiterung>jpg</multimediaErweiterung>
+      <multimediaFunktion>Repro Digitalisat</multimediaFunktion>
+      <multimediaPfadangabe>M:\MuseumPlus\Produktiv\Multimedia\EM\Musikethnologie\Karteikarten\Instrumente\01-
+   I Asien
+  </multimediaPfadangabe>
+      <verknüpftesObjekt>255072</verknüpftesObjekt>
+   </multimediaobjekt>
+   <multimediaobjekt priorität="1" freigabe="web" exportdatum="2011-11-10T02:16:39"
+                     mulId="255072071831"
+                     typ="Bild"
+                     quelle="mpx-rif">
+      <multimediaDateiname>I C 16546 -A x</multimediaDateiname>
+      <multimediaErweiterung>jpg</multimediaErweiterung>
+      <multimediaFarbe>farbig</multimediaFarbe>
+      <multimediaFunktion>Repro Digitalisat</multimediaFunktion>
+      <multimediaPfadangabe>R:\MIMO-JPGS_Ready-To-Go\farbig\Verena_Höhn
+  </multimediaPfadangabe>
+      <multimediaTyp>Digitale Aufnahme</multimediaTyp>
+      <multimediaUrhebFotograf>Verena Höhn</multimediaUrhebFotograf>
+      <verknüpftesObjekt>255072</verknüpftesObjekt>
+   </multimediaobjekt>
+   <multimediaobjekt quelle="mpx-rif" exportdatum="2011-08-31T10:15:10" typ="Audio"
+                     mulId="2550721316031"
+                     freigabe="web"
+                     priorität="1">
+      <multimediaDateiname>I C 16546 -A x</multimediaDateiname>
+      <multimediaErweiterung>mp3</multimediaErweiterung>
+      <multimediaFunktion>Repro Digitalisat</multimediaFunktion>
+      <multimediaPfadangabe>R:\MIMO-Audio_Ready-To-Go\Svenja Strauß
+  </multimediaPfadangabe>
+      <multimediaTyp>Digitale Aufnahme</multimediaTyp>
+      <multimediaUrhebFotograf>Svenja Strauß</multimediaUrhebFotograf>
+      <verknüpftesObjekt>255072</verknüpftesObjekt>
+   </multimediaobjekt>
+   <multimediaobjekt quelle="mpx-rif" exportdatum="2011-08-31T10:22:46" typ="Video"
+                     mulId="2550721316071"
+                     freigabe="web"
+                     priorität="1">
+      <multimediaDateiname>I C 16546 -A x</multimediaDateiname>
+      <multimediaErweiterung>mpg</multimediaErweiterung>
+      <multimediaFunktion>Repro Digitalisat</multimediaFunktion>
+      <multimediaPfadangabe>R:\MIMO-Video_Ready-To-Go\Svenja Strauß
+  </multimediaPfadangabe>
+      <multimediaTyp>Digitale Aufnahme</multimediaTyp>
+      <multimediaUrhebFotograf>Svenja Strauß</multimediaUrhebFotograf>
+      <verknüpftesObjekt>255072</verknüpftesObjekt>
+   </multimediaobjekt>
+   <personKörperschaft exportdatum="2011-08-05T14:18:02" kueId="721">
+      <bearbDatum>21.03.2011</bearbDatum>
+      <berufTätigkeit>Sammler</berufTätigkeit>
+      <datierung art="erste Erwähnung">1883</datierung>
+      <geogrBezug funktion="Herkunft (Allgemein)">Indien (Chota Nagpur)</geogrBezug>
+      <name>Batsch, F.</name>
+      <nennform>F. Batsch</nennform>
+      <quelle>Nachweis aus dem Inventar I, DS bearb. B. Gliesmann</quelle>
+      <typ>Person</typ>
+      <verantwortlichkeit>EM-Süd- und Südostasien</verantwortlichkeit>
+   </personKörperschaft>
+   <sammlungsobjekt exportdatum="2011-02-15T10:03:46" objId="255072">
+      <bearbDatum>06.09.2010</bearbDatum>
+      <bemerkungSammlung>2.8.2010 gecheckt ME</bemerkungSammlung>
+      <credits>Staatliche Museen zu Berlin, Preußischer Kulturbesitz, Ethnologisches
+   Museum</credits>
+      <erwerbDatum>1886</erwerbDatum>
+      <erwerbNr>I/22/1886</erwerbNr>
+      <geogrBezug funktion="Herkunft (Allgemein)" bezeichnung="Land">Indien
+  </geogrBezug>
+      <geogrBezug funktion="Herkunft (Allgemein)">Chota Nagpur</geogrBezug>
+      <identNr art="Ident. Nr.">I C 16546</identNr>
+      <inventarNotiz>Sachbegriff Ansetzung lt. Fr. Dr. Ziegler / Erwerbungsart im
+   Inventar nicht genannt
+   / Meyer DB: Geo Bezug "Indien"
+  </inventarNotiz>
+      <langeBeschreibung>KK Musiketh.: „'Idiophon, Gong" HK: Flachgong
+  </langeBeschreibung>
+      <maßangabe typ="Gefäß">5 x 23 cm</maßangabe>
+      <objekttyp>Musikinstrument</objekttyp>
+      <objStatus>Objekt vorhanden: ja</objStatus>
+      <oov art="Vorgang">E 1246/1883</oov>
+      <personKörperschaftRef funktion="Sammler" id="721">Batsch
+  </personKörperschaftRef>
+      <sachbegriff>Gong</sachbegriff>
+      <ständigerStandort>Depot V (Saiten) (EM / Musikethnologie) / Raum 329; S: 01;
+   Re: 01; F: 07</ständigerStandort>
+      <systematikArt>111.241.1</systematikArt>
+      <verantwortlichkeit>EM-Süd- und Südostasien</verantwortlichkeit>
+      <verwaltendeInstitution>Ethnologisches Museum, Staatliche Museen zu
+   Berlin
+  </verwaltendeInstitution>
+   </sammlungsobjekt>
+</museumPlusExport>

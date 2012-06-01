@@ -8,30 +8,20 @@ use strict;
 use Moose::Role;
 
 #use namespace::autoclean;
-
-#make sure that this engine complies with the interface
-with 'HTTP::OAI::DataProvider::Engine::Interface';
-
-use HTTP::OAI;
-use HTTP::OAI::Repository qw/validate_date/;
-use HTTP::OAI::DataProvider::Engine::Result;
-
-#shouldn't I be talking to ChunkCache instead of ChunkCache Description?
-#what about Demeter?
-use HTTP::OAI::DataProvider::ChunkCache::Description;
-use HTTP::OAI::DataProvider::Common qw/Debug Warning/;
-use HTTP::OAI::DataProvider::Transformer;
-
-#use HTTP::OAI::DataProvider::ChunkCache::Description; #why does it seem to work so far?
-
-use XML::LibXML;
-
-#use XML::LibXML::XPathContext;
-#use XML::SAX::Writer;
-
 use Carp qw(carp croak);
 use DBI qw(:sql_types);    #new
 use DBIx::Connector;
+use XML::LibXML;
+use HTTP::OAI;
+use HTTP::OAI::Repository qw/validate_date/;
+use HTTP::OAI::DataProvider::Engine::Result;
+use HTTP::OAI::DataProvider::ChunkCache::Description;
+use HTTP::OAI::DataProvider::Common qw/Debug Warning/;
+use HTTP::OAI::DataProvider::Transformer;
+with 'HTTP::OAI::DataProvider::Engine::Interface';
+
+#use XML::LibXML::XPathContext;
+#use XML::SAX::Writer;
 
 =head1 SYNOPSIS
 	use HTTP::OAI::DataProvider::SQLite;
@@ -56,42 +46,34 @@ use DBIx::Connector;
 Provide a sqlite for HTTP::OAI::DataProvider and abstract all the database
 action to store, modify and access header and metadata information.
 
-=head1 TODO
-
-Separate out everything that is not sql-related engine work, so that writing
-another engine is MUCH less work. I will probably take out all the stuff to
-create results. That looks like another module. Maybe it could be a base
-module which the actual engine inherits. That would serve the purpose. Then
-it would be
 	HTTP::OAI::DataProvider::Engine
 
 TODO: See if I want to use base or parent?
 only for debug during development
-
 TODO: consider using SQL::Abstract to make code look nice.
-
 
 =method my $cache=HTTP::OAI::DataRepository::SQLite::new (@args);
 
-Am currently not sure about the arguments. Currently i accept everything,
-so invocation has to be selective.
+Am currently not sure about the arguments. 
 
 =cut
 
-has 'chunkCache' => ( isa => 'Object', is => 'ro', required => 0 );
-has 'chunkSize'  => ( isa => 'Str',    is => 'ro', required => 0 );
-has 'locateXSL'    => ( isa => 'CodeRef', is => 'ro', required => 0 );
+has 'chunkCache' => ( isa => 'Object',  is => 'ro', required => 0 );
+has 'chunkSize'  => ( isa => 'Str',     is => 'ro', required => 0 );
+has 'locateXSL'  => ( isa => 'CodeRef', is => 'ro', required => 0 );
 
 #required
-has 'dbfile'       => ( isa => 'Str',     is => 'ro', required => 1 );
-has 'nativePrefix' => ( isa => 'Str',     is => 'ro', required => 1 );
-has 'nativeURI'    => ( isa => 'Str',     is => 'ro', required => 1 );
+has 'dbfile'       => ( isa => 'Str', is => 'ro', required => 1 );
+has 'nativePrefix' => ( isa => 'Str', is => 'ro', required => 1 );
+has 'nativeURI'    => ( isa => 'Str', is => 'ro', required => 1 );
 
 #has 'requestURL'    => ( isa => 'Str', is => 'rw', required => 1 ); #todo
 
 =head1 INTERFACE METHODS
 
 In the following, I list the methods which fulfill the interface.
+
+=head2 QUERY
 
 =head2 my $response=$engine->queryChunk($chunkDescription);
 
@@ -105,9 +87,6 @@ in an HTTP::OAI::DataProvider::ChunkCache::ChunkDescription.
 
 [gets called in queryChunk and in data provider's (the badly named) chunkExist]
 
-=cut
-
-=head2 QUERY
 =cut
 
 sub queryChunk {
@@ -145,7 +124,7 @@ sub queryChunk {
 		$result->requestURL = $self->requestURL;
 	}
 
-    #SQL
+	#SQL
 	my $dbh = $self->{connection}->dbh()       or die $DBI::errstr;
 	my $sth = $dbh->prepare( $chunkDesc->sql ) or croak $dbh->errstr();
 	$sth->execute() or croak $dbh->errstr();
@@ -225,8 +204,7 @@ sub queryChunk {
 
 =head2 my $date=$engine->earliestDate();
 
-Maybe your Identify callback wants to call this to get the earliest date for
-the Identify verb.
+Maybe the Identify verb wants to call this.
 
 =cut
 
@@ -259,7 +237,7 @@ of datestamps in the store.
 Question is how much trouble I go to check weather all values comply with this
 definition?
 
-TODO: Check weather all datestamps comply with format
+TODO: Check whether all datestamps comply with format
 
 =cut
 
@@ -595,7 +573,8 @@ sub _connectDB {
 	my $self = shift;
 	my $dbfile = $self->dbfile or croak "Need dbfile!";
 
-	$self->valFileExists($dbfile) or return;
+	return if ( !$self->valFileExists($dbfile) );
+
 	$self->{connection} = DBIx::Connector->new(
 		"dbi:SQLite:dbname=$dbfile",
 		'', '',
@@ -694,30 +673,57 @@ sub initDB {
 
 }
 
-=method my $doc=$self->_loadXML($xmlFile);
+=sub method $engine->storeRecord($record);
 
-Expects a path to an XML file, registers native namespace and returns a
-XML::LibXML::Document.
+store record in db
 
 =cut
 
-sub _loadXML {
-	my $self     = shift or carp "Need myself";
-	my $location = shift or return;
+sub storeRecord {
+	my $self   = shift or croak "Need myself";
+	my $record = shift or croak "Need record";
 
-	#Debug "Enter _loadXML ($location)";
+	#Debug "Enter _storeRecord $record";
+	#check if complete
+	my $header = $record->header or croak "No header";
+	$record->metadata   or croak "No metadata";
+	$header->identifier or croak "No identifier";
+	$header->datestamp  or croak "No datestamp";
 
-	my $doc = XML::LibXML->load_xml( location => $location )
-	  or croak "Could not load " . $location;
+	#now I want to add: update only when datestamp equal or newer
 
-	$doc = _registerNS( $self, $doc );
+	my $datestamp_db = $self->_datestampDB($record);
 
-	return $doc;
+	#croak $dbh->errstr();
+
+	if ($datestamp_db) {
+
+		#if datestamp, then compare db and source datestamp
+		#Debug "datestamp source: $datestamp // datestamp $datestamp_db";
+		if ( $datestamp_db le $header->datestamp ) {
+
+			Debug
+			  "$header->identifier exists and date equal or newer -> update";
+			$self->_updateRecord($record) or croak "should be return";
+		}
+	}
+	else {
+
+		#Debug "$identifier new -> insert";
+		$self->_insertRecord($record) or croak "should be return";
+
+	}
+	$self->_updateSets($record) or croak "should be return";
+	return 1;    #success
 }
 
 =method my ( $total, $maxChunkNo ) =$self->_mk_numbers($params);
 
 Expects the params as hashRef (todo: turn into hash). Returns
+two numbers: The total amount of results and the number of chunks.
+
+This is not database specific. Could go elsewhere if there is more
+chunking!
 
 =cut
 
@@ -769,109 +775,90 @@ sub _queryCount {
 	return $sql;
 }
 
-sub _registerNS {
-	my $self = shift;
-	my $doc  = shift;
+sub _updateRecord {
+	my $self   = shift or die "Need myself!";
+	my $record = shift or return;
 
-	#Debug 'Enter _registerNS';
-
-	if ( $self->{nativePrefix} ) {
-		if ( !$self->{nativeURI} ) {
-			croak "ns_prefix specified, but ns_uri missing";
-		}
-
-		#Debug 'ns: ' . $self->{nativePrefix} . ':' . $self->{nativeURI};
-
-		$doc = XML::LibXML::XPathContext->new($doc);
-		$doc->registerNs( $self->{nativePrefix}, $self->{nativeURI} );
-	}
-	return $doc;
-}
-
-#store record in db
-sub storeRecord {
-	my $self   = shift or croak "Need myself";
-	my $record = shift or croak "Need record";
-
-	my $header     = $record->header     or croak "No header";
-	my $md         = $record->metadata   or croak "No metadata";
-	my $identifier = $header->identifier or croak "No identifier";
-	my $datestamp  = $header->datestamp  or croak "No datestamp";
+	my $up =
+	  q/UPDATE records SET datestamp=?, native_md =? / . q/WHERE identifier=?/;
 
 	my $dbh = $self->{connection}->dbh() or die $DBI::errstr;
+	croak "No database handle!" if ( !$dbh );
 
-	#Debug "Enter _storeRecord";
+	#Debug "UPDATE:$up";
+	my $sth = $dbh->prepare($up) or croak $dbh->errstr();
+	$sth->execute( $record->datestamp, $record->metadata->toString,
+		$record->identifier )
+	  or croak $dbh->errstr();
+	return 1;                     #success
+}
 
-	if ( !$dbh ) {
-		croak "No database handle!";
-	}
+sub _insertRecord {
+	my $self   = shift or die "Need myself!";
+	my $record = shift or return;
+	my $header = $record->header;
+	my $in = q/INSERT INTO records(identifier, datestamp, native_md, status) /;
+	$in .= q/VALUES (?,?,?,?)/;
 
-	#now I want to add: update only when datestamp equal or newer
-	#i.e. correct behavior might be
-	#a) insert because rec does not yet exist at all
-	#b) update because rec exists and is older
-	#c) do nothing because rec exists already and is newer
-	#my first idea is to check with a SELECT
-	#get datestamp and determine which of the two actions or none
-	#have to be taken
+	my $dbh = $self->{connection}->dbh() or die $DBI::errstr;
+	croak "No database handle!" if ( !$dbh );
+
+	#Debug "INSERT:$in";
+	my $sth = $dbh->prepare($in) or croak $dbh->errstr();
+	my $status;
+	$sth->execute(
+		$header->identifier,         $header->datestamp,
+		$record->metadata->toString, $header->status
+	) or croak $dbh->errstr();
+	return 1;
+}
+
+=method my $datestamp=$engine->_datestampDB($record); 
+	Returns the datestamp saved in the db for the identifier in record. (It 
+	does $record->header->identifier internally.)
+	
+	Returns empty/false on error.
+	
+	Gets called only in storeRecord at this time.
+=cut
+
+sub _datestampDB {
+	my $self   = shift or die "Need myself!";
+	my $record = shift or return;
+
+	my $dbh = $self->{connection}->dbh() or die $DBI::errstr;
+	croak "No database handle!" if ( !$dbh );
 
 	my $check = qq(SELECT datestamp FROM records WHERE identifier = ?);
 	my $sth = $dbh->prepare($check) or croak $dbh->errstr();
-	$sth->execute($identifier) or croak $dbh->errstr();
-	my $datestamp_db = $sth->fetchrow_array;
+	$sth->execute( $record->identifier ) or croak $dbh->errstr();
+	return $sth->fetchrow_array;
+}
 
-	#croak $dbh->errstr();
-
-	if ($datestamp_db) {
-
-		#if datestamp, then compare db and source datestamp
-		#Debug "datestamp source: $datestamp // datestamp $datestamp_db";
-		if ( $datestamp_db le $datestamp ) {
-
-			#Debug "$identifier exists and date equal or newer -> update";
-			my $up = q/UPDATE records SET datestamp=?, native_md =? /
-			  . q/WHERE identifier=?/;
-
-			#Debug "UPDATE:$up";
-			my $sth = $dbh->prepare($up) or croak $dbh->errstr();
-			$sth->execute( $datestamp, $md->toString, $identifier )
-			  or croak $dbh->errstr();
-		}
-
-		#else: db date is older than current one -> NO update
-	}
-	else {
-
-		#Debug "$identifier new -> insert";
-
-		#if no datestamp, then no record -> insert one
-		#this implies every record MUST have a datestamp!
-		my $in =
-		  q/INSERT INTO records(identifier, datestamp, native_md, status) /;
-		$in .= q/VALUES (?,?,?,?)/;
-
-		#Debug "INSERT:$in";
-		my $sth = $dbh->prepare($in) or croak $dbh->errstr();
-		my $status;
-		$sth->execute( $identifier, $datestamp, $md->toString, $status )
-		  or croak $dbh->errstr();
-	}
+sub _updateSets {
+	my $self   = shift or croak "Need myself";
+	my $record = shift or croak "Need record";
 
 	#Debug "delete Sets for record $identifier";
-	my $deleteSets = qq/DELETE FROM sets WHERE identifier=?/;
-	$sth = $dbh->prepare($deleteSets) or croak $dbh->errstr();
-	$sth->execute($identifier) or croak $dbh->errstr();
+	my $dbh = $self->{connection}->dbh() or die $DBI::errstr;
+	croak "No database handle!" if ( !$dbh );
 
-	if ( $header->setSpec ) {
-		foreach my $set ( $header->setSpec ) {
+	my $sql = qq/DELETE FROM sets WHERE identifier=?/;
+	my $sth = $dbh->prepare($sql) or croak $dbh->errstr();
+	$sth->execute( $record->identifier ) or croak $dbh->errstr();
+
+	if ( $record->header->setSpec ) {
+		foreach my $set ( $record->header->setSpec ) {
 
 			#Debug "write new set:" . $set;
 			my $addSet =
 			  q/INSERT INTO sets (setSpec, identifier) VALUES (?, ?)/;
 			$sth = $dbh->prepare($addSet) or croak $dbh->errstr();
-			$sth->execute( $set, $identifier ) or croak $dbh->errstr();
+			$sth->execute( $set, $record->header->identifier )
+			  or croak $dbh->errstr();
 		}
 	}
+	return 1;    #success
 }
 
 1;

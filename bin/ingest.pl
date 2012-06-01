@@ -1,18 +1,26 @@
 #!/usr/bin/perl
-#PODNAME:
+#PODNAME: ingest.pl
 #ABSTRACT: demo the data provider's ingest feature
 
 use strict;
 use warnings;
 use Getopt::Long;
+use Carp 'confess';
 
 use FindBin;
 use File::Spec;
-use lib File::Spec->catfile( $FindBin::Bin, '..', 'lib' );
-
-use HTTP::OAI::DataProvider::SQLite;
-use HTTP::OAI::DataProvider::Common qw(say);
+use XML::LibXML;
 use Pod::Usage;
+use lib File::Spec->catfile( $FindBin::Bin, '..', 'lib' );
+use HTTP::OAI::DataProvider::Ingester;
+use HTTP::OAI::DataProvider::Common qw(
+	Debug 
+	say 
+	testEnvironment 
+	Warning
+);
+use lib testEnvironment ('dir');
+use MPX;
 
 sub verbose;
 sub error;
@@ -41,51 +49,40 @@ ingest.pl file.xml
 # USER INPUT
 #
 
-my %opts; #from cli
-GetOptions(
-	'config=s' => \$opts{c},
-	'help'     => \$opts{h},
-	'verbose'  => \$opts{v},
-);
-pod2usage(1) if ( $opts{h} );
-
-if ( !$ARGV[0] ) {
-	error "No input file!";
-}
-
-if ( !-e $ARGV[0] ) {
-	error "Input file not found ($ARGV[0])!";
-}
-
-my %config = loadConfig(); #from file
+my %opts = userInput();    #from cli
 
 #
 # MAIN
 #
+my %config = loadConfig();    #from file
+$config{engine}    = 'HTTP::OAI::DataProvider::Engine::SQLite';
+$config{nativeURI} = $config{native_ns_uri};
+my $ingester = new HTTP::OAI::DataProvider::Ingester(%config) or die "Cant make new Ingester";
+verbose " ingester loaded successfully with config from '$opts{c}'";
+verbose " about to ingest file '$ARGV[0]' using mapping from 't/environment/MPX.pm'";
+$ingester->digest( source => $ARGV[0], mapping => \&MPX::extractRecords )
+  or confess "Can't digest";
+verbose " ingest complete";
 
-my $db= new HTTP::OAI::DataProvider::SQLite (%opts);
-#do i really need the chunkCache just ingest some data? hardly.
-#but if I make it optional, it could go missing when I need it, so put tests back in
-#for when I do need it.
-
-
-#
-# SUBs
-#
+###
+### SUBs
+###
 
 =head2 ...INTERNAL...
 
-If all goes well, you don't need to look at the internals.
+If all goes well, you don't need ever to look at the internals.
 
 =cut
 
 sub loadConfig {
 	my $configFile;
-	if ( $opts{c}) {
+	if ( $opts{c} ) {
 		$configFile = $opts{c};
 	}
 	else {
-		$configFile = HTTP::OAI::DataProvider::Common::testEnvironment('config');
+		$configFile =
+		  HTTP::OAI::DataProvider::Common::testEnvironment('config');
+		$opts{c}=$configFile;
 	}
 
 	if ( !-f $configFile ) {
@@ -95,11 +92,11 @@ sub loadConfig {
 	my %config = do $configFile or die "Error: Configuration not loaded";
 
 	#die "Error: Not a hashref" if ref $config ne 'HASH';
-	verbose (" Config file $configFile loaded");
+	verbose(" Config file $configFile loaded");
 	return %config;
 }
 
-=head 2 ...Messages...
+=head2 ...Messages...
 
 =func verbose "bla";
 
@@ -123,3 +120,31 @@ sub error {
 	say "Error: $msg";
 	exit 0;
 }
+
+=head2 ...Utility...
+
+=func %opts=userInput ();
+
+Parse long options in hash %opts;
+
+=cut
+
+sub userInput {
+
+	GetOptions(
+		'config=s' => \$opts{c},
+		'help'     => \$opts{h},
+		'verbose'  => \$opts{v},
+	);
+	pod2usage(1) if ( $opts{h} );
+
+	if ( !$ARGV[0] ) {
+		error "No input file!";
+	}
+
+	if ( !-e $ARGV[0] ) {
+		error "Input file not found ($ARGV[0])!";
+	}
+	return %opts;
+}
+

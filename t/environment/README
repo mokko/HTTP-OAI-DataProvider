@@ -1,1 +1,6 @@
-This direction functions as a test environment. Files here contain a working configuration of the data provider using the data I have. The data is in a format called MPX. It's not an integral part of the data provider, but merely an example format.
+This directory collects files needed for a  test environment. These files 
+contain a working configuration of the data provider (using the data I have 
+in the format i have). 
+
+The data format is called MPX. It's not an integral part of the data provider, 
+it is merely an example format. 
