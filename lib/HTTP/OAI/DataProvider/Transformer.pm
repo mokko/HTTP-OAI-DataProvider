@@ -6,7 +6,7 @@ use strict;
 use Moose;
 use namespace::autoclean;
 
-use Carp qw/croak carp/;
+use Carp qw/croak carp confess/;
 use HTTP::OAI::DataProvider::Common qw/Debug Warning/;
 use XML::LibXSLT;
 
@@ -36,17 +36,9 @@ has 'locateXSL' => (is => 'ro', isa => 'CodeRef', required => 1,);
 =cut
 
 sub toTargetPrefix {
-	my $self         = shift;    #transformer
-	my $targetPrefix = shift;
-	my $dom          = shift;
-
-	if ( !$targetPrefix ) {
-		die "no targetPrefix";
-	}
-
-	if ( !$dom ) {
-		die "no dom";
-	}
+	my $self         = shift or carp "Need myself!";    #transformer
+	my $targetPrefix = shift or carp "Need targetPrefix!"; 
+	my $dom          = shift or carp "Need document!";
 
 	#Debug "Enter toTargetPrefix ($targetPrefix)";
 	#Debug "self: " . ref $self;
@@ -54,7 +46,7 @@ sub toTargetPrefix {
 	#Debug "locateXSL: " . $self->{locateXSL};
 	#Debug "dom:" . ref $dom;
 
-	if ( $targetPrefix eq $self->{nativePrefix} ) {
+	if ( $targetPrefix eq $self->nativePrefix ) {
 
 		#Debug "toTargetPrefix: native and target are eq";
 		return $dom;
@@ -69,9 +61,8 @@ sub _cache_stylesheet {
 	my $self         = shift;
 	my $targetPrefix = shift;
 
-	if ( !$self->{locateXSL} ) {
-		die "locateXSL missing";
-	}
+	my $location=&{$self->locateXSL}($targetPrefix);
+	#print "loc...................$location\n";
 
 	my $style_doc;
 	my $xslt = XML::LibXSLT->new();
@@ -85,7 +76,7 @@ sub _cache_stylesheet {
 		# fullpath to the xsl which transforms to new (non native) format
 		no strict "refs";
 		$style_doc = XML::LibXML->load_xml(
-			location => $self->{locateXSL}($targetPrefix),
+			location => $location,
 			no_cdata => 1
 		);
 		use strict "refs";
@@ -103,7 +94,7 @@ sub _cache_stylesheet {
 	}
 
 	if ( !$stylesheet_cache{$targetPrefix} ) {
-		die "Stylesheet missing";
+		confess "Stylesheet missing";
 	}
 	return $stylesheet_cache{$targetPrefix};
 

@@ -11,10 +11,12 @@ use namespace::autoclean;
 use HTTP::OAI;
 use HTTP::OAI::Repository qw/validate_request/;
 use HTTP::OAI::DataProvider::SetLibrary;
-use HTTP::OAI::DataProvider::ChunkCache;
-use HTTP::OAI::DataProvider::Transformer;
-use HTTP::OAI::DataProvider::SQLite;
-use HTTP::OAI::DataProvider::Common qw/Debug Warning/;
+
+#use HTTP::OAI::DataProvider::ChunkCache; #should go. Chunk can become a thing of the Engine
+#use HTTP::OAI::DataProvider::Transformer;
+use HTTP::OAI::DataProvider::Engine;
+use HTTP::OAI::DataProvider::Common qw/Debug Warning hashRef2hash/;
+use XML::SAX::Writer;
 
 #use Data::Dumper qw/Dumper/; #for debugging
 
@@ -29,7 +31,7 @@ use HTTP::OAI::DataProvider::Common qw/Debug Warning/;
 	my $response=$provider->$verb(%params);
 
 	#New Error Checking
-	my $response=$provider->$verb(%params) or return $provider->errorMessage;
+	my $response=$provider->$verb(%params) or return $provider->error;
 
 =method my $provider->new ($options);
 
@@ -101,18 +103,20 @@ returns a path.
 =cut
 
 #required
-has 'adminEmail'        => ( isa => 'Str',     is => 'ro', required => 1 );
-has 'baseURL'           => ( isa => 'Str',     is => 'ro', required => 1 );
-has 'chunkCacheMaxSize' => ( isa => 'Str',     is => 'ro', required => 1 );
-has 'chunkSize'         => ( isa => 'Int',     is => 'ro', required => 1 );
-has 'deletedRecord'     => ( isa => 'Str',     is => 'ro', required => 1 );
-has 'dbfile'            => ( isa => 'Str',     is => 'ro', required => 1 );
-has 'GlobalFormats'     => ( isa => 'HashRef', is => 'ro', required => 1 );
-has 'locateXSL'         => ( isa => 'CodeRef', is => 'ro', required => 1 );
-has 'nativePrefix'      => ( isa => 'Str',     is => 'ro', required => 1 );
-has 'native_ns_uri'     => ( isa => 'Str',     is => 'ro', required => 1 );
-has 'repositoryName'    => ( isa => 'Str',     is => 'ro', required => 1 );
-has 'setLibrary'        => ( isa => 'HashRef', is => 'ro', required => 1 );
+has 'adminEmail' => ( isa => 'Str', is => 'ro', required => 1 );
+has 'baseURL'    => ( isa => 'Str', is => 'ro', required => 1 );
+
+#has 'chunkCacheMaxSize' => ( isa => 'Str',     is => 'ro', required => 1 );
+#has 'chunkSize'         => ( isa => 'Int',     is => 'ro', required => 1 );
+has 'engine'         => ( isa => 'HashRef', is => 'ro', required => 1 );
+has 'deletedRecord'  => ( isa => 'Str',     is => 'ro', required => 1 );
+has 'dbfile'         => ( isa => 'Str',     is => 'ro', required => 1 );
+has 'GlobalFormats'  => ( isa => 'HashRef', is => 'ro', required => 1 );
+#has 'locateXSL'      => ( isa => 'CodeRef', is => 'ro', required => 1 );
+#has 'nativePrefix'   => ( isa => 'Str',     is => 'ro', required => 1 );
+has 'native_ns_uri'  => ( isa => 'Str',     is => 'ro', required => 1 );
+has 'repositoryName' => ( isa => 'Str',     is => 'ro', required => 1 );
+has 'setLibrary'     => ( isa => 'HashRef', is => 'ro', required => 1 );
 
 #optional
 has 'debug'      => ( isa => 'CodeRef', is => 'ro', required => 0 );
@@ -129,18 +133,20 @@ sub BUILD {
 	Debug( $self->debug )     if ( $self->debug );
 	Warning( $self->warning ) if ( $self->warning );
 
-	$self->_initChunkCache();
+	#$self->_initChunkCache();
 	$self->_checkGlobalFormatsComplete();
 
-	#init engine (todo: this is noT properly abstracted)
-	$self->{engine} = new HTTP::OAI::DataProvider::SQLite(
-		dbfile       => $self->dbfile,
-		chunkCache   => $self->{chunkCache},
-		chunkSize    => $self->chunkSize,       # might not be necessary
-		nativePrefix => $self->nativePrefix,
-		nativeURI    => $self->native_ns_uri,
-		locateXSL    => $self->locateXSL,
-	);
+	my %opts = hashRef2hash( $self->engine );
+	$self->{Engine} = new HTTP::OAI::DataProvider::Engine(%opts);
+
+	#engine     => 'HTTP::OAI::DataProvider::Engine::SQLite',
+	#dbfile     => $self->dbfile,
+	#chunkCache => $self->{chunkCache},
+	#chunkSize    => $self->chunkSize,       # might not be necessary
+	#nativePrefix => $self->nativePrefix,
+	#nativeURI    => $self->native_ns_uri,
+	#locateXSL    => $self->locateXSL,
+
 }
 
 =method my $result=$provider->GetRecord(%params);
@@ -166,7 +172,7 @@ sub GetRecord {
 	my @errors;
 
 	$params{verb} = 'GetRecord';
-	$self->_validateRequest(%params) or return $self->errorMessage;
+	$self->_validateRequest(%params) or return $self->error;
 
 	my $engine        = $self->{engine};
 	my $globalFormats = $self->{globalFormats};
@@ -187,10 +193,10 @@ sub GetRecord {
 	}
 
 	# Metadata handling
-	my $response = $engine->query( \%params, $self->requestURL() );
+	my $response = $engine->query( \%params );    #todo
 
 	#noRecordsMatch is now done inside query
-	return $self->_output($response);    #success
+	return $self->_output($response);             #success
 }
 
 =method my $response=$provider->Identify(%params);
@@ -210,7 +216,7 @@ sub Identify {
 	my %params = @_;
 
 	$params{verb} = 'Identify';
-	$self->_validateRequest(%params) or return $self->errorMessage;
+	$self->_validateRequest(%params) or return $self->error;
 
 	#Debug "Enter Identify";
 
@@ -264,7 +270,7 @@ sub ListMetadataFormats {
 	#
 	# Error handling
 	#
-	$self->_validateRequest(%params) or return $self->errorMessage;
+	$self->_validateRequest(%params) or return $self->error;
 
 	#only if there is actually an identifier
 	if ( $params{identifier} ) {
@@ -392,7 +398,7 @@ sub ListIdentifiers {
 	my $response = $engine->query( \%params, $request );    #todo!
 
 	if ( !$response ) {
-		$self->{errorMessage} =
+		$self->{error} =
 		  $self->err2XML( new HTTP::OAI::Error( code => 'noRecordsMatch' ) );
 		return;                                             #error
 	}
@@ -434,7 +440,7 @@ sub ListRecords {
 	my $self   = shift;
 	my %params = @_;
 	$params{verb} = 'ListRecords';
-	$self->_validateRequest(%params) or return $self->errorMessage;
+	$self->_validateRequest(%params) or return $self->error;
 
 	#Warning 'Enter ListRecords (prefix:' . $params->{metadataPrefix};
 
@@ -456,7 +462,7 @@ sub ListRecords {
 		if ($chunk) {
 			return $self->_output($chunk);
 		}
-		$self->{errorMessage} = $self->err2XML(
+		$self->{error} = $self->err2XML(
 			new HTTP::OAI::Error( code => 'badResumptionToken' ) );
 		return;    #error
 	}
@@ -466,7 +472,7 @@ sub ListRecords {
 	}
 
 	if (@errors) {
-		$self->{errorMessage} = $self->err2XML(@errors);
+		$self->{error} = $self->err2XML(@errors);
 		return;              #errors
 	}
 
@@ -507,7 +513,7 @@ sub ListSets {
 	my $engine = $self->{engine};
 
 	$params{verb} = 'ListSets';
-	$self->_validateRequest(%params) or return $self->errorMessage;
+	$self->_validateRequest(%params) or return $self->error;
 
 	#print "Enter ListSets $self\n";
 
@@ -560,19 +566,21 @@ sub ListSets {
 	return $self->_output($listSets);
 }
 
-=method return $provider->errorMessage;
+=method return $provider->error;
+
+USED TO BE $provider->errorMessage;
 
 Returns an internal error message (if any). Error message is a single scalar 
 (string) ready for print.
 
 Just a getter, no setter! The error is set internally, e.g.
-	$provider->_validateRequest (%params) or return provider->errorMessage;
+	$provider->_validateRequest (%params) or return provider->error;
 
 =cut
 
-sub errorMessage {
+sub error {
 	my $self = shift or croak "Need myself!";
-	return $self->{errorMessage} if ( $self->{errorMessage} );
+	return $self->{error} if ( $self->{error} );
 }
 
 #
@@ -630,21 +638,21 @@ sub err2XML {
 =method $self->raiseOAIerrors (@errors);
 
 Expects a list of HTTP::OAI errors. Sets xml string version of the error 
-message which can be retrieved using $self->errorMessage.
+message which can be retrieved using $self->error.
 
 =cut
 
 sub raiseOAIerrors {
 	my $self = shift or die "Need myself";
 	if (@_) {
-		$self->{errorMessage} = $self->err2XML(@_);
+		$self->{error} = $self->err2XML(@_);
 	}
 }
 
 =method $self->raiseError('noRecordsMatch', 'optional message');
 
 Expects an OAI error code as string. The error message is optional. Sets the 
-error message which can be retrieved using $self->errorMessage.
+error message which can be retrieved using $self->error.
 
 =cut
 
@@ -657,36 +665,7 @@ sub raiseError {
 		$opts{message} = $msg;
 	}
 
-	$self->{errorMessage} = $self->err2XML( new HTTP::OAI::Error(%opts) );
-}
-
-=method my $chunk=$self->chunkExists (%params);
-
-returns a chunk description (if one with this resumptionToken exists) or nothing.
-
-Usage:
-	my $chunk=$self->chunkExists (%params);
-	if (!$chunk) {
-		return new HTTP::OAI::Error (code=>'badResumptionToken');
-	}
-
-=cut
-
-sub chunkExists {
-	my $self = shift or croak "Need myself!";
-	my %params = @_;
-	my $request = $self->requestURL;    #should be optional, but isn't, right?
-	my $token      = $params{resumptionToken} or return;
-	my $chunkCache = $self->{chunkCache};
-
-	Debug "Query chunkCache for " . $token;
-
-	my $chunkDesc = $chunkCache->get($token) or return;
-
-	#todo: eliminate $request from this method call
-	my $response =
-	  $self->{engine}->queryChunk( $chunkDesc, \%params, $request );
-	return $response;
+	$self->{error} = $self->err2XML( new HTTP::OAI::Error(%opts) );
 }
 
 =method my $xml=$self->_output($response);
@@ -775,7 +754,7 @@ for a nicer look and added on the top of reponse headers.
 
 sub _init_xslt {
 	my $self = shift;
-	my $obj  = shift;    #e.g. HTTP::OAI::ListRecord
+	my $obj  = shift or return;    #e.g. HTTP::OAI::ListRecord
 	if ( !$obj ) {
 		Warning "init_xslt called without a object!";
 		return ();
@@ -796,7 +775,7 @@ sub _validateRequest {
 	my %params = @_    or return;
 	my @errors = validate_request(%params);
 	if (@errors) {
-		$self->{errorMessage} = $self->err2XML(@errors);
+		$self->{error} = $self->err2XML(@errors);
 		return;    #there was an error during validation
 	}
 	return 1;      #no validation error (success)
@@ -860,14 +839,6 @@ sub _checkGlobalFormatsComplete {
 			croak "GlobalFormat $prefix in configuration incomplete";
 		}
 	}
-}
-
-sub _initChunkCache {
-	my $self = shift or croak "Need myself!";
-	$self->{chunkCache} =
-	  new HTTP::OAI::DataProvider::ChunkCache(
-		maxSize => $self->chunkCacheMaxSize )
-	  or croak "Cannot init chunkCache";
 }
 
 __PACKAGE__->meta->make_immutable;

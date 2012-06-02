@@ -1,8 +1,15 @@
 use strict;
 use warnings;
-use Test::More tests => 3;
+use Test::More tests => 4;
 use Scalar::Util qw(blessed);
 use HTTP::OAI::DataProvider::Test;
+use HTTP::OAI::DataProvider::Common qw(testEnvironment Debug Warning);
+use lib testEnvironment('dir'); #to load MPX from testEnviron
+use MPX; 
+
+my %config = loadWorkingTestConfig();
+die "No config! " if ( !%config );
+#init debugger
 
 =head1 CONCEPT
 
@@ -27,9 +34,6 @@ BEGIN {
 	ok( $@, 'new should fail' );
 }
 
-my %config = loadWorkingTestConfig();
-die "No config! " if ( !%config );
-
 my $ingester = new HTTP::OAI::DataProvider::Ingester(
 	engine       => 'HTTP::OAI::DataProvider::Engine::SQLite',
 	nativePrefix => $config{nativePrefix},
@@ -39,3 +43,9 @@ my $ingester = new HTTP::OAI::DataProvider::Ingester(
 
 ok( blessed $ingester eq 'HTTP::OAI::DataProvider::Ingester',
 	'ingester initialized' );
+
+
+my $small=File::Spec->catfile (testEnvironment('dir'),'sampleData-small.mpx');
+my $ret=$ingester->digest( source => $small, mapping => \&MPX::extractRecords ) or die "Can't digest";
+ok ( $ret, "import of $small seems to work (returns true)");
+

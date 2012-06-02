@@ -1,5 +1,4 @@
 package HTTP::OAI::DataProvider::Engine::SQLite;
-
 # ABSTRACT: A simple and fairly generic SQLite engine for HTTP::OAI::DataProvider
 
 use warnings;
@@ -8,7 +7,7 @@ use strict;
 use Moose::Role;
 
 #use namespace::autoclean;
-use Carp qw(carp croak);
+use Carp qw(carp croak confess);
 use DBI qw(:sql_types);    #new
 use DBIx::Connector;
 use XML::LibXML;
@@ -58,8 +57,8 @@ Am currently not sure about the arguments.
 
 =cut
 
-has 'chunkCache' => ( isa => 'Object',  is => 'ro', required => 0 );
-has 'chunkSize'  => ( isa => 'Str',     is => 'ro', required => 0 );
+#has 'chunkCache' => ( isa => 'Object',  is => 'ro', required => 0 );
+#has 'chunkSize'  => ( isa => 'Int',     is => 'ro', required => 1 ); 
 has 'locateXSL'  => ( isa => 'CodeRef', is => 'ro', required => 0 );
 
 #required
@@ -472,17 +471,18 @@ sub planChunking {
 	my $params = shift;
 
 	#do NOT test if provider was born with chunking ability on intention!
+	
 	#total: total # of responses
 	#maxChunkNo ???
+	
+	####IF getRecord we dont need to make numbers
+	
 	my ( $total, $maxChunkNo ) = $self->_mk_numbers($params);
 
 	Debug "planChunking: total records:$total, maxChunkNo:$maxChunkNo";
 
-	#what about an empty database?
-	if ( $total == 0 ) {
-		return;
-	}
-
+	return if ( $total == 0 ); 	#empty database?
+	
 	my $first;
 	my $chunkNo      = 1;
 	my $currentToken = $self->mkToken();
@@ -720,10 +720,13 @@ sub storeRecord {
 =method my ( $total, $maxChunkNo ) =$self->_mk_numbers($params);
 
 Expects the params as hashRef (todo: turn into hash). Returns
-two numbers: The total amount of results and the number of chunks.
+two numbers: The total amount of results and the total number of 
+chunks.
 
-This is not database specific. Could go elsewhere if there is more
-chunking!
+Gets called in planChunking.
+
+[This is not database specific. Could go elsewhere if there is more
+chunking!]
 
 =cut
 
@@ -732,6 +735,11 @@ sub _mk_numbers {
 	my $params = shift;
 	my $total  = $self->_countTotals($params);
 
+	if (!$self->chunkSize or $self->chunkSize == 0) {
+		confess "no chunkSize";
+	}
+
+	Debug "test $total/". $self->chunkSize ;
 	#e.g. 2222 total with 500 chunk size: 1, 501, 1001, 1501, 2001
 	my $max = ( $total / $self->chunkSize ) + 1;    #max no of chunks
 	return $total, sprintf( "%d", $max );           #rounded up to int

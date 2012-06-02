@@ -1,19 +1,27 @@
 use strict;
 use warnings;
+use HTTP::OAI::DataProvider;
 use HTTP::OAI::DataProvider::Valid;
-
-#use HTTP::OAI::DataProvider;
+use HTTP::OAI::DataProvider::Test;
+use HTTP::OAI::DataProvider::Common qw(say);
 use Test::More tests => 4;
 use XML::LibXML;
-use Slurp; #unnecessary dependency
+use File::Spec;
 
-my $filename = '/home/maurice/projects/HTTP-OAI-DataProvider/xml/getRecord.xml';
-die "need file" unless -f $filename;
-my $response = slurp ($filename) or die "Cant slurp!";
+#at this point the provider is not yet tested, so I should be using it really
+#in older versions I loaded a OAI response from file for that reason
+my %config   = loadWorkingTestConfig();
+my $provider = new HTTP::OAI::DataProvider(%config);
+my $response = $provider->GetRecord(
+	metadataPrefix => 'oai_dc',
+	identifier     => 'spk-berlin.de:EM-objId-524'
+) or die "Cant identify";
 
-my $doc = XML::LibXML->load_xml( location => $filename );
+my $doc = XML::LibXML->load_xml( string => $response )
+  or die "Cant load xml response!";
 
 my $v = new HTTP::OAI::DataProvider::Valid();
+
 #old form
 {
 	my $msg = $v->validate($doc);
@@ -31,6 +39,6 @@ my $v = new HTTP::OAI::DataProvider::Valid();
 }
 
 {
-	my $msg = $v->validateResponse($response, 'lax');
+	my $msg = $v->validateResponse( $response, 'lax' );
 	ok( $msg eq 'ok', "lax validation should pass: $msg" );
 }

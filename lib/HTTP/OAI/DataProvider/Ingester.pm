@@ -3,11 +3,9 @@ use strict;
 use warnings;
 use Moose;
 use Carp qw(carp croak confess);
+use HTTP::OAI::DataProvider::Common qw(Debug Warning);
 
-#use Module::Loader;
 use XML::LibXML;
-
-#use HTTP::OAI::DataProvider::Common qw(hashRef2hash);
 
 has 'engine'       => ( isa => 'Str', is => 'ro', required => 1 );
 has 'nativePrefix' => ( isa => 'Str', is => 'ro', required => 1 );

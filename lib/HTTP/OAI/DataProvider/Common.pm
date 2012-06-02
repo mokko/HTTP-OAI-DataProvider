@@ -109,8 +109,11 @@ sub valPackageName {
 
 =sub Debug "debug message";
 
-First initialize Debug:
+First initialize Debug with codeRef:
 	Debug (sub { my $msg=shift; print "$msg\n" if $msg});
+		#or
+	$config{debug}=sub { my $msg=shift; print "$msg\n" if $msg};
+	Debug $config{debug};
 Then use it
 	Debug "debug message";
 
@@ -156,20 +159,29 @@ sub say {
 	print "@_\n";
 }
 
+=func testEnvironment ($signal, $attach);
+
+If $signal (optional) is 'config' absolute path of the configuration file is returned. 
+Otherwise configuration directory (directory in which config resides) is returned.
+
+If $attach is specified the string $attach is added to configuration directory. 
+
+If $signal is 'config' and $attach is added, $attach is ignored.
+
+=cut
+
 sub testEnvironment {
-	my $arg=shift;
-	my $dir = File::Spec->catfile( $FindBin::Bin, '..', 't', 'environment' );
-	my $config = File::Spec->catfile( $dir, 'config.pl' );
-	if ( !$arg ) { 
-		return $dir; 
+	my $arg    = shift;
+	my $attach = shift;
+	my $dir    = File::Spec->catfile( $FindBin::Bin, '..', 't', 'environment' );
+	my $return=$dir;
+	if ( $arg eq 'config' ) {
+		$attach='config.pl';
 	}
-	if ($arg eq 'dir') {
-		return $dir; 
+	if ($attach) {
+		$return=File::Spec->catfile($return, $attach);
 	}
-	if ($arg eq 'config') {
-		return $config; 
-	}
-	croak "Unknown argument!";
+	return $return;
 }
 
 #a candidate for Common

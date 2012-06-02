@@ -4,6 +4,7 @@ use strict;
 use warnings;
 use Test::More tests => 14;
 use HTTP::OAI::DataProvider::Test;
+use HTTP::OAI::DataProvider::Common qw(hashRef2hash);
 use Cwd qw(realpath);
 
 =head1 CONCEPT
@@ -24,17 +25,15 @@ BEGIN {
 ### Just NEW
 ###
 
-my %config = loadWorkingTestConfig();
-
+my %config = loadWorkingTestConfig('engine');
 die "No config! " if ( !%config );
 
-my $engine = new HTTP::OAI::DataProvider::Engine(
-	dbfile       => $config{dbfile},
-	engine       => 'HTTP::OAI::DataProvider::Engine::SQLite',
-	locateXSL    => $config{locateXSL},
-	nativePrefix => $config{nativePrefix},
-	nativeURI    => $config{native_ns_uri},
-);
+#	dbfile       => $config{dbfile},
+#	engine       => 'HTTP::OAI::DataProvider::Engine::SQLite',
+#	locateXSL    => $config{locateXSL},
+#	nativePrefix => $config{nativePrefix},
+#	nativeURI    => $config{native_ns_uri},
+my $engine = new HTTP::OAI::DataProvider::Engine(%config);
 
 ###
 ### test inherited stuff from Interface
@@ -113,7 +112,10 @@ ok( $engine->granularity eq 'YYYY-MM-DDThh:mm:ssZ', 'granularity looks good' );
 # earliestDate
 #
 
-ok( $engine->earliestDate() eq '2010-04-20T11:21:49Z',
+#print $engine->earliestDate()."\n";
+
+#if you import new data in the test database you may have to adjust that date...
+ok( $engine->earliestDate() eq '2011-02-15T10:03:46Z',
 	'earliestDate looks good' );
 
 ###

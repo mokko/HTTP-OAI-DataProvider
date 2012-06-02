@@ -7,15 +7,20 @@ use Moose;
 use namespace::autoclean;
 use Time::HiRes qw(gettimeofday);    #to generate unique tokens
 use Carp qw(carp croak);
-use HTTP::OAI::DataProvider::Common qw/Debug Warning/;
-#use HTTP::OAI::DataProvider::ChunkCache::Description;
+use HTTP::OAI::DataProvider::Common qw/Debug hashRef2hash say Warning/;
+use HTTP::OAI::DataProvider::ChunkCache;
+use HTTP::OAI::DataProvider::Transformer;
 
+has 'chunkCache' => ( isa => 'HashRef', is => 'ro', required => 1 );
+
+#has 'chunkSize' => ( isa => 'Int', is => 'ro', required => 1 );
 has 'dbfile'       => ( isa => 'Str',     is => 'ro', required => 1 );
 has 'engine'       => ( isa => 'Str',     is => 'ro', required => 1 );
 has 'locateXSL'    => ( isa => 'CodeRef', is => 'ro', required => 1 );
-has 'nativePrefix' => ( isa => 'Str',     is => 'ro', required => 1 );
-has 'nativeURI'    => ( isa => 'Str',     is => 'ro', required => 1 );
-has 'requestURL'    => ( isa => 'Str',     is => 'rw', required => 0 );
+has 'nativeFormat' => ( isa => 'HashRef', is => 'ro', required => 1 );
+#has 'nativePrefix' => ( isa => 'Str',     is => 'ro', required => 1 );
+#has 'nativeURI'    => ( isa => 'Str',     is => 'ro', required => 1 );
+has 'requestURL' => ( isa => 'Str', is => 'rw', required => 0 );
 
 =head1 DESCRIPTION
 
@@ -72,6 +77,29 @@ DP::Ingester (class) consumes
 	
 =cut
 
+sub nativePrefix {
+	my $self = shift or confess "Need myself!";
+	my $nativePrefix = ( keys %{ $self->nativeFormat } )[0];
+
+	confess "something's wrong with nativePrefix" if ( !$nativePrefix );
+	return $nativePrefix;
+}
+
+sub BUILD {
+	my $self = shift or croak "Need myself";
+	#dynamically consume a role and inherit from it
+
+	$self->{transformer} = new HTTP::OAI::DataProvider::Transformer(
+		nativePrefix => $self->nativePrefix,
+		locateXSL    => $self->locateXSL,
+	);
+	with $self->engine;
+
+
+	$self->initDB();
+}
+
+
 =head2 $result=$provider->query ($params);
 
 Expects OAI parameters as hashref (TODO: hash). query 
@@ -90,6 +118,7 @@ internally
 
 =cut
 
+
 sub query {
 	my $self = shift or croak "Need myself!";
 	my $params = shift;
@@ -107,30 +136,47 @@ sub query {
 		return;
 	}
 
-	my $response = $self->queryChunk( $first );
+	my $response = $self->queryChunk($first);
 
 	#todo: we still have to test if result has any result at all
 
 	return $response;
 }
 
-#e.g. HTTP::OAI::DataProvider::Engine::SQLite;
+=method my $chunk=$self->chunkExists (%params);
 
-#with 'HTTP::OAI::DataProvider::Engine::SQLite';
+TODO/NEW:$self->chunkExists ($resumptionToken);
 
-sub BUILD {
-	my $self = shift or croak "Need myself";
-	my $engine = $self->engine;
+returns a chunk description (if one with this resumptionToken exists) or nothing.
 
-	#dynamically consume a role and inherit from it
-	with $engine;
+Usage:
+	my $chunk=$self->chunkExists (%params);
+	if (!$chunk) {
+		return new HTTP::OAI::Error (code=>'badResumptionToken');
+	}
 
-	$self->{transformer} = new HTTP::OAI::DataProvider::Transformer(
-		nativePrefix => $self->nativePrefix,
-		locateXSL    => $self->locateXSL,
-	);
+ TODO: Should this move into the engine? Does the provider need to know about
+ chunkcache at all?
+ $engine->chunkExists(%params)
+ $engine->chunkExists($resumptionToken);
 
-	$self->initDB() or return;
+=cut
+
+sub chunkExists {
+	my $self            = shift or croak "Need myself!";
+	my %params          = @_;
+	my $resumptionToken = $params{resumptionToken} or return;
+
+	#my $request = $self->requestURL;    #should be optional, but isn't, right?
+
+	my $chunkCache = $self->{_chunkCache};
+
+	Debug "Query chunkCache for " . $resumptionToken;
+
+	my $chunkDesc = $chunkCache->get($resumptionToken) or return;
+
+	#returns a chunk
+	return $self->queryChunk( $chunkDesc, \%params );
 }
 
 =head1 MEMO TO MYSELF
@@ -202,53 +248,33 @@ sub mkToken {
 	return time . $msec;
 }
 
-=head2 my $chunk_size=$result->chunkSize;
+#=head2 my $chunk_size=$result->chunkSize;
+#
+#Return chunk_size if defined or empty. Chunk_size is a config value that
+#determines how big (number of records per chunk) the chunks are.
+#
+#=cut
+#
+#sub chunkSize {
+#	my $self = shift;
+#	Debug "chunkSize" . $self->{chunkSize};
+#	if ( $self->{chunkSize} ) {
+#		return $self->{chunkSize};
+#	}
+#}
 
-Return chunk_size if defined or empty. Chunk_size is a config value that
-determines how big (number of records per chunk) the chunks are.
+sub _initChunkCache {
+	my $self = shift or croak "Need myself!";
 
-=cut
+	#object in _chunkCache and options in chunkcache
+	my %opts = hashRef2hash( $self->{chunkCache} );
 
-sub chunkSize {
-	my $self = shift;
-	Debug "chunkSize" . $self->{chunkSize};
-	if ( $self->{chunkSize} ) {
-		return $self->{chunkSize};
-	}
-}
-
-=head1 BASIC PARAMETER VALIDATION
-
-While we are waiting that perl gets method signatures (see Method::Sigatures),
-we work with very simple hand-made parameter validation.
-
-=head2 $self->requireAttributes ($hashref, 'a', b');
-
-Feature is a key of a hashref, either the object itself or another hashref
-object.
-
-Croaks if a or b are not present. If hashref is omitted, checks in $self:
-	$self->requireAttributes ('a', b');
-
-=cut
-
-sub requireAttributes {
-	my $self = shift;    #hashref
-	if ( ref $_[0] eq 'HASH' ) {
-		my $args = shift;
-		foreach my $key (@_) {
-			if ( !$args->{$key} ) {
-				croak "Attribute $key missing";
-			}
-		}
-	}
-	else {
-		foreach my $key (@_) {
-			if ( !$self->{$key} ) {
-				croak "Attribute $key missing";
-			}
-		}
-	}
+	#use Data::Dumper qw(Dumper);
+	#Debug 'WWWWWWWWWWWEIRD'.Dumper (%opts);
+	$self->{ChunkCache} =
+	  new HTTP::OAI::DataProvider::ChunkCache(
+		maxSize => $self->chunkCacheMaxSize )
+	  or croak "Cannot init chunkCache";
 }
 
 1;

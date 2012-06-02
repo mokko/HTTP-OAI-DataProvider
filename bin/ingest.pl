@@ -14,12 +14,12 @@ use Pod::Usage;
 use lib File::Spec->catfile( $FindBin::Bin, '..', 'lib' );
 use HTTP::OAI::DataProvider::Ingester;
 use HTTP::OAI::DataProvider::Common qw(
-	Debug 
-	say 
-	testEnvironment 
-	Warning
+  Debug
+  say
+  testEnvironment
+  Warning
 );
-use lib testEnvironment ('dir');
+use lib testEnvironment('dir');
 use MPX;
 
 sub verbose;
@@ -57,9 +57,12 @@ my %opts = userInput();    #from cli
 my %config = loadConfig();    #from file
 $config{engine}    = 'HTTP::OAI::DataProvider::Engine::SQLite';
 $config{nativeURI} = $config{native_ns_uri};
-my $ingester = new HTTP::OAI::DataProvider::Ingester(%config) or die "Cant make new Ingester";
+my $ingester = new HTTP::OAI::DataProvider::Ingester(%config)
+  or die "Cant make new Ingester";
 verbose " ingester loaded successfully with config from '$opts{c}'";
-verbose " about to ingest file '$ARGV[0]' using mapping from 't/environment/MPX.pm'";
+verbose " starting to ingest file '$ARGV[0]' using mapping from  "
+  . " 't/environment/MPX.pm' (this may take a while with big xm files)"
+  ;
 $ingester->digest( source => $ARGV[0], mapping => \&MPX::extractRecords )
   or confess "Can't digest";
 verbose " ingest complete";
@@ -82,7 +85,7 @@ sub loadConfig {
 	else {
 		$configFile =
 		  HTTP::OAI::DataProvider::Common::testEnvironment('config');
-		$opts{c}=$configFile;
+		$opts{c} = $configFile;
 	}
 
 	if ( !-f $configFile ) {

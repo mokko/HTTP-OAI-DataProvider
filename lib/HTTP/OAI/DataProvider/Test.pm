@@ -9,7 +9,11 @@ use XML::LibXML;
 use Carp qw(carp croak);
 
 #use Scalar::Util;
-use HTTP::OAI::DataProvider::Common qw(valPackageName isScalar testEnvironment);
+use HTTP::OAI::DataProvider::Common qw(hashRef2hash
+  isScalar
+  testEnvironment
+  valPackageName
+);
 use HTTP::OAI::DataProvider::Valid;
 use base 'Exporter';
 our @EXPORT_OK;
@@ -212,7 +216,7 @@ sub okIfBadArgument {
 
 =head2 NEW UTILITIES
 
-=func my $config =
+=func my %config =
 	  HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
 
 	loadWorkingTestConfig returns a hashref with a working configuration .
@@ -220,19 +224,39 @@ sub okIfBadArgument {
 =cut
 
 sub loadWorkingTestConfig {
+	my $signal   = shift; #optional
 
-	my $fileName=HTTP::OAI::DataProvider::Common::testEnvironment('config');
-	if (!-e $fileName) {
+	my $fileName = HTTP::OAI::DataProvider::Common::testEnvironment('config');
+
+	if ( !-e $fileName ) {
 		carp "working test config not found!";
 	}
 
-	my %config = do $fileName or croak "Error: Configuration not loaded";
+	my %config = do $fileName or return;
 
 	#in lieu of proper validation
 	#croak "Error: Not a hashref" if ref $config ne 'HASH';
 
+	#signal in first level?
+	if ( $signal && $config{$signal} ) {
+		return hashRef2hash( $config{$signal} );
+	}
+
+	#signal in 2nd level?
+	if ( $signal) {
+		foreach my $first (keys %config) {
+			if ($config{$first}{$signal}) {
+				return %{$config{$first}{$signal}};				
+			}
+			
+		}
+	#return complete hash	
+	return hashRef2hash( $config{$signal} );
+	}
+	
 	return %config;
 }
+
 
 =func my $err=oaiErrorResponse ($response)
 

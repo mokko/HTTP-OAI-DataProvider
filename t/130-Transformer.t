@@ -11,47 +11,60 @@ BEGIN {
 ";
 }
 
-my %config = HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
+my %engine =
+  HTTP::OAI::DataProvider::Test::loadWorkingTestConfig('engine');
+my %nativeFormat =
+  HTTP::OAI::DataProvider::Test::loadWorkingTestConfig('nativeFormat');
+my $nativePrefix = ( keys(%nativeFormat) )[0];
+
+#print "native:$nativePrefix\n";
+#my $nativeURI=$nativeFormat{$nativePrefix};
 
 {
-	my %smallConfig = ( nativePrefix => $config{nativePrefix}, );
-
 	eval {
-		my $transformer = new HTTP::OAI::DataProvider::Transformer(%smallConfig);
+		my $transformer =
+		  new HTTP::OAI::DataProvider::Transformer(
+			nativePrefix => $nativePrefix );
 	};
-	ok( $@, 'should fail: ' . $@ );
+	ok( $@, 'should fail ');
 }
 
 {
-	my %smallConfig = ( locateXSL => $config{locateXSL}, );
 
 	eval {
-		my $transformer = new HTTP::OAI::DataProvider::Transformer(%smallConfig);
+		my $transformer =
+		  new HTTP::OAI::DataProvider::Transformer(
+			locateXSL => $engine{locateXSL} );
 	};
-	ok( $@, 'should fail: ' . $@ );
+	ok( $@, 'should fail ' );
 }
 
-my %smallConfig = (
-	nativePrefix => $config{nativePrefix},
-	locateXSL    => $config{locateXSL},
+#
+# finally make a transformer
+#
+
+my $transformer = new HTTP::OAI::DataProvider::Transformer(
+	nativePrefix => $nativePrefix,
+	locateXSL    => $engine{locateXSL},
 );
 
-my $transformer = new HTTP::OAI::DataProvider::Transformer(%smallConfig);
 ok( blessed($transformer) eq 'HTTP::OAI::DataProvider::Transformer',
 	'transformer exists' );
 
 {
-	my $file = File::Spec->catfile( $FindBin::Bin, 'eg.mpx' );
+	my $file = testEnvironment ('dir', 'eg.mpx' );
+	#print "FILE: $file\n";
 	my $doc = XML::LibXML->load_xml( location => $file )
 	  or die "Cant read file";
 	my $newdom = $transformer->toTargetPrefix( 'oai_dc', $doc );
+	#print $newdom->toString;
 	my $tx = Test::XPath->new(
 		xml   => $newdom->toString,
 		xmlns => {
 			dc     => 'http://purl.org/dc/elements/1.1/',
 			oai_dc => 'http://www.openarchives.org/OAI/2.0/oai_dc/'
-		  }
+		}
 	);
 
-	$tx->ok( '/oai_dc:dc/dc:title', 'looks like oai_dc' );
+	$tx->ok( '/oai_dc:dc/dc:title', 'looks like oai_dc works' );
 }
