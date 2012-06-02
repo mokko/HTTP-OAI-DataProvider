@@ -3,7 +3,7 @@
 
 use strict;
 use warnings;
-use Test::More tests => 16;
+use Test::More tests => 14;
 use HTTP::OAI;
 use HTTP::OAI::DataProvider::Test;
 use HTTP::OAI::DataProvider::Transformer;
@@ -18,43 +18,37 @@ BEGIN {
 # preparations
 #
 
-my %engine = HTTP::OAI::DataProvider::Test::loadWorkingTestConfig('engine');
-my %nativeFormat =
-  HTTP::OAI::DataProvider::Test::loadWorkingTestConfig('nativeFormat');
+my %engine       = loadWorkingTestConfig('engine');
+my %nativeFormat = loadWorkingTestConfig('nativeFormat');
 my $nativePrefix = ( keys(%nativeFormat) )[0];
 
-my $t;    #used in subsequent tests!
-{
-	$t = new HTTP::OAI::DataProvider::Transformer(
-		nativePrefix => $nativePrefix,
-		locateXSL    => $engine{locateXSL},
-	);
-}
+#print "prefix:$nativePrefix\n";
+
+my $t = new HTTP::OAI::DataProvider::Transformer(
+	nativePrefix => $nativePrefix,
+	locateXSL    => $engine{locateXSL},
+) or die "Cant make transformer";
 
 #
 # 1-test new
 #
 
-{
-	my %opts;
-	$opts{transformer} = $t;
-	eval { my $result = new HTTP::OAI::DataProvider::Engine::Result(%opts); };
-	ok( $@, 'should fail: ' . $@ );
-}
+eval {
+	my $result =
+	  new HTTP::OAI::DataProvider::Engine::Result( transformer => $t );
+};
+ok( $@, 'should fail: ' );
 
-{
-	my %opts;
-	$opts{verb} = 'GetRecord';
-	eval { my $result = new HTTP::OAI::DataProvider::Engine::Result(%opts); };
-	ok( $@, 'should fail: ' . $@ );
-}
+eval {
+	my $result =
+	  new HTTP::OAI::DataProvider::Engine::Result( verb => 'GetRecord' );
+};
+ok( $@, 'should fail: ' );
 
 my $result = minimalResult();
-{
+ok( blessed($result) eq 'HTTP::OAI::DataProvider::Engine::Result',
+	'minimal new works' );
 
-	ok( blessed($result) eq 'HTTP::OAI::DataProvider::Engine::Result',
-		'new works' );
-}
 
 #
 # 2-$result->requestURL
@@ -77,7 +71,7 @@ ok( $url eq 'http://some.uri.com', 'url exists now' );
 ok( !$result->isError, 'isError should return nothing' );
 
 eval { $result->addError('nonsense'); };
-ok( $@, 'should fail: ' . $@ );
+ok( $@, 'should fail' );
 
 $result->addError('badArgument');
 ok( $result->addError('badArgument'), 'adds error and returns true' );
@@ -94,30 +88,33 @@ ok( $err[0]->code eq 'badArgument', 'isError contains right HTTP::OAI error' );
 $result = minimalResult();
 ok( $result->countHeaders() == 0, "head count is zero" );
 
-#TODO see if it changes
+#TODO see if it changes DO WE REALLY NEED CHUNK SIZE METHOD INSIDE OF RESULT?
+#Can it not be elsewhere?
 
 #
 # 6-$result->chunkSize
 #
-{
-	my %config = HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
-	die "Need chunkSize" if ( !$config{chunkSize} );
-
-	my %opts = (
-		transformer => $t,
-		verb        => 'GetRecord',
-		chunkSize   => $config{chunkSize},
-	);
-	$result = new HTTP::OAI::DataProvider::Engine::Result(%opts);
-	new HTTP::OAI::DataProvider::Engine::Result(%opts);
-	ok( $result->chunkSize == $config{chunkSize}, 'chunkSize seems right' );
-}
+#{
+#	my %engine = HTTP::OAI::DataProvider::Test::loadWorkingTestConfig('engine');
+#	#die "Need chunkSize" if ( !$config{chunkSize} );
+#
+#	print "CHUNK SIZE:$engine{chunkCache}{RecordsPerChunk}\n";
+#
+#	my %opts = (
+#		transformer => $t,
+#		verb        => 'GetRecord',
+#		chunkSize   => $engine{chunkCache}{RecordsPerChunk},
+#	);
+#	$result = new HTTP::OAI::DataProvider::Engine::Result(%opts);
+#	new HTTP::OAI::DataProvider::Engine::Result(%opts);
+#	ok( $result->chunkSize == $engine{chunkCache}{RecordsPerChunk}, 'chunkSize seems right' );
+#}
 
 #
 # 7-$result->getType();
 #
 
-ok( $result->getType(), '$r->getType is weird' );
+#ok( $result->getType(), '$r->getType is weird' );
 
 #TODO
 
@@ -138,16 +135,14 @@ ok( $@, '$r->getResponse should fail' );
 ###
 
 sub minimalResult {
-	my %config   = HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
-	my %t_config = (
-		nativePrefix => $config{nativePrefix},
-		locateXSL    => $config{locateXSL},
+	my %engine = HTTP::OAI::DataProvider::Test::loadWorkingTestConfig('engine');
+	my $t      = new HTTP::OAI::DataProvider::Transformer(
+		nativePrefix => $nativePrefix,
+		locateXSL    => $engine{locateXSL},
 	);
-	my $t = new HTTP::OAI::DataProvider::Transformer(%t_config);
 
-	my %opts = (
+	return new HTTP::OAI::DataProvider::Engine::Result(
 		transformer => $t,
 		verb        => 'GetRecord',
 	);
-	return new HTTP::OAI::DataProvider::Engine::Result(%opts);
 }

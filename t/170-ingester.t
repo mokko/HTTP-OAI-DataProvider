@@ -7,9 +7,10 @@ use HTTP::OAI::DataProvider::Common qw(testEnvironment Debug Warning);
 use lib testEnvironment('dir'); #to load MPX from testEnviron
 use MPX; 
 
-my %config = loadWorkingTestConfig();
-die "No config! " if ( !%config );
-#init debugger
+my %engine = loadWorkingTestConfig('engine');
+my %nativeFormat=loadWorkingTestConfig('nativeFormat');
+my $nativePrefix=(keys %nativeFormat)[0];
+die "No config! " if ( !%engine );
 
 =head1 CONCEPT
 
@@ -34,11 +35,12 @@ BEGIN {
 	ok( $@, 'new should fail' );
 }
 
+
 my $ingester = new HTTP::OAI::DataProvider::Ingester(
-	engine       => 'HTTP::OAI::DataProvider::Engine::SQLite',
-	nativePrefix => $config{nativePrefix},
-	nativeURI    => $config{native_ns_uri},
-	dbfile    => $config{dbfile},
+	engine       => $engine{engine},
+	nativePrefix => $nativePrefix,
+	nativeURI    => $nativeFormat{$nativePrefix},
+	dbfile    => $engine{dbfile},
 );
 
 ok( blessed $ingester eq 'HTTP::OAI::DataProvider::Ingester',

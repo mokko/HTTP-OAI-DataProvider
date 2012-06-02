@@ -1,4 +1,5 @@
 package HTTP::OAI::DataProvider::Ingester;
+#ABSTRACT: Get data from XML file into the DB 
 use strict;
 use warnings;
 use Moose;
@@ -25,56 +26,8 @@ has 'dbfile'       => ( isa => 'Str', is => 'ro', required => 1 );
 
 =head1 DESCRIPTION
 
-I wonder if it makes sense to separate the ingest process which imports data
-into the database from the rest of the database stuff that gets data out of
-database.
-
-At the very least it should be a playing field to test a rudimentary database
-abstraction layer.
-
-Ideally, I have a part that is specific for SQLite and one part that works
-generally. The current implementation (as part of the SQLite pacakge) 
-consists
-
-SQLite->digest_single ($file,&$mapping);
-    loads XML file specified in $file and hands it to the code specified in
-    $mapping. Expects a complete HTTP::OAI::Record back from $mapping.
-    calls _storeRecord($record)
-    This part is generic. It is not database specific and it is not dependent
-    on the metadata format. (The part that is metadataFormat specific is 
-    already separated out as mapping.)
-: SQLite->_storeRecord
-	First checks if record with that OAI id already exists and what its 
-	timestamp are (first SQL).
-	Then either  
-	a) do nothing 
-	b) update db record (second SQL)
-	c) insert db record (third SQL)
+Get stuff into the database by parsing an XML file. 
 	
-	So we have three steps:
-	a) a timestamp comparison which triggers appropriate follow-up action 
-	   (involving first SQL)
-	b) insertSQL
-	c) updateSQL 
-	
-	This part does not depend on metadataFormat, but on the database
-	
-=head1 COMMUNICATION BETWEEN PACKAGES
-
-I want a solution where I have a clearly defined interface to write multiple
-DB backends. My current implementation of SQLite, for example, uses a very
-simple and not very efficient database layout, where a lot of perKor 
-information exists multiple times (for instance).
-
-Or somebody else might want to use a different database altogether.
-
-Imagine we had such an alternative database implementation and it would be
-called OAI::DP::MySql. How would the dataProvider know which package to load?
-
-Obviously, we have to have a new config value which tells him.
-
-But OAI::DP::MySQL might also come with it own configuration
-
 =cut
 
 sub BUILD {
@@ -88,7 +41,7 @@ sub BUILD {
 	#	nativePrefix => $self->nativePrefix,
 	#	locateXSL    => $self->locateXSL,
 	#);
-	$self->initDB() or confess "Cant init database";
+	$self->_initDB() or confess "Cant init database";
 
 }
 
@@ -120,7 +73,8 @@ sub digest {
 }
 
 #
-# NOT SURE ABOUT THIS
+# NOT IF THIS METHOD SHOULD BE SOMEWHERE ELSE. I HAVE THE IMPRESSION I NEED 
+# registerNS somewhere else
 #
 
 sub registerNS {
@@ -162,5 +116,6 @@ sub loadXML {
 
 	return $doc;
 }
-__PACKAGE__->meta->make_immutable;
+#doesn't work if immutabale; i am not exactly sure why
+#__PACKAGE__->meta->make_immutable;
 1;

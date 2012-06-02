@@ -50,7 +50,6 @@ my $transformer = new HTTP::OAI::DataProvider::Transformer(
 ok( blessed($transformer) eq 'HTTP::OAI::DataProvider::Transformer',
 	'transformer exists' );
 
-exit 1;
 {
 	my $file = testEnvironment( 'dir', 'eg.mpx' );
 

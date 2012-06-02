@@ -95,8 +95,7 @@ sub BUILD {
 	);
 	with $self->engine;
 
-
-	$self->initDB();
+	$self->init();
 }
 
 
@@ -263,18 +262,7 @@ sub mkToken {
 #	}
 #}
 
-sub _initChunkCache {
-	my $self = shift or croak "Need myself!";
 
-	#object in _chunkCache and options in chunkcache
-	my %opts = hashRef2hash( $self->{chunkCache} );
-
-	#use Data::Dumper qw(Dumper);
-	#Debug 'WWWWWWWWWWWEIRD'.Dumper (%opts);
-	$self->{ChunkCache} =
-	  new HTTP::OAI::DataProvider::ChunkCache(
-		maxSize => $self->chunkCacheMaxSize )
-	  or croak "Cannot init chunkCache";
-}
-__PACKAGE__->meta->make_immutable;
+#doesn't work if it is immutable
+#__PACKAGE__->meta->make_immutable;
 1;

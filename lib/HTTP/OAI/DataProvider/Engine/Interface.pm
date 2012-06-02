@@ -86,7 +86,6 @@ Database specific stuff (like SQL queries) goes into the specific engine.
 requires 'planChunking';
 requires 'queryChunk';
 
-
 =head2 INGEST INTERFACE 
 
 =method $engine->storeRecord($record);
@@ -100,16 +99,15 @@ requires 'storeRecord';
 
 =head2 NEEDED FOR INGESTER AND QUERY ENGINE
 
-=method $self->initDB($engineOpts);
+=method $self->init();
 
-Gets called when initialization of $engine. It should 
-a) connect to DB,
-b) make sure that tables exist and
-c) set a database handle in $engine->{connection}
+in case your engine needs to do something after its made (kind of like Moose's 
+BUILD).
+
+I use it now to initialize chunkCache. Then it calls ->initDB().
 
 =cut
-
-requires 'initDB';
+requires 'init';
 
 =head2 IDENTIFY 
 

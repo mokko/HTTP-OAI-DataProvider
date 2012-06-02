@@ -14,8 +14,8 @@ use XML::LibXML;
 use HTTP::OAI;
 use HTTP::OAI::Repository qw/validate_date/;
 use HTTP::OAI::DataProvider::Engine::Result;
-use HTTP::OAI::DataProvider::ChunkCache::Description;
-use HTTP::OAI::DataProvider::Common qw/Debug Warning/;
+use HTTP::OAI::DataProvider::ChunkCache;
+use HTTP::OAI::DataProvider::Common qw/Debug Warning hashRef2hash/;
 use HTTP::OAI::DataProvider::Transformer;
 with 'HTTP::OAI::DataProvider::Engine::Interface';
 
@@ -36,7 +36,14 @@ with 'HTTP::OAI::DataProvider::Engine::Interface';
 		my $header=$engine->findByIdentifier($identifier);
 		my $result=$engine->query($params);
 		my $result=$engine->queryHeaders($params);
-		my $result=$engine->queryRecords($params);
+		my $result=$engine->queryChunk($params);
+
+	#3) Error
+
+	#4) Other stuff
+		init(); #gets called from Engine->BUILD;
+		my $grany=$engine->granularity();
+		my $earliestDate=$engine->earliestDate();
 
 	#inherits additional methods from L<DP::Engine::Interface>,
 
@@ -59,9 +66,10 @@ Am currently not sure about the arguments.
 
 #has 'chunkCache' => ( isa => 'Object',  is => 'ro', required => 0 );
 #has 'chunkSize'  => ( isa => 'Int',     is => 'ro', required => 1 ); 
-has 'locateXSL'  => ( isa => 'CodeRef', is => 'ro', required => 0 );
+#has 'locateXSL'  => ( isa => 'CodeRef', is => 'ro', required => 0 );
 
 #required
+has 'chunkCache' => ( isa => 'HashRef', is => 'ro', required => 1 );
 has 'dbfile'       => ( isa => 'Str', is => 'ro', required => 1 );
 has 'nativePrefix' => ( isa => 'Str', is => 'ro', required => 1 );
 has 'nativeURI'    => ( isa => 'Str', is => 'ro', required => 1 );
@@ -183,8 +191,7 @@ sub queryChunk {
 		$last_id = $aref->[0];
 	}
 
-	#save the last record
-	#in case there is only one record we get here!
+	#save the last record;	get here if only one record!
 	$result->save(
 		header => $header,
 		md     => $md,
@@ -196,9 +203,7 @@ sub queryChunk {
 		return $self->err2XML( $result->isError );
 	}
 
-	#transform result to response
-	my $response = $result->getResponse;
-	return $response;
+	return $result->getResponse;
 }
 
 =head2 my $date=$engine->earliestDate();
@@ -381,76 +386,47 @@ will re-enter this loop at a later point in time.
 
 =cut
 
-=head2 my $sql=$self->_querySQL ($params,$limit, $offset);
 
-Returns the sql for the query (includes metadata for GetRecord and
-ListRecords).
 
-Used in planChunking. Since it is only called from inside this package I 
-consider it private.
+=method init
+
+was initChunkCache()
+
+Would this method better be in DP::Engine::SQLite. Does it make much of a 
+difference? DP::Engine inherits from the engine, DP:Engine 
+needs to initialize the chunkCache anyways. Of course, it would be easy to
+require initChunkCache in Interface and then overwrite it if another db 
+implementation doesn't need it.
+
+Takes input from $self->{chunkCache} and writes output (object) in 
+$self->{ChunkCache}.
 
 =cut
 
-sub _querySQL {
-	my $self = shift;
-	my %args = @_;
+sub init {
+	my $self = shift or croak "Need myself!";
 
-	my $params = $args{params};
-	my $limit  = $args{limit};
-	my $offset = $args{offset};
+	#
+	# First make ChunkCache
+	#
 
-	#Debug "OFFSET: $offset LIMIT: $limit";
-	#md becomes modifier with values md and count?
-	# SELECT COUNT records.identifier FROM records WHERE
-	# records.identifier = ? AND
-	# datestamp > ? AND
-	# datestamp < ? AND
-	# setSpec = ?
+	#object in _chunkCache and options in chunkcache
+	my %opts = hashRef2hash( $self->chunkCache );
 
-	#This version is SLOW, but does it really matter? It's just one query
-	#for each request. Who cares?
-
-	my $sql = q/SELECT records.identifier, datestamp, status, setSpec /;
-
-	if (   $params->{verb} eq 'GetRecord'
-		or $params->{verb} eq 'ListRecords' )
-	{
-		$sql .= q/, native_md /;
-	}
-
-	$sql .= q/FROM records LEFT JOIN sets ON records.identifier =
-	sets.identifier WHERE /;
-
-	if ( $params->{identifier} ) {
-		$sql .= qq/records.identifier = '$params->{identifier}' AND /;
-	}
-
-	if ( $params->{'from'} ) {
-		$sql .= qq/ datestamp > '$params->{'from'}' AND /;
-	}
-
-	if ( $params->{'until'} ) {
-		$sql .= qq/ datestamp < '$params->{'until'}' AND /;
-	}
-
-	if ( $params->{set} ) {
-		$sql .= qq/setSpec = '$params->{'set'}' AND /;
-	}
-
-	$sql .= qq/ 1=1 LIMIT $limit OFFSET $offset/;
-
-	#About order: I could add "ORDER BY records.identifier ASC" which gives us
-	#strict alphabetical order. Not want is expected. That wdn' t really be a
-	#problem, but not nice. Now we have the order we put'em in. Less reliable,
-	#but more intuitive. Until it goes wrong.
-
-	#$sql = q/SELECT records.identifier, datestamp, status, setSpec
-	#FROM records JOIN sets ON records.identifier = sets.identifier/;
-
-	#Debug $sql;
-	return $sql
-
+	#print "maxSize:$opts{MaxChunks}\n";
+	#use Data::Dumper qw(Dumper);
+	#Debug 'WWWWWWWWWWWEIRD'.Dumper (%opts);
+	$self->{ChunkCache} =
+	  new HTTP::OAI::DataProvider::ChunkCache(
+		maxSize => $opts{MaxChunks} )
+	  or croak "Cannot init chunkCache";
+	 
+	 #
+	 # initDB
+	 #
+	 $self->_initDB();
 }
+
 
 =head2 my $first=$self->planChunking($params);
 
@@ -557,6 +533,77 @@ sub planChunking {
 They are meant to be called from other methods inside this module. They are
 relevant for the author of this SQLite implementation, but not to its user.
 
+=head2 my $sql=$self->_querySQL ($params,$limit, $offset);
+
+Returns the sql for the query (includes metadata for GetRecord and
+ListRecords).
+
+Used in planChunking. Since it is only called from inside this package I 
+consider it private.
+
+=cut
+
+sub _querySQL {
+	my $self = shift;
+	my %args = @_;
+
+	my $params = $args{params};
+	my $limit  = $args{limit};
+	my $offset = $args{offset};
+
+	#Debug "OFFSET: $offset LIMIT: $limit";
+	#md becomes modifier with values md and count?
+	# SELECT COUNT records.identifier FROM records WHERE
+	# records.identifier = ? AND
+	# datestamp > ? AND
+	# datestamp < ? AND
+	# setSpec = ?
+
+	#This version is SLOW, but does it really matter? It's just one query
+	#for each request. Who cares?
+
+	my $sql = q/SELECT records.identifier, datestamp, status, setSpec /;
+
+	if (   $params->{verb} eq 'GetRecord'
+		or $params->{verb} eq 'ListRecords' )
+	{
+		$sql .= q/, native_md /;
+	}
+
+	$sql .= q/FROM records LEFT JOIN sets ON records.identifier =
+	sets.identifier WHERE /;
+
+	if ( $params->{identifier} ) {
+		$sql .= qq/records.identifier = '$params->{identifier}' AND /;
+	}
+
+	if ( $params->{'from'} ) {
+		$sql .= qq/ datestamp > '$params->{'from'}' AND /;
+	}
+
+	if ( $params->{'until'} ) {
+		$sql .= qq/ datestamp < '$params->{'until'}' AND /;
+	}
+
+	if ( $params->{set} ) {
+		$sql .= qq/setSpec = '$params->{'set'}' AND /;
+	}
+
+	$sql .= qq/ 1=1 LIMIT $limit OFFSET $offset/;
+
+	#About order: I could add "ORDER BY records.identifier ASC" which gives us
+	#strict alphabetical order. Not want is expected. That wdn' t really be a
+	#problem, but not nice. Now we have the order we put'em in. Less reliable,
+	#but more intuitive. Until it goes wrong.
+
+	#$sql = q/SELECT records.identifier, datestamp, status, setSpec
+	#FROM records JOIN sets ON records.identifier = sets.identifier/;
+
+	#Debug $sql;
+	return $sql
+
+}
+
 =head2 my $connection=_connectDB();
 
 Connects to database and saves DBIx::Connector object in 
@@ -639,7 +686,7 @@ TODO: currently I mix croaking and error messages. Decide what you want!
 
 =cut
 
-sub initDB {
+sub _initDB {
 	my $self = shift;
 	$self->_connectDB or croak "Connecting problems";
 	my $dbh = $self->{connection}->dbh() or croak $DBI::errstr;

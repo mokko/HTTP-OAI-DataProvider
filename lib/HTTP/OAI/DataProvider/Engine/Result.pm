@@ -7,17 +7,21 @@ use namespace::autoclean;
 use Carp qw(croak carp);
 use HTTP::OAI;
 use Encode qw/decode/;    #encoding problem when dealing with data from sqlite
-use parent qw(HTTP::OAI::DataProvider::Engine);
+
+#
+# DOUBTFUL!
+#not sure if I should inherit from Engine!
+#use parent qw(HTTP::OAI::DataProvider::Engine);
 use HTTP::OAI::DataProvider::Common qw(Warning Debug);
 
 has 'transformer'  => ( isa => 'Object', is => 'ro', required => 1 );
 has 'verb'  => ( isa => 'Str', is => 'ro', required => 1 );
-has 'requestURL'  => ( isa => 'Str', is => 'ro', required => 0 );
+has 'requestURL'  => ( isa => 'Str', is => 'rw', required => 0 );
 
 =head1 DESCRIPTIOPN
 
-A result is an object can carry 
-a) info to carry out a DB query and
+A result is an object that can carry 
+[a) info to carry out a DB query and (should ChunkCache, right?)]
 b) the db response before it is transformed to a HTTP::OAI::Response object.
 c) it can also carry OAI errors
 
@@ -266,13 +270,13 @@ determines how big (number of records per chunk) the chunks are.
 
 =cut
 
-sub chunkSize {
-	my $result = shift;
-	if ( $result->{chunkSize} ) {
-		return $result->{chunkSize};
-	}
-	return ();    #fail
-}
+#sub chunkSize {
+#	my $result = shift;
+#	if ( $result->{chunkSize} ) {
+#		return $result->{chunkSize};
+#	}
+#	return ();    #fail
+#}
 
 =method $result->getType();
 
