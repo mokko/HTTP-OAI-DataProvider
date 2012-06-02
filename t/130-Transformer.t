@@ -11,8 +11,7 @@ BEGIN {
 ";
 }
 
-my %engine =
-  HTTP::OAI::DataProvider::Test::loadWorkingTestConfig('engine');
+my %engine = HTTP::OAI::DataProvider::Test::loadWorkingTestConfig('engine');
 my %nativeFormat =
   HTTP::OAI::DataProvider::Test::loadWorkingTestConfig('nativeFormat');
 my $nativePrefix = ( keys(%nativeFormat) )[0];
@@ -26,7 +25,7 @@ my $nativePrefix = ( keys(%nativeFormat) )[0];
 		  new HTTP::OAI::DataProvider::Transformer(
 			nativePrefix => $nativePrefix );
 	};
-	ok( $@, 'should fail ');
+	ok( $@, 'should fail ' );
 }
 
 {
@@ -52,11 +51,13 @@ ok( blessed($transformer) eq 'HTTP::OAI::DataProvider::Transformer',
 	'transformer exists' );
 
 {
-	my $file = testEnvironment ('dir', 'eg.mpx' );
+	my $file = testEnvironment( 'dir', 'eg.mpx' );
+
 	#print "FILE: $file\n";
 	my $doc = XML::LibXML->load_xml( location => $file )
 	  or die "Cant read file";
 	my $newdom = $transformer->toTargetPrefix( 'oai_dc', $doc );
+
 	#print $newdom->toString;
 	my $tx = Test::XPath->new(
 		xml   => $newdom->toString,

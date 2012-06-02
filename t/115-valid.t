@@ -6,20 +6,21 @@ use HTTP::OAI::DataProvider::Test;
 use HTTP::OAI::DataProvider::Common qw(say);
 use Test::More tests => 4;
 use XML::LibXML;
-use File::Spec;
 
 #at this point the provider is not yet tested, so I should be using it really
 #in older versions I loaded a OAI response from file for that reason
-my %config   = loadWorkingTestConfig();
-my $provider = new HTTP::OAI::DataProvider(%config);
-my $response = $provider->GetRecord(
-	metadataPrefix => 'oai_dc',
-	identifier     => 'spk-berlin.de:EM-objId-524'
-) or die "Cant identify";
+#my %config   = loadWorkingTestConfig();
+#my $provider = new HTTP::OAI::DataProvider(%config);
+#my $response = $provider->GetRecord(
+#	metadataPrefix => 'oai_dc',
+#	identifier     => 'spk-berlin.de:EM-objId-524'
+#) or die "Cant identify";
 
-my $doc = XML::LibXML->load_xml( string => $response )
+my $file=testEnvironment ('dir','getRecord.mpx-oai.xml');
+
+my $doc = XML::LibXML->load_xml( location => $file )
   or die "Cant load xml response!";
-
+my $response = $doc->toString;
 my $v = new HTTP::OAI::DataProvider::Valid();
 
 #old form
