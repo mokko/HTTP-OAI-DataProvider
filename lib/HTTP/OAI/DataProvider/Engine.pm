@@ -276,5 +276,5 @@ sub _initChunkCache {
 		maxSize => $self->chunkCacheMaxSize )
 	  or croak "Cannot init chunkCache";
 }
-
+__PACKAGE__->meta->make_immutable;
 1;

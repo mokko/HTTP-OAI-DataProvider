@@ -162,5 +162,5 @@ sub loadXML {
 
 	return $doc;
 }
-
+__PACKAGE__->meta->make_immutable;
 1;

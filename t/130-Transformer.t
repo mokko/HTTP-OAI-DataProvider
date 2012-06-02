@@ -39,7 +39,7 @@ my $nativePrefix = ( keys(%nativeFormat) )[0];
 }
 
 #
-# finally make a transformer
+# finally make a working transformer
 #
 
 my $transformer = new HTTP::OAI::DataProvider::Transformer(
@@ -50,6 +50,7 @@ my $transformer = new HTTP::OAI::DataProvider::Transformer(
 ok( blessed($transformer) eq 'HTTP::OAI::DataProvider::Transformer',
 	'transformer exists' );
 
+exit 1;
 {
 	my $file = testEnvironment( 'dir', 'eg.mpx' );
 

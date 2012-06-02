@@ -2,11 +2,17 @@ package HTTP::OAI::DataProvider::Engine::Result;
 
 # ABSTRACT: Result object for engine
 
+use Moose;
+use namespace::autoclean;
 use Carp qw(croak carp);
 use HTTP::OAI;
 use Encode qw/decode/;    #encoding problem when dealing with data from sqlite
 use parent qw(HTTP::OAI::DataProvider::Engine);
 use HTTP::OAI::DataProvider::Common qw(Warning Debug);
+
+has 'transformer'  => ( isa => 'Object', is => 'ro', required => 1 );
+has 'verb'  => ( isa => 'Str', is => 'ro', required => 1 );
+has 'requestURL'  => ( isa => 'Str', is => 'ro', required => 0 );
 
 =head1 DESCRIPTIOPN
 
@@ -39,17 +45,16 @@ c) it can also carry OAI errors
 	#HEADERS
 	print $result->countHeaders. 'headers';
 
+	#depending on $result will return listIdentifiers or listRecords
+	my $response=$result->getResponse
+
 	#WRAPPERS
 	#return records/headers as a HTTP::OAI::Response
 	my $getRecord=$result->toGetRecord;
 	my $listIdentifiers=$result->toListIdentifiers;
 	my $listRecords=$result->toListRecords;
 
-	#depending on $result will return listIdentifiers or listRecords
-	my $response=$result->getResponse
-
 	#CHUNKING
-	$bool=$result->chunking; #test if chunking is turned on or off
 	$result->chunk; #figures out maxChunkNo and sets
 	$result->chunkRequest([bla=>$bla]); #getter & setter for chunkRequest data
 	$result->EOFChunk ($rt); #tester, getter & setter for EOFChunk signal
@@ -82,21 +87,15 @@ c) it can also carry OAI errors
 
 =cut
 
-sub new {
-	my $class  = shift;
-	my %args   = @_;
-	my $result = \%args;
-	bless $result, $class;
-
-	$result->requiredFeatures( 'transformer', 'verb' );
+sub BUILD {
+	my $self=shift or carp "Need myself!";
 
 	#init values
-	$result->{records}   = [];    #use $result->countRecords
-	$result->{headCount} = 0;     #use $result->countHeaders
-	$result->{headers} = new HTTP::OAI::ListIdentifiers;
-	$result->{errors}  = [];
+	$self->{records}   = [];    #use $result->countRecords
+	$self->{headCount} = 0;     #use $result->countHeaders
+	$self->{headers} = new HTTP::OAI::ListIdentifiers;
+	$self->{errors}  = [];
 
-	return $result;
 }
 
 =method my $request=$result->requestURL ([$request]);
@@ -114,17 +113,17 @@ is convenient.
 =cut
 
 #don't think this is necessary anymore, should be done by DataProvider::_output
-sub requestURL {
-	my $result = shift or carp "Need myself!";
-	my $request = shift;
-
-	if ($request) {    #setter
-		$result->{requestURL} = $request;
-	}
-	else {             #getter
-		return $result->{requestURL};
-	}
-}
+#sub requestURL {
+#	my $result = shift or carp "Need myself!";
+#	my $request = shift;
+#
+#	if ($request) {    #setter
+#		$result->{requestURL} = $request;
+#	}
+#	else {             #getter
+#		return $result->{requestURL};
+#	}
+#}
 
 =method $result->addError($code[, $message]);
 
@@ -285,19 +284,19 @@ TODO:
 -There should also be an undef state
 =cut
 
-sub getType {
-	my $result       = shift or die "Wrong!";
-
-	if ( !$result->{type} ) {
-		if ( $result->countRecords > 0 ) {
-			$chunkRequest->{type} = 'records';
-		}
-		else {
-			$chunkRequest->{type} = 'headers';
-		}
-	}
-	#return $result->{type};
-}
+#sub getType {
+#	my $result       = shift or die "Wrong!";
+#
+#	if ( !$result->{type} ) {
+#		if ( $result->countRecords > 0 ) {
+#			$chunkRequest->{type} = 'records';
+#		}
+#		else {
+#			$chunkRequest->{type} = 'headers';
+#		}
+#	}
+#	#return $result->{type};
+#}
 
 =method my $response=$result->getResponse;
 
@@ -585,5 +584,5 @@ sub lastChunk {
 	}
 	return ();
 }
-
-1;    #HTTP::OAI::DataProvider::Engine::Result
+__PACKAGE__->meta->make_immutable;
+1;   

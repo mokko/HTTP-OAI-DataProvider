@@ -18,14 +18,17 @@ BEGIN {
 # preparations
 #
 
+my %engine = HTTP::OAI::DataProvider::Test::loadWorkingTestConfig('engine');
+my %nativeFormat =
+  HTTP::OAI::DataProvider::Test::loadWorkingTestConfig('nativeFormat');
+my $nativePrefix = ( keys(%nativeFormat) )[0];
+
 my $t;    #used in subsequent tests!
 {
-	my %config   = HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
-	my %t_config = (
-		nativePrefix => $config{nativePrefix},
-		locateXSL    => $config{locateXSL},
+	$t = new HTTP::OAI::DataProvider::Transformer(
+		nativePrefix => $nativePrefix,
+		locateXSL    => $engine{locateXSL},
 	);
-	$t = new HTTP::OAI::DataProvider::Transformer(%t_config);
 }
 
 #
