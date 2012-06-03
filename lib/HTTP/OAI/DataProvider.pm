@@ -162,7 +162,7 @@ sub GetRecord {
 	my %params = @_;
 	my @errors;
 
-	$params{verb} = ' GetRecord ';
+	$params{verb} = 'GetRecord';
 	$self->_validateRequest(%params) or return $self->error;
 
 	my $engine        = $self->{Engine};
@@ -206,7 +206,7 @@ sub Identify {
 	my $self     = shift;
 	my %params   = @_;
 	my $identify = $self->identify;
-	$params{verb} = ' Identify ';
+	$params{verb} = 'Identify';
 	$self->_validateRequest(%params) or return $self->error;
 
 	#Debug "Enter Identify";
@@ -218,10 +218,10 @@ sub Identify {
 		deletedRecord => $identify->{deletedRecord},
 
 		#probably a demeter problem
-		earliestDatestamp => $self->{engine}->earliestDate(),
-		granularity       => $self->{engine}->granularity(),
-		repositoryName    => $identify->repositoryName,
-		requestURL        => $identify->requestURL,
+		earliestDatestamp => $self->{Engine}->earliestDate(),
+		granularity       => $self->{Engine}->granularity(),
+		repositoryName    => $identify->{repositoryName},
+		requestURL        => $identify->{requestURL},
 	) or return "Cannot create new HTTP::OAI::Identify";
 
 	return $self->_output($obj);    #success
@@ -255,7 +255,7 @@ sub ListMetadataFormats {
 
 	Warning ' Enter ListMetadataFormats ';
 	my %params = @_;
-	$params{verb} = ' ListMetadataFormats ';
+	$params{verb} = 'ListMetadataFormats';
 	my $engine = $self->{Engine};
 
 	#

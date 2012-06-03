@@ -12,12 +12,17 @@ use Test::Xpath;
 
 # new is taken for granted
 my %config   = HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
+
+#use Data::Dumper qw(Dumper);
+#print Dumper (%config);
+
 my $provider = new HTTP::OAI::DataProvider(%config);
 
 #
 # execute verb: test if things work
 #
 my $response = $provider->Identify();    #response should be a xml string
+#print $response;
 okIdentify($response);
 
 #
@@ -35,7 +40,7 @@ my $from_config_test = {
 my $xt = xpathTester($response);
 
 foreach my $key ( keys %{$from_config_test} ) {
-	$xt->is( $from_config_test->{$key}, $config{$key}, "$key correct" );
+	$xt->is( $from_config_test->{$key}, $config{identify}{$key}, "$key correct" );
 }
 
 #
@@ -51,7 +56,7 @@ my $other_config_values = {
 my $expected = {
 	'request'           => 'http://localhost',
 	'granuality'        => 'YYYY-MM-DDThh:mm:ssZ',
-	'earliestDatestamp' => '2010-04-20T11:21:49Z'
+	'earliestDatestamp' => '2011-02-15T10:03:46Z'
 
 	  #	'responseDate' => '/oai:OAI-PMH/oai:responseDate'
 };
