@@ -64,17 +64,11 @@ Am currently not sure about the arguments.
 
 =cut
 
-#has 'chunkCache' => ( isa => 'Object',  is => 'ro', required => 0 );
-#has 'chunkSize'  => ( isa => 'Int',     is => 'ro', required => 1 ); 
-#has 'locateXSL'  => ( isa => 'CodeRef', is => 'ro', required => 0 );
 
 #required
 has 'nativeFormat'    => ( isa => 'HashRef', is => 'ro', required => 1 );
 has 'chunkCache' => ( isa => 'HashRef', is => 'ro', required => 1 );
 has 'dbfile'       => ( isa => 'Str', is => 'ro', required => 1 );
-#has 'nativePrefix' => ( isa => 'Str', is => 'ro', required => 1 );
-#has 'nativeURI'    => ( isa => 'Str', is => 'ro', required => 1 );
-#has 'requestURL'    => ( isa => 'Str', is => 'rw', required => 1 ); #todo
 
 =head1 INTERFACE METHODS
 

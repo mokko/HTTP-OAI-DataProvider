@@ -4,6 +4,7 @@ package HTTP::OAI::DataProvider::Engine;
 use strict;
 use warnings;
 use Moose;
+use Moose::Util::TypeConstraints;
 use namespace::autoclean;
 use Time::HiRes qw(gettimeofday);    #to generate unique tokens
 use Carp qw(carp croak);
@@ -11,17 +12,28 @@ use HTTP::OAI::DataProvider::Common qw/Debug hashRef2hash say Warning/;
 use HTTP::OAI::DataProvider::ChunkCache;
 use HTTP::OAI::DataProvider::Transformer;
 
+#TODO:
+#subtype 'nativeFormat'
+#subtype 'chunkCache'
 
-has 'chunkCache' => ( isa => 'HashRef', is => 'ro', required => 1 );
+subtype 'nativeFormatType', as 'HashRef', where {
+	return if scalar keys %{$_} > 1;
+	return if ( !( keys %{$_} )[0] );
+	return 1; #success
+};
 
-#has 'chunkSize' => ( isa => 'Int', is => 'ro', required => 1 );
-has 'dbfile'       => ( isa => 'Str',     is => 'ro', required => 1 );
-has 'engine'       => ( isa => 'Str',     is => 'ro', required => 1 );
-has 'locateXSL'    => ( isa => 'CodeRef', is => 'ro', required => 1 );
-has 'nativeFormat' => ( isa => 'HashRef', is => 'ro', required => 1 );
-#has 'nativePrefix' => ( isa => 'Str',     is => 'ro', required => 1 );
-#has 'nativeURI'    => ( isa => 'Str',     is => 'ro', required => 1 );
-has 'requestURL' => ( isa => 'Str', is => 'rw', required => 0 );
+subtype 'chunkCacheType', as 'HashRef', where {
+	return if ( !$_->{maxChunks} );
+	return if ( !$_->{recordsPerChunk} );
+	return 1; #success
+};
+
+has 'chunkCache'   => ( isa => 'chunkCacheType',          is => 'ro', required => 1 );
+has 'dbfile'       => ( isa => 'Str',              is => 'ro', required => 1 );
+has 'engine'       => ( isa => 'Str',              is => 'ro', required => 1 );
+has 'locateXSL'    => ( isa => 'CodeRef',          is => 'ro', required => 1 );
+has 'nativeFormat' => ( isa => 'nativeFormatType', is => 'ro', required => 1 );
+has 'requestURL'   => ( isa => 'Str',              is => 'rw', required => 0 );
 
 =head1 DESCRIPTION
 
@@ -88,6 +100,7 @@ sub nativePrefix {
 
 sub BUILD {
 	my $self = shift or croak "Need myself";
+
 	#dynamically consume a role and inherit from it
 
 	$self->{transformer} = new HTTP::OAI::DataProvider::Transformer(
@@ -98,7 +111,6 @@ sub BUILD {
 
 	$self->init();
 }
-
 
 =head2 $result=$provider->query ($params);
 
@@ -117,7 +129,6 @@ TODO: What to do on failure? Should return nothing and set $self->error
 internally
 
 =cut
-
 
 sub query {
 	my $self = shift or croak "Need myself!";
@@ -262,7 +273,6 @@ sub mkToken {
 #		return $self->{chunkSize};
 #	}
 #}
-
 
 #doesn't work if it is immutable
 #__PACKAGE__->meta->make_immutable;

@@ -12,9 +12,6 @@ use namespace::autoclean;
 use HTTP::OAI;
 use HTTP::OAI::Repository qw/validate_request/;
 use HTTP::OAI::DataProvider::SetLibrary;
-
-#use HTTP::OAI::DataProvider::ChunkCache; #should go. Chunk can become a thing of the Engine
-#use HTTP::OAI::DataProvider::Transformer;
 use HTTP::OAI::DataProvider::Engine;
 use HTTP::OAI::DataProvider::Common qw/Debug Warning hashRef2hash/;
 use XML::SAX::Writer;
@@ -37,7 +34,6 @@ subtype 'globalFormatsType', as 'HashRef', where {
 };
 
 #required
-#has 'dbfile'        => ( isa => 'Str',     is => 'ro', required => 1 );
 has 'engine' => ( isa => 'HashRef', is => 'ro', required => 1 );
 has 'globalFormats' => (
 	isa      => 'globalFormatsType',
@@ -49,8 +45,8 @@ has 'setLibrary' => ( isa => 'HashRef',      is => 'ro', required => 1 );
 
 #optional
 has 'debug'      => ( isa => 'CodeRef', is => 'ro', required => 0 );
-has 'warning'    => ( isa => 'CodeRef', is => 'ro', required => 0 );
 has 'requestURL' => ( isa => 'Str',     is => 'rw', required => 0 );
+has 'warning'    => ( isa => 'CodeRef', is => 'ro', required => 0 );
 has 'xslt'       => ( isa => 'Str',     is => 'ro', required => 0 );
 
 =head1 SYNOPSIS
@@ -140,20 +136,8 @@ sub BUILD {
 	Debug( $self->debug )     if ( $self->debug );
 	Warning( $self->warning ) if ( $self->warning );
 
-	#$self->_initChunkCache();
-	$self->_checkGlobalFormatsComplete();
-
 	my %engine = hashRef2hash( $self->engine );
 	$self->{Engine} = new HTTP::OAI::DataProvider::Engine(%engine);
-
-	#engine     => ' HTTP::OAI::DataProvider::Engine::SQLite ',
-	#dbfile     => $self->dbfile,
-	#chunkCache => $self->{chunkCache},
-	#chunkSize    => $self->chunkSize,       # might not be necessary
-	#nativePrefix => $self->nativePrefix,
-	#nativeURI    => $self->native_ns_uri,
-	#locateXSL    => $self->locateXSL,
-
 }
 
 =method my $result=$provider->GetRecord(%params);
@@ -769,7 +753,12 @@ sub _init_xslt {
 	}
 }
 
-#$self->_validateRequest( verb=>'GetRecord', %params ) or return $self->error;
+=method $self->_validateRequest(%params) or return $self->error;
+
+You may want to write $self->_validateRequest(verb=>'GetRecord', %params) if 
+params does not include a verb.
+
+=cut
 sub _validateRequest {
 	my $self   = shift or croak "Need myself!";
 	my %params = @_    or return;
@@ -828,18 +817,6 @@ sub _processSetLibrary {
 		return $listSets;
 	}
 	warn "no setLibrary found in Dancer's config file";
-}
-
-#let moose's subtype do that check!
-sub _checkGlobalFormatsComplete {
-	my $self = shift or croak "Need myself!";
-	foreach my $prefix ( keys %{ $self->globalFormats } ) {
-		if (   !${ $self->globalFormats }{$prefix}{ns_uri}
-			or !${ $self->globalFormats }{$prefix}{ns_schema} )
-		{
-			croak "globalFormat $prefix in configuration incomplete";
-		}
-	}
 }
 
 __PACKAGE__->meta->make_immutable;
