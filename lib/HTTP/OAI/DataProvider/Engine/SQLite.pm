@@ -418,7 +418,7 @@ sub init {
 	#Debug 'WWWWWWWWWWWEIRD'.Dumper (%opts);
 	$self->{ChunkCache} =
 	  new HTTP::OAI::DataProvider::ChunkCache(
-		maxSize => $opts{MaxChunks} )
+		maxSize => $opts{maxChunks} )
 	  or croak "Cannot init chunkCache";
 	 
 	 #

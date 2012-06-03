@@ -6,6 +6,7 @@ use warnings;
 use strict;
 use Carp qw/croak carp/;
 use Moose;
+use Moose::Util::TypeConstraints;
 use namespace::autoclean;
 
 use HTTP::OAI;
@@ -19,6 +20,38 @@ use HTTP::OAI::DataProvider::Common qw/Debug Warning hashRef2hash/;
 use XML::SAX::Writer;
 
 #use Data::Dumper qw/Dumper/; #for debugging
+
+subtype 'identifyType', as 'HashRef', where {
+	     exists $_->{adminEmail}  #use defined instead?
+	  && exists $_->{baseURL}
+	  && exists $_->{deletedRecord}
+	  && exists $_->{repositoryName};
+}, message { 'Something is wrong with your identify' };
+
+subtype 'globalFormatsType', as 'HashRef', where {
+	foreach my $prefix ( keys %{$_} ) {
+		return if (! exists $_->{$prefix}{ns_uri});
+		return if (! exists $_->{$prefix}{ns_schema});
+	}
+	return 1;
+};
+
+#required
+#has 'dbfile'        => ( isa => 'Str',     is => 'ro', required => 1 );
+has 'engine' => ( isa => 'HashRef', is => 'ro', required => 1 );
+has 'globalFormats' => (
+	isa      => 'globalFormatsType',
+	is       => 'ro',
+	required => 1
+);
+has 'identify'   => ( isa => 'identifyType', is => 'ro', required => 1 );
+has 'setLibrary' => ( isa => 'HashRef',      is => 'ro', required => 1 );
+
+#optional
+has 'debug'      => ( isa => 'CodeRef', is => 'ro', required => 0 );
+has 'warning'    => ( isa => 'CodeRef', is => 'ro', required => 0 );
+has 'requestURL' => ( isa => 'Str',     is => 'rw', required => 0 );
+has 'xslt'       => ( isa => 'Str',     is => 'ro', required => 0 );
 
 =head1 SYNOPSIS
 
@@ -81,7 +114,6 @@ returns a path.
 * xslt=>'path/to/style.xslt' [OPTIONAL]
 	Adds this path to HTTP::OAI::Repsonse objects to modify output in browser.
 	[Doc TODO. Info should be here not in _init_xslt]
-
 =head3 Parameters for the Database Engine
 
 * dbfile => 'path/to/dbfile'
@@ -102,31 +134,6 @@ returns a path.
 
 =cut
 
-#required
-has 'adminEmail' => ( isa => 'Str', is => 'ro', required => 1 );
-has 'baseURL'    => ( isa => 'Str', is => 'ro', required => 1 );
-
-#has 'chunkCacheMaxSize' => ( isa => 'Str',     is => 'ro', required => 1 );
-#has 'chunkSize'         => ( isa => 'Int',     is => 'ro', required => 1 );
-has 'engine'         => ( isa => 'HashRef', is => 'ro', required => 1 );
-has 'deletedRecord'  => ( isa => 'Str',     is => 'ro', required => 1 );
-has 'dbfile'         => ( isa => 'Str',     is => 'ro', required => 1 );
-has 'GlobalFormats'  => ( isa => 'HashRef', is => 'ro', required => 1 );
-#has 'locateXSL'      => ( isa => 'CodeRef', is => 'ro', required => 1 );
-#has 'nativePrefix'   => ( isa => 'Str',     is => 'ro', required => 1 );
-has 'native_ns_uri'  => ( isa => 'Str',     is => 'ro', required => 1 );
-has 'repositoryName' => ( isa => 'Str',     is => 'ro', required => 1 );
-has 'setLibrary'     => ( isa => 'HashRef', is => 'ro', required => 1 );
-
-#optional
-has 'debug'      => ( isa => 'CodeRef', is => 'ro', required => 0 );
-has 'warning'    => ( isa => 'CodeRef', is => 'ro', required => 0 );
-has 'requestURL' => ( isa => 'Str',     is => 'rw', required => 0 );
-has 'xslt'       => ( isa => 'Str',     is => 'ro', required => 0 );
-
-#TODO: separate out the ARGS for the engine into one HashRef
-#has 'engineArgs'         => ( isa => 'HashRef', is => 'ro', required => 1 );
-
 sub BUILD {
 	my $self = shift or die "Need myself!";
 
@@ -139,7 +146,7 @@ sub BUILD {
 	my %opts = hashRef2hash( $self->engine );
 	$self->{Engine} = new HTTP::OAI::DataProvider::Engine(%opts);
 
-	#engine     => 'HTTP::OAI::DataProvider::Engine::SQLite',
+	#engine     => ' HTTP::OAI::DataProvider::Engine::SQLite ',
 	#dbfile     => $self->dbfile,
 	#chunkCache => $self->{chunkCache},
 	#chunkSize    => $self->chunkSize,       # might not be necessary
@@ -171,7 +178,7 @@ sub GetRecord {
 	my %params = @_;
 	my @errors;
 
-	$params{verb} = 'GetRecord';
+	$params{verb} = ' GetRecord ';
 	$self->_validateRequest(%params) or return $self->error;
 
 	my $engine        = $self->{engine};
@@ -180,7 +187,7 @@ sub GetRecord {
 	# Error handling
 	my $header = $engine->findByIdentifier( $params{identifier} );
 	if ( !$header ) {
-		push( @errors, new HTTP::OAI::Error( code => 'idDoesNotExist' ) );
+		push( @errors, new HTTP::OAI::Error( code => ' idDoesNotExist ' ) );
 	}
 
 	if ( my $e = $self->checkFormatSupported( $params{metadataPrefix} ) ) {
@@ -212,25 +219,25 @@ granularity).
 =cut
 
 sub Identify {
-	my $self   = shift;
-	my %params = @_;
-
-	$params{verb} = 'Identify';
+	my $self     = shift;
+	my %params   = @_;
+	my $identify = $self->identify;
+	$params{verb} = ' Identify ';
 	$self->_validateRequest(%params) or return $self->error;
 
 	#Debug "Enter Identify";
 
 	# Metadata munging
 	my $obj = new HTTP::OAI::Identify(
-		adminEmail    => $self->adminEmail,
-		baseURL       => $self->baseURL,
-		deletedRecord => $self->deletedRecord,
+		adminEmail    => $identify->{adminEmail},
+		baseURL       => $identify->{baseURL},
+		deletedRecord => $identify->{deletedRecord},
 
 		#probably a demeter problem
 		earliestDatestamp => $self->{engine}->earliestDate(),
 		granularity       => $self->{engine}->granularity(),
-		repositoryName    => $self->repositoryName,
-		requestURL        => $self->requestURL,
+		repositoryName    => $identify->repositoryName,
+		requestURL        => $identify->requestURL,
 	) or return "Cannot create new HTTP::OAI::Identify";
 
 	return $self->_output($obj);    #success
@@ -262,9 +269,9 @@ ERRORS
 sub ListMetadataFormats {
 	my $self = shift;
 
-	Warning 'Enter ListMetadataFormats';
+	Warning ' Enter ListMetadataFormats ';
 	my %params = @_;
-	$params{verb} = 'ListMetadataFormats';
+	$params{verb} = ' ListMetadataFormats ';
 	my $engine = $self->{engine};    #TODO test
 
 	#
@@ -276,25 +283,25 @@ sub ListMetadataFormats {
 	if ( $params{identifier} ) {
 		my $header = $engine->findByIdentifier( $params{identifier} );
 		if ( !$header ) {
-			$self->raiseError('idDoesNotExist');
+			$self->raiseError(' idDoesNotExist ');
 			return;
 		}
 	}
 
 	#Metadata Handling
 	my $list = new HTTP::OAI::ListMetadataFormats;
-	foreach my $prefix ( keys %{ $self->{GlobalFormats} } ) {
+	foreach my $prefix ( keys %{ $self->{globalFormats} } ) {
 
 		#print "prefix:$prefix\n";
 		my $format = new HTTP::OAI::MetadataFormat;
 		$format->metadataPrefix($prefix);
-		$format->schema( $self->{GlobalFormats}{$prefix}{ns_schema} );
-		$format->metadataNamespace( $self->{GlobalFormats}{$prefix}{ns_uri} );
+		$format->schema( $self->{globalFormats}{$prefix}{ns_schema} );
+		$format->metadataNamespace( $self->{globalFormats}{$prefix}{ns_uri} );
 		$list->metadataFormat($format);
 	}
 
 	#ListMetadataFormat has requestURL info, so recreate it
-	#mk sure we don't lose requestURL in Starman
+	#mk sure we don' t lose requestURL in Starman
 	if ( $self->requestURL ) {
 		$list->requestURL( $self->requestURL );
 	}
@@ -606,7 +613,7 @@ format cannot be disseminated. Returns nothing on success, so you can do:
 sub checkFormatSupported {
 	my $self         = shift or carp "Need self!";
 	my $prefixWanted = shift or carp "Need something to test for";
-	if ( !$self->{GlobalFormats}{$prefixWanted} ) {
+	if ( !$self->{globalFormats}{$prefixWanted} ) {
 		return new HTTP::OAI::Error( code => 'cannotDisseminateFormat' );
 	}
 	return;    #empty is success here
@@ -754,7 +761,7 @@ for a nicer look and added on the top of reponse headers.
 
 sub _init_xslt {
 	my $self = shift;
-	my $obj  = shift or return;    #e.g. HTTP::OAI::ListRecord
+	my $obj = shift or return;    #e.g. HTTP::OAI::ListRecord
 	if ( !$obj ) {
 		Warning "init_xslt called without a object!";
 		return ();
@@ -830,13 +837,14 @@ sub _processSetLibrary {
 	warn "no setLibrary found in Dancer's config file";
 }
 
+#let moose's subtype do that check!
 sub _checkGlobalFormatsComplete {
 	my $self = shift or croak "Need myself!";
-	foreach my $prefix ( keys %{ $self->GlobalFormats } ) {
-		if (   !${ $self->GlobalFormats }{$prefix}{ns_uri}
-			or !${ $self->GlobalFormats }{$prefix}{ns_schema} )
+	foreach my $prefix ( keys %{ $self->globalFormats } ) {
+		if (   !${ $self->globalFormats }{$prefix}{ns_uri}
+			or !${ $self->globalFormats }{$prefix}{ns_schema} )
 		{
-			croak "GlobalFormat $prefix in configuration incomplete";
+			croak "globalFormat $prefix in configuration incomplete";
 		}
 	}
 }

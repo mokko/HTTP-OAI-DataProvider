@@ -11,8 +11,8 @@
 
 	engine => {
 		chunkCache => {
-			MaxChunks       => 4000,    #was chunkCacheMaxSize
-			RecordsPerChunk => 10,      #was chunkSize
+			maxChunks       => 4000,    #was chunkCacheMaxSize
+			recordsPerChunk => 10,      #was chunkSize
 		},
 		dbfile    => "$FindBin::Bin/../t/environment/db",
 		engine    => 'HTTP::OAI::DataProvider::Engine::SQLite',
