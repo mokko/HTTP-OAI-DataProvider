@@ -23,7 +23,7 @@ subtype 'identifyType', as 'HashRef', where {
 	  && defined $_->{baseURL}
 	  && defined $_->{deletedRecord}
 	  && defined $_->{repositoryName};
-}, message { 'Something is wrong with your identify' };
+};
 
 subtype 'globalFormatsType', as 'HashRef', where {
 	foreach my $prefix ( keys %{$_} ) {
@@ -171,7 +171,7 @@ sub GetRecord {
 	# Error handling
 	my $header = $engine->findByIdentifier( $params{identifier} );
 	if ( !$header ) {
-		push( @errors, new HTTP::OAI::Error( code => ' idDoesNotExist ' ) );
+		push( @errors, new HTTP::OAI::Error( code => 'idDoesNotExist' ) );
 	}
 
 	if ( my $e = $self->checkFormatSupported( $params{metadataPrefix} ) ) {
@@ -267,7 +267,7 @@ sub ListMetadataFormats {
 	if ( $params{identifier} ) {
 		my $header = $engine->findByIdentifier( $params{identifier} );
 		if ( !$header ) {
-			$self->raiseError(' idDoesNotExist ');
+			$self->raiseError('idDoesNotExist');
 			return;
 		}
 	}

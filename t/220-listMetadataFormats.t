@@ -22,7 +22,7 @@ my $baseURL = 'http://localhost:3000/oai';
 {
 	my $response =
 	  $provider->ListMetadataFormats();    #response should be a xml string
-	okListMetadataFormats($response);
+	  	okListMetadataFormats($response);
 
 	foreach my $prefix ( keys %{ $config{GlobalFormats} } ) {
 		isLMFprefix( $response, $prefix );
@@ -33,7 +33,7 @@ my $baseURL = 'http://localhost:3000/oai';
 
 	#diag "ListMetadataFormats __with__ identifier";
 	my $response = $provider->ListMetadataFormats(
-		identifier => 'spk-berlin.de:EM-objId-1560323' );
+		identifier => 'spk-berlin.de:EM-objId-153740' ) or die "Cant get metadata format";
 	okListMetadataFormats($response);
 
 }
@@ -51,7 +51,8 @@ my $baseURL = 'http://localhost:3000/oai';
 	my $response = $provider->ListMetadataFormats(
 		identifier => 'spk-berlin.de:EM-objId-01234567890A' );
 	if ( !$response ) {
-		isOAIerror( $provider->errorMessage, 'idDoesNotExist' );
+		#print $provider->error;
+		isOAIerror( $provider->error, 'idDoesNotExist' );
 	}
 }
 
