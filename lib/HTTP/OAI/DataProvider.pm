@@ -22,16 +22,16 @@ use XML::SAX::Writer;
 #use Data::Dumper qw/Dumper/; #for debugging
 
 subtype 'identifyType', as 'HashRef', where {
-	     exists $_->{adminEmail}  #use defined instead?
-	  && exists $_->{baseURL}
-	  && exists $_->{deletedRecord}
-	  && exists $_->{repositoryName};
+	     defined $_->{adminEmail}  #use defined instead?
+	  && defined $_->{baseURL}
+	  && defined $_->{deletedRecord}
+	  && defined $_->{repositoryName};
 }, message { 'Something is wrong with your identify' };
 
 subtype 'globalFormatsType', as 'HashRef', where {
 	foreach my $prefix ( keys %{$_} ) {
-		return if (! exists $_->{$prefix}{ns_uri});
-		return if (! exists $_->{$prefix}{ns_schema});
+		return if (! $_->{$prefix}{ns_uri});
+		return if (! $_->{$prefix}{ns_schema});
 	}
 	return 1;
 };
@@ -143,8 +143,8 @@ sub BUILD {
 	#$self->_initChunkCache();
 	$self->_checkGlobalFormatsComplete();
 
-	my %opts = hashRef2hash( $self->engine );
-	$self->{Engine} = new HTTP::OAI::DataProvider::Engine(%opts);
+	my %engine = hashRef2hash( $self->engine );
+	$self->{Engine} = new HTTP::OAI::DataProvider::Engine(%engine);
 
 	#engine     => ' HTTP::OAI::DataProvider::Engine::SQLite ',
 	#dbfile     => $self->dbfile,
@@ -181,7 +181,7 @@ sub GetRecord {
 	$params{verb} = ' GetRecord ';
 	$self->_validateRequest(%params) or return $self->error;
 
-	my $engine        = $self->{engine};
+	my $engine        = $self->{Engine};
 	my $globalFormats = $self->{globalFormats};
 
 	# Error handling
@@ -272,7 +272,7 @@ sub ListMetadataFormats {
 	Warning ' Enter ListMetadataFormats ';
 	my %params = @_;
 	$params{verb} = ' ListMetadataFormats ';
-	my $engine = $self->{engine};    #TODO test
+	my $engine = $self->{Engine};
 
 	#
 	# Error handling
@@ -360,7 +360,7 @@ sub ListIdentifiers {
 	$self->_validateRequest(%params) or return;
 
 	my $request = $self->requestURL();
-	my $engine  = $self->{engine};       #provider
+	my $engine  = $self->{Engine};       #provider
 
 	# Error handling
 	if ( !$engine ) {
@@ -458,7 +458,7 @@ sub ListRecords {
 	#  if $params->{resumptionToken};
 
 	my @errors;
-	my $engine = $self->{engine};
+	my $engine = $self->{Engine};
 
 	#
 	# Error handling
@@ -517,7 +517,7 @@ sub ListSets {
 	my $self   = shift;
 	my %params = @_;
 
-	my $engine = $self->{engine};
+	my $engine = $self->{Engine};
 
 	$params{verb} = 'ListSets';
 	$self->_validateRequest(%params) or return $self->error;
@@ -762,17 +762,10 @@ for a nicer look and added on the top of reponse headers.
 sub _init_xslt {
 	my $self = shift;
 	my $obj = shift or return;    #e.g. HTTP::OAI::ListRecord
-	if ( !$obj ) {
-		Warning "init_xslt called without a object!";
-		return ();
-	}
 
 	#Debug "Enter _init_xslt obj:$obj"; #beautify
 	if ( $self->xslt ) {
-		$obj->xslt( $self->xslt );
-	}
-	else {
-		Warning "No beautify-xslt loaded!";
+		$obj->xslt( $self->xslt ) or croak "problems with xslt!";
 	}
 }
 

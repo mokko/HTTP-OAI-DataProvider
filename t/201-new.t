@@ -3,14 +3,14 @@ use strict;
 use warnings;
 use HTTP::OAI::DataProvider;
 use HTTP::OAI::DataProvider::Test;
-use Test::More tests => 14;
+use Test::More tests => 9;
 
 #use Data::Dumper qw(Dumper); #only for debugging tests
 
 
 #load a working standard test config which should have ONLY required values
 my %config=HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
-my @options = qw(requestURL);
+my @options = qw(debug requestURL warning xslt);
 
 # 1. Does it work? Return value right?
 #
@@ -26,17 +26,9 @@ ok(
 # 2.1 parameters (aka 'required options')
 
 my @required = qw(
-  adminEmail
-  baseURL
-  chunkCacheMaxSize
-  chunkSize
-  dbfile
-  deletedRecord
-  GlobalFormats
-  locateXSL
-  nativePrefix
-  native_ns_uri
-  repositoryName
+  engine
+  globalFormats
+  identify
   setLibrary
 );
 
@@ -52,6 +44,7 @@ foreach my $value (@required) {
 #
 
 foreach my $value (@options) {
+	#print "Try without $value\n";
 	my %config=HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
 	delete $config{$value};
 	my $provider;
