@@ -23,8 +23,8 @@ subtype 'nativeFormatType', as 'HashRef', where {
 };
 
 subtype 'chunkCacheType', as 'HashRef', where {
-	return if ( !$_->{maxChunks} );
-	return if ( !$_->{recordsPerChunk} );
+	return if ( !$_->{maxChunks} or $_->{maxChunks}==0);
+	return if ( !$_->{recordsPerChunk} or $_->{recordsPerChunk}==0);
 	return 1; #success
 };
 
@@ -132,12 +132,7 @@ internally
 
 sub query {
 	my $self = shift or croak "Need myself!";
-	my $params = shift;
-
-	if ( !$params ) {
-		$self->{error} = 'query: OAI params missing!';
-		return;
-	}
+	my $params = shift or croak "Need params!";
 
 	my $first = $self->planChunking($params);
 
@@ -147,7 +142,7 @@ sub query {
 		return;
 	}
 
-	my $response = $self->queryChunk($first);
+	my $response = $self->queryChunk($first, $params);
 
 	#todo: we still have to test if result has any result at all
 
@@ -155,8 +150,6 @@ sub query {
 }
 
 =method my $chunk=$self->chunkExists (%params);
-
-TODO/NEW:$self->chunkExists ($resumptionToken);
 
 returns a chunk description (if one with this resumptionToken exists) or nothing.
 
@@ -180,7 +173,7 @@ sub chunkExists {
 
 	#my $request = $self->requestURL;    #should be optional, but isn't, right?
 
-	my $chunkCache = $self->{_chunkCache};
+	my $chunkCache = $self->{ChunkCache};
 
 	Debug "Query chunkCache for " . $resumptionToken;
 
@@ -259,20 +252,6 @@ sub mkToken {
 	return time . $msec;
 }
 
-#=head2 my $chunk_size=$result->chunkSize;
-#
-#Return chunk_size if defined or empty. Chunk_size is a config value that
-#determines how big (number of records per chunk) the chunks are.
-#
-#=cut
-#
-#sub chunkSize {
-#	my $self = shift;
-#	Debug "chunkSize" . $self->{chunkSize};
-#	if ( $self->{chunkSize} ) {
-#		return $self->{chunkSize};
-#	}
-#}
 
 #doesn't work if it is immutable
 #__PACKAGE__->meta->make_immutable;

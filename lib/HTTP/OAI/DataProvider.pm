@@ -19,7 +19,7 @@ use XML::SAX::Writer;
 #use Data::Dumper qw/Dumper/; #for debugging
 
 subtype 'identifyType', as 'HashRef', where {
-	     defined $_->{adminEmail}  #use defined instead?
+	defined $_->{adminEmail}    #use defined instead?
 	  && defined $_->{baseURL}
 	  && defined $_->{deletedRecord}
 	  && defined $_->{repositoryName};
@@ -27,8 +27,8 @@ subtype 'identifyType', as 'HashRef', where {
 
 subtype 'globalFormatsType', as 'HashRef', where {
 	foreach my $prefix ( keys %{$_} ) {
-		return if (! $_->{$prefix}{ns_uri});
-		return if (! $_->{$prefix}{ns_schema});
+		return if ( !$_->{$prefix}{ns_uri} );
+		return if ( !$_->{$prefix}{ns_schema} );
 	}
 	return 1;
 };
@@ -336,25 +336,20 @@ TODO: Hierarchical sets
 =cut
 
 sub ListIdentifiers {
-	my $self   = shift;
-	my %params = @_;
+	my $self   = shift           or croak "Need myself!";
+	my %params = @_              or croak "Need params";
+	my $engine = $self->{Engine} or croak "Internal error: Data store missing!";
 	my @errors;    #stores errors before there is a result object
 	$params{verb} = 'ListIdentifiers';
 
 	$self->_validateRequest(%params) or return;
 
-	my $request = $self->requestURL();
-	my $engine  = $self->{Engine};       #provider
-
-	# Error handling
-	if ( !$engine ) {
-		croak "Internal error: Data store missing!";
-	}
+	#my $request = $self->requestURL();
 
 	if ( $params{resumptionToken} ) {
 
 		#chunk is response object here!
-		my $chunk = $self->chunkExists(%params);
+		my $chunk = $engine->chunkExists(%params);
 
 		if ($chunk) {
 			return $self->_output($chunk);    #success
@@ -386,12 +381,12 @@ sub ListIdentifiers {
 
 	#Metadata handling: query returns response
 	#always only the first chunk
-	my $response = $engine->query( \%params, $request );    #todo!
+	my $response = $engine->query( \%params );    #todo!
 
 	if ( !$response ) {
 		$self->{error} =
 		  $self->err2XML( new HTTP::OAI::Error( code => 'noRecordsMatch' ) );
-		return;                                             #error
+		return;                                   #error
 	}
 
 	#Debug "RESPONSE:".$response;
@@ -759,6 +754,7 @@ You may want to write $self->_validateRequest(verb=>'GetRecord', %params) if
 params does not include a verb.
 
 =cut
+
 sub _validateRequest {
 	my $self   = shift or croak "Need myself!";
 	my %params = @_    or return;

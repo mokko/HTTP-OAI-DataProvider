@@ -8,12 +8,17 @@ use Moose;
 use Carp qw/carp croak/;
 use namespace::autoclean;
 
-has 'chunkNo'    => ( is => 'ro', isa => 'Int', required => '1' );
-has 'maxChunkNo' => ( is => 'ro', isa => 'Int', required => '1' );
-has 'sql'        => ( is => 'ro', isa => 'Str', required => '1' );
-has 'token'      => ( is => 'ro', isa => 'Str', required => '1' );
-has 'total'      => ( is => 'ro', isa => 'Str', required => '1' );
-has 'next'       => ( is => 'rw', isa => 'Str', required => '0' );
+has 'chunkNo'      => ( is => 'ro', isa => 'Int', required => '1' );
+has 'maxChunkNo'   => ( is => 'ro', isa => 'Int', required => '1' );
+has 'sql'          => ( is => 'ro', isa => 'Str', required => '1' );
+has 'token'        => ( is => 'ro', isa => 'Str', required => '1' );
+has 'total'        => ( is => 'ro', isa => 'Str', required => '1' );
+has 'targetPrefix' => ( is => 'ro', isa => 'Str', required => '1' );
+has 'next' => ( is => 'rw', isa => 'Str', required => '0' );
+has 'last' => ( is => 'rw', isa => 'Str', required => '0' );
+has 'requestURL' => ( is => 'rw', isa => 'Str', required => '0' );
+
+
 
 =method my $desc=new HTTP::OAI::DataProvider::ChunkCache::Description(%OPTS);
 

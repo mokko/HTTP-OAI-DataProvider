@@ -14,9 +14,19 @@ use Encode qw/decode/;    #encoding problem when dealing with data from sqlite
 #use parent qw(HTTP::OAI::DataProvider::Engine);
 use HTTP::OAI::DataProvider::Common qw(Warning Debug);
 
-has 'transformer'  => ( isa => 'Object', is => 'ro', required => 1 );
-has 'verb'  => ( isa => 'Str', is => 'ro', required => 1 );
-has 'requestURL'  => ( isa => 'Str', is => 'rw', required => 0 );
+has 'transformer' => ( isa => 'Object', is => 'ro', required => 1 );
+has 'verb'        => ( isa => 'Str',    is => 'ro', required => 1 );
+
+has 'chunkSize'  => ( isa => 'Str',    is => 'ro', required => 0 );
+has 'chunkNo'  => ( isa => 'Str',    is => 'ro', required => 0 );
+has 'targetPrefix'  => ( isa => 'Str',    is => 'ro', required => 0 );
+has 'token'  => ( isa => 'Str',    is => 'ro', required => 0 );
+has 'total'  => ( isa => 'Str',    is => 'ro', required => 0 );
+
+has 'requestURL'  => ( isa => 'Str',    is => 'rw', required => 0 );
+
+
+
 
 =head1 DESCRIPTIOPN
 
@@ -92,7 +102,7 @@ c) it can also carry OAI errors
 =cut
 
 sub BUILD {
-	my $self=shift or carp "Need myself!";
+	my $self = shift or carp "Need myself!";
 
 	#init values
 	$self->{records}   = [];    #use $result->countRecords
@@ -144,9 +154,9 @@ isError returns
 =cut
 
 sub addError {
-	my $self   = shift;
-	my $code   = shift;    #required
-	my $msg    = shift;    #optional
+	my $self           = shift;
+	my $code           = shift;    #required
+	my $msg            = shift;    #optional
 	my @possibleErrors = qw(
 	  badArgument
 	  badGranularity
@@ -163,9 +173,9 @@ sub addError {
 		carp "addError needs a code";
 	}
 
-	if (grep ($_ eq $code,@possibleErrors) == 0) {
-		croak "Error code not recognized"; #carp or return?
-		return 0; #error
+	if ( grep ( $_ eq $code, @possibleErrors ) == 0 ) {
+		croak "Error code not recognized";    #carp or return?
+		return 0;                             #error
 	}
 
 	my %arg;
@@ -175,9 +185,7 @@ sub addError {
 		$arg{message} = $msg;
 	}
 
-	if ($code) {
-		push( @{ $self->{errors} }, new HTTP::OAI::Error(%arg) );
-	}
+	push( @{ $self->{errors} }, new HTTP::OAI::Error(%arg) );
 }
 
 =method $result->_addHeader ($header);
@@ -378,17 +386,15 @@ verb to result->{verb} when result is born.
 
 sub save {
 	my $result = shift or carp "Need myself!";
-	my %args   = @_;      #contains params, header, optional: $md
+	my %args = @_;    #contains params, header, optional: $md
 
-	#Debug "Enter save";
-
-	$result->requiredFeatures( \%args, 'header' );
-	$result->requiredFeatures('params');
+	croak "no header" if ( !$args{header} );
+	croak "no params" if ( !$args{params} );
 
 	#md is optional, a deleted record wd have none
 	if ( $result->{verb} eq 'ListIdentifiers' ) {
 		$result->_addHeader( $args{header} );
-		return 0;         #success;
+		return 0;     #success;
 	}
 
 	#assume it is either GetRecord or ListRecords
@@ -502,6 +508,9 @@ sub _resumptionToken {
 
 	#Debug 'Enter _resumptionToken'.ref $result;
 
+	#print ":::::chunkNo:$result->{chunkNo}\n";
+	#print ":::::chunkSize:$result->{chunkSize}\n";
+
 	my $rt = new HTTP::OAI::ResumptionToken(
 		completeListSize => $result->{total},
 
@@ -589,4 +598,4 @@ sub lastChunk {
 	return ();
 }
 __PACKAGE__->meta->make_immutable;
-1;   
+1;

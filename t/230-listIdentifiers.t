@@ -8,10 +8,6 @@ use XML::LibXML;
 
 #use Data::Dumper; #debugging the test
 
-#
-# $baseURL is not tested since it is deprecated anyway.
-#
-
 my %config   = HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
 my $provider = new HTTP::OAI::DataProvider(%config);
 
@@ -24,7 +20,7 @@ my $baseURL = 'http://localhost:3000/oai';
 	);
 	validateRequest(%params);
 	my $response = $provider->ListIdentifiers(%params)
-	  or die $provider->errorMessage;
+	  or die $provider->error;
 	okListIdentifiers($response);
 }
 
@@ -35,7 +31,7 @@ my $baseURL = 'http://localhost:3000/oai';
 	);
 	validateRequest(%params);
 	my $response = $provider->ListIdentifiers(%params)
-	  or die $provider->errorMessage;
+	  or die $provider->error;
 	okListIdentifiers( $response, 'different format' );
 }
 
@@ -47,7 +43,7 @@ my $baseURL = 'http://localhost:3000/oai';
 	);
 	validateRequest(%params);
 	my $response = $provider->ListIdentifiers(%params)
-	  or die $provider->errorMessage;
+	  or die $provider->error;
 	okListIdentifiers( $response, 'with set' );
 }
 
@@ -61,7 +57,7 @@ my $baseURL = 'http://localhost:3000/oai';
 	validateRequest(%params);
 
 	my $response = $provider->ListIdentifiers(%params)
-	  or die $provider->errorMessage;
+	  or die $provider->error;
 	okListIdentifiers( $response, 'with from' );
 }
 {
@@ -75,7 +71,7 @@ my $baseURL = 'http://localhost:3000/oai';
 	validateRequest(%params);
 
 	my $response = $provider->ListIdentifiers(%params)
-	  or die $provider->errorMessage;
+	  or die $provider->error;
 	okListIdentifiers( $response, 'with until' );
 }
 {
@@ -89,7 +85,7 @@ my $baseURL = 'http://localhost:3000/oai';
 	);
 	validateRequest(%params);
 	my $response = $provider->ListIdentifiers(%params)
-	  or die $provider->errorMessage;
+	  or die $provider->error;
 	okListIdentifiers( $response, 'with from and until' );
 }
 
@@ -104,7 +100,7 @@ my $baseURL = 'http://localhost:3000/oai';
 	validateRequest(%params);
 	my $response = $provider->ListIdentifiers(%params);
 	die "that wasn't supposed to happen" if ($response);
-	$response = $provider->errorMessage;
+	$response = $provider->error;
 	isOAIerror( $response, 'badResumptionToken' );
 }
 
@@ -118,7 +114,7 @@ my $baseURL = 'http://localhost:3000/oai';
 	my $response = $provider->ListIdentifiers(%params);
 
 	die "that wasn't supposed to happen" if ($response);
-	$response = $provider->errorMessage;
+	$response = $provider->error;
 	isOAIerror( $response, 'cannotDisseminateFormat' );
 }
 
@@ -132,7 +128,7 @@ my $baseURL = 'http://localhost:3000/oai';
 	#validateRequest(%params);
 	my $response = $provider->ListIdentifiers(%params);
 	die "that wasn't supposed to happen ($response)" if ($response);
-	$response = $provider->errorMessage;
+	$response = $provider->error;
 	isOAIerror( $response, 'badArgument' );
 }
 
@@ -142,7 +138,7 @@ my $baseURL = 'http://localhost:3000/oai';
 	#validateRequest(%params);
 	my $response = $provider->ListIdentifiers(%params);
 	die "that wasn't supposed to happen" if ($response);
-	$response = $provider->errorMessage;
+	$response = $provider->error;
 	isOAIerror( $response, 'badArgument' );
 }
 
@@ -156,7 +152,7 @@ my $baseURL = 'http://localhost:3000/oai';
 	#validateRequest(%params);
 	my $response = $provider->ListIdentifiers(%params);
 	die "that wasn't supposed to happen" if ($response);
-	$response = $provider->errorMessage;
+	$response = $provider->error;
 	isOAIerror( $response, 'noRecordsMatch' );
 }
 

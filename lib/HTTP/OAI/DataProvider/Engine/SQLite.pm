@@ -1,4 +1,5 @@
 package HTTP::OAI::DataProvider::Engine::SQLite;
+
 # ABSTRACT: A simple and fairly generic SQLite engine for HTTP::OAI::DataProvider
 
 use warnings;
@@ -64,11 +65,10 @@ Am currently not sure about the arguments.
 
 =cut
 
-
 #required
-has 'nativeFormat'    => ( isa => 'HashRef', is => 'ro', required => 1 );
-has 'chunkCache' => ( isa => 'HashRef', is => 'ro', required => 1 );
-has 'dbfile'       => ( isa => 'Str', is => 'ro', required => 1 );
+has 'nativeFormat' => ( isa => 'HashRef', is => 'ro', required => 1 );
+has 'chunkCache'   => ( isa => 'HashRef', is => 'ro', required => 1 );
+has 'dbfile'       => ( isa => 'Str',     is => 'ro', required => 1 );
 
 =head1 INTERFACE METHODS
 
@@ -95,18 +95,19 @@ sub queryChunk {
 	my $chunkDesc = shift or croak "Need chunkDesc!";
 	my $params    = shift or croak "Need params!";
 
+	#print "chunkDesc->chunkNo".$chunkDesc->chunkNo."\n";
+	#print "recordsPerChunk".$self->{chunkCache}{recordsPerChunk}."\n";
 	#Debug "Enter queryChunk";
 
 	my %opts = (
-		requestURL  => $self->{requestURL},
 		transformer => $self->{transformer},
 		verb        => $params->{verb},
 		params      => $params,
 
 		#for resumptionToken
-		chunkSize    => $self->{chunkSize},
+		chunkSize    => $self->{chunkCache}{recordsPerChunk},
 		chunkNo      => $chunkDesc->chunkNo,
-		targetPrefix => $chunkDesc->{targetPrefix},    #why here?
+		targetPrefix => $chunkDesc->targetPrefix, 
 		token        => $chunkDesc->token,
 		total        => $chunkDesc->total,
 	);
@@ -126,7 +127,7 @@ sub queryChunk {
 	}
 
 	#SQL
-	my $dbh = $self->{connection}->dbh()       or die $DBI::errstr;
+	my $dbh = $self->{connection}->dbh()       or croak $DBI::errstr;
 	my $sth = $dbh->prepare( $chunkDesc->sql ) or croak $dbh->errstr();
 	$sth->execute() or croak $dbh->errstr();
 
@@ -380,8 +381,6 @@ will re-enter this loop at a later point in time.
 
 =cut
 
-
-
 =method init
 
 was initChunkCache()
@@ -411,16 +410,14 @@ sub init {
 	#use Data::Dumper qw(Dumper);
 	#Debug 'WWWWWWWWWWWEIRD'.Dumper (%opts);
 	$self->{ChunkCache} =
-	  new HTTP::OAI::DataProvider::ChunkCache(
-		maxSize => $opts{maxChunks} )
+	     new HTTP::OAI::DataProvider::ChunkCache( maxSize => $opts{maxChunks} )
 	  or croak "Cannot init chunkCache";
-	 
-	 #
-	 # initDB
-	 #
-	 $self->_initDB();
-}
 
+	#
+	# initDB
+	#
+	$self->_initDB();
+}
 
 =head2 my $first=$self->planChunking($params);
 
@@ -440,24 +437,18 @@ sub planChunking {
 	my $self   = shift;
 	my $params = shift;
 
-	#do NOT test if provider was born with chunking ability on intention!
-	
-	#total: total # of responses
-	#maxChunkNo ???
-	
-	####IF getRecord we dont need to make numbers
-	
+	#For getRecord we dont NEED to make numbers, but why not...
 	my ( $total, $maxChunkNo ) = $self->_mk_numbers($params);
 
-	Debug "planChunking: total records:$total, maxChunkNo:$maxChunkNo";
+	Debug "planChunking: total records:$total, maxChunkNo:$maxChunkNo\n";
 
-	return if ( $total == 0 ); 	#empty database?
-	
+	return if ( $total == 0 );    #empty database?
+
 	my $first;
 	my $chunkNo      = 1;
 	my $currentToken = $self->mkToken();
-	my $chunkSize    = $self->chunkSize;
-	my $chunkCache   = $self->chunkCache;
+	my $chunkCache   = $self->{ChunkCache};
+	my $chunkSize    = $self->{chunkCache}->{recordsPerChunk};
 
 	#create all chunkDescriptions in chunkCache
 	while ( $chunkNo <= $maxChunkNo ) {
@@ -468,7 +459,6 @@ sub planChunking {
 			offset => $offset,
 			params => $params,
 		);
-		my $nextToken = $self->mkToken();
 
 		my $chunk = new HTTP::OAI::DataProvider::ChunkCache::Description(
 			chunkNo      => $chunkNo,
@@ -480,6 +470,7 @@ sub planChunking {
 		);
 
 		#the last chunk has no resumption token
+		my $nextToken = $self->mkToken();
 		if ( $chunkNo < $maxChunkNo ) {
 			$chunk->{'next'} = $nextToken;
 		}
@@ -498,21 +489,17 @@ sub planChunking {
 	#TODO
 	#only check for 2nd chunk if there is more than 1
 	#i don't really need this sanity check
-	if ( $maxChunkNo > 1 && $params->{verb} ne 'GetRecord' ) {
-
-		#sanity check: can I find the 2nd chunk in chunkCache
-		my $secondToken = $first->{next};
-
-		#Debug "secondToken:".$secondToken;
-		my $secondChunk = $chunkCache->get($secondToken);
-		if ($secondChunk) {
-			Debug "2nd CHUNK FOUND" . $secondChunk->{token};
-		}
-		else {
-
-			#die "2nd chunk not found in cache";
-		}
-	}
+	#if ( $maxChunkNo > 1 && $params->{verb} ne 'GetRecord' ) {
+	#
+	#		#sanity check: can I find the 2nd chunk in chunkCache
+	#		my $secondToken = $first->{next};
+	#
+	#		#Debug "secondToken:".$secondToken;
+	#		my $secondChunk = $chunkCache->get($secondToken);
+	#		if ($secondChunk) {
+	#			Debug "2nd CHUNK FOUND" . $secondChunk->{token};
+	#		}
+	#	}
 
 	#Debug "planChunking RESULT".$self->{chunkCache}->count;
 	return $first;
@@ -541,9 +528,11 @@ sub _querySQL {
 	my $self = shift;
 	my %args = @_;
 
-	my $params = $args{params};
-	my $limit  = $args{limit};
-	my $offset = $args{offset};
+	my $params = $args{params} or croak "Need params";
+	my $limit  = $args{limit}  or croak "Need limit";
+	my $offset = $args{offset};    #or would croak on 0
+
+	if ( !defined $offset ) { croak "offset missing"; }
 
 	#Debug "OFFSET: $offset LIMIT: $limit";
 	#md becomes modifier with values md and count?
@@ -552,9 +541,6 @@ sub _querySQL {
 	# datestamp > ? AND
 	# datestamp < ? AND
 	# setSpec = ?
-
-	#This version is SLOW, but does it really matter? It's just one query
-	#for each request. Who cares?
 
 	my $sql = q/SELECT records.identifier, datestamp, status, setSpec /;
 
@@ -772,18 +758,19 @@ chunking!]
 =cut
 
 sub _mk_numbers {
-	my $self   = shift;
-	my $params = shift;
-	my $total  = $self->_countTotals($params);
+	my $self       = shift;
+	my $params     = shift;
+	my $total      = $self->_countTotals($params);
+	my $chunkCache = $self->chunkCache;
 
-	if (!$self->chunkSize or $self->chunkSize == 0) {
-		confess "no chunkSize";
-	}
+	#use Data::Dumper qw(Dumper);
+	#print Dumper $chunkCache;
+	#print "........................test $total/"
+	#  . $chunkCache->{recordsPerChunk} . "\n";
 
-	Debug "test $total/". $self->chunkSize ;
 	#e.g. 2222 total with 500 chunk size: 1, 501, 1001, 1501, 2001
-	my $max = ( $total / $self->chunkSize ) + 1;    #max no of chunks
-	return $total, sprintf( "%d", $max );           #rounded up to int
+	my $max = ( $total / $chunkCache->{recordsPerChunk} ) + 1; #max no of chunks
+	return $total, sprintf( "%d", $max );    #rounded up to int
 }
 
 #sql for count request
@@ -839,7 +826,7 @@ sub _updateRecord {
 	$sth->execute( $record->datestamp, $record->metadata->toString,
 		$record->identifier )
 	  or croak $dbh->errstr();
-	return 1;                     #success
+	return 1;    #success
 }
 
 sub _insertRecord {
