@@ -248,7 +248,6 @@ sub loadWorkingTestConfig {
 			if ($config{$first}{$signal}) {
 				return %{$config{$first}{$signal}};				
 			}
-			
 		}
 	#return complete hash	
 	return hashRef2hash( $config{$signal} );

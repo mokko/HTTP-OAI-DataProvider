@@ -600,7 +600,10 @@ sub _connectDB {
 	my $self = shift;
 	my $dbfile = $self->dbfile or croak "Need dbfile!";
 
-	return if ( !$self->valFileExists($dbfile) );
+	#db may be missing if not yet initialized
+	if ( !$self->valFileExists($dbfile) ) {
+		Warning 'dbfile missing';
+	}
 
 	$self->{connection} = DBIx::Connector->new(
 		"dbi:SQLite:dbname=$dbfile",
@@ -612,6 +615,8 @@ sub _connectDB {
 	) or $self->{error} = "Problems with DBIx::connector";
 
 	if ( !$self->{connection} ) {
+		croak 'connection problem';
+		$self->{error}='No connection';
 		return;    #error
 	}
 	return 1;      #success

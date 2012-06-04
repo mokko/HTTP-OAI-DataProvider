@@ -159,12 +159,13 @@ sub say {
 	print "@_\n";
 }
 
-=func testEnvironment ($signal, $attach);
+=func testEnvironment ($signal, [$attach,] [$anotherAttach,] ...);
 
 If $signal (optional) is 'config' absolute path of the configuration file is returned. 
 Otherwise configuration directory (directory in which config resides) is returned.
 
-If $attach is specified the string $attach is added to configuration directory. 
+If $attach is specified the string $attach is added to configuration directory. You
+may add multiple $attach if you like.
 
 If $signal is 'config' and $attach is added, $attach is ignored.
 
@@ -172,14 +173,17 @@ If $signal is 'config' and $attach is added, $attach is ignored.
 
 sub testEnvironment {
 	my $arg    = shift;
-	my $attach = shift;
 	my $dir    = File::Spec->catfile( $FindBin::Bin, '..', 't', 'environment' );
 	my $return=$dir;
+	
 	if ( $arg eq 'config' ) {
-		$attach='config.pl';
+		return File::Spec->catfile($dir, 'config.pl');
 	}
-	if ($attach) {
-		$return=File::Spec->catfile($return, $attach);
+
+	if (@_) {
+		foreach my $item (@_) {
+			$return=File::Spec->catfile($return, $item);
+		}
 	}
 	return $return;
 }

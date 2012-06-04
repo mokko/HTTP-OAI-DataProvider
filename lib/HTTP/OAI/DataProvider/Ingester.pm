@@ -5,7 +5,6 @@ use warnings;
 use Moose;
 use Carp qw(carp croak confess);
 use HTTP::OAI::DataProvider::Common qw(Debug Warning);
-
 use XML::LibXML;
 
 has 'engine'       => ( isa => 'Str', is => 'ro', required => 1 );

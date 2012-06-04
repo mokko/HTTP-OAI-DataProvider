@@ -12,3 +12,4 @@ db
 HTTP-*
 bak/*
 t/log/*
+t/environment/sampleData-big.mpx

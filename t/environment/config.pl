@@ -16,7 +16,6 @@
 		},
 		dbfile    => "$FindBin::Bin/../t/environment/db",
 		engine    => 'HTTP::OAI::DataProvider::Engine::SQLite',
-		ingester  => 'HTTP::OAI::DataProvider::Engin',
 		locateXSL => sub {
 			my $prefix       = shift;
 			my $nativePrefix = (keys %{$config{engine}{nativeFormat}})[0]
