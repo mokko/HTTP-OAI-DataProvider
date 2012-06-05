@@ -1,7 +1,5 @@
 #options for testing the data provider
 %config = (
-
-	#required
 	identify => {
 		adminEmail     => 'mauricemengel@gmail.com',
 		baseURL        => 'http://localhost:3000/oai',
@@ -18,7 +16,7 @@
 		engine    => 'HTTP::OAI::DataProvider::Engine::SQLite',
 		locateXSL => sub {
 			my $prefix       = shift;
-			my $nativePrefix = (keys %{$config{engine}{nativeFormat}})[0]
+			my $nativePrefix = ( keys %{ $config{engine}{nativeFormat} } )[0]
 			  or die "nativePrefix missing";
 			return "$FindBin::Bin/../t/environment/$nativePrefix" . '2'
 			  . "$prefix.xsl";
@@ -30,7 +28,6 @@
 		warning => sub { my $msg = shift; warn ">>$msg"    if $msg; },
 	},
 
-	#capital letter
 	globalFormats => {
 		mpx => {
 			ns_uri => "http://www.mpx.org/mpx",
@@ -42,16 +39,14 @@
 			ns_schema => "http://www.openarchives.org/OAI/2.0/oai_dc.xsd",
 		},
 	},
-
-	#	native_ns_uri  => 'http://www.mpx.org/mpx',
+	#requestURL => 'http://testurl.com',
 	setLibrary => {
 		'78' => {
 			    'setName' => 'Schellackplatten aus dem Phonogramm-Archiv'
 			  . ' (ursprünglich für DISMARC exportiert)'
 		},
-		'MIMO' => {
-			'setName' => 'Musical Instruments selected for MIMO project'
-		},
+		'MIMO' =>
+		  { 'setName' => 'Musical Instruments selected for MIMO project' },
 		'test' => {
 			'setName' => 'testing setSpecs - might not work without this one',
 

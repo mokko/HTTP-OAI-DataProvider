@@ -13,7 +13,7 @@ use HTTP::OAI;
 use HTTP::OAI::Repository qw/validate_request/;
 use HTTP::OAI::DataProvider::SetLibrary;
 use HTTP::OAI::DataProvider::Engine;
-use HTTP::OAI::DataProvider::Common qw/Debug Warning hashRef2hash/;
+use HTTP::OAI::DataProvider::Common qw/Debug Warning say/;
 use XML::SAX::Writer;
 
 #use Data::Dumper qw/Dumper/; #for debugging
@@ -56,11 +56,16 @@ has 'xslt'       => ( isa => 'Str',     is => 'ro', required => 0 );
 	my $provider = HTTP::OAI::DataProvider->new(%options);
 	
 	#Verbs: GetRecord, Identify ...
-	my $provider->requestURL('http://newbase.url'); 	#overwrite the automatic setting
 	my $response=$provider->$verb(%params);
 
-	#New Error Checking
-	my $response=$provider->$verb(%params) or return $provider->error;
+	#$response is a string containing OAI-PMH XML, either one of the six OAI 
+	#verbs or an error. Might be empty or croak on important errors.
+
+	#New Error Checking 
+	#TODO check if it actually works
+	if ($provider->error) {
+		print $provider->error	
+	}
 
 =method my $provider->new ($options);
 
@@ -68,7 +73,7 @@ Initialize the HTTP::OAI::DataProvider object with the options of your choice.
 
 On failure return nothing. 
 
-=head3 OAI Parameters
+=head3 OAI Parameters TODO UPDATE DOC!
 see OAI specification for details on the following parameters
 
 * adminEmail =>'bla@email.com'
@@ -136,8 +141,7 @@ sub BUILD {
 	Debug( $self->debug )     if ( $self->debug );
 	Warning( $self->warning ) if ( $self->warning );
 
-	my %engine = hashRef2hash( $self->engine );
-	$self->{Engine} = new HTTP::OAI::DataProvider::Engine(%engine);
+	$self->{Engine} = new HTTP::OAI::DataProvider::Engine( %{ $self->engine } );
 }
 
 =method my $result=$provider->GetRecord(%params);
@@ -158,7 +162,7 @@ Errors
 =cut
 
 sub GetRecord {
-	my $self   = shift;
+	my $self = shift;
 	my %params = @_ or ();    #dont croak here, prefer propper OAI error
 	my @errors;
 
@@ -204,7 +208,7 @@ granularity).
 
 sub Identify {
 	my $self     = shift;
-	my %params = @_ or ();    #dont croak here, prefer propper OAI error
+	my %params   = @_ or ();          #dont croak here, prefer propper OAI error
 	my $identify = $self->identify;
 	$params{verb} = 'Identify';
 	$self->_validateRequest(%params) or return;
@@ -339,10 +343,10 @@ sub ListIdentifiers {
 	my $self = shift or croak "Need myself!";
 	my $engine = $self->{Engine} or croak "Internal error: Data store missing!";
 	my %params = @_ or ();    #dont croak here, prefer propper OAI error
-	my @errors;    #stores errors before there is a result object
+	my @errors;               #stores errors before there is a result object
 	$params{verb} = 'ListIdentifiers';
 
-	$self->_validateRequest(%params) or return; 
+	$self->_validateRequest(%params) or return;
 
 	#my $request = $self->requestURL();
 
@@ -423,7 +427,7 @@ ERRORS
 =cut
 
 sub ListRecords {
-	my $self   = shift;
+	my $self = shift;
 	my %params = @_ or ();    #dont croak here, prefer propper OAI error
 	$params{verb} = 'ListRecords';
 	$self->_validateRequest(%params) or return;
@@ -493,7 +497,7 @@ ERRORS
 =cut
 
 sub ListSets {
-	my $self   = shift;
+	my $self = shift;
 	my %params = @_ or ();    #dont croak here, prefer propper OAI error
 
 	my $engine = $self->{Engine};
@@ -614,6 +618,7 @@ sub err2XML {
 		$response->errors($_) if ( ref $_ eq 'HTTP::OAI::Error' );
 	}
 
+	#$response=$self->overwriteRequestURL($response);
 	$self->overwriteRequestURL($response);
 	$self->_init_xslt($response);
 	return $response->toDOM->toString;
@@ -668,14 +673,19 @@ sub _output {
 	if ( !$response ) {
 		die "No response!";
 	}
+	#response is a HTTP::OAI::$verb object
+	#say "response: $response";
 
 	$self->_init_xslt($response);
 
 	#overwrites real requestURL with config value
-	$self->overwriteRequestURL($response);
+	#$self->overwriteRequestURL($response);
+	$response=$self->overwriteRequestURL($response);
+	#say "response: $response";
 
+	#i dont know why this doesn't work
 	#return $dom=$response->toDOM->toString;
-
+	#alternative output
 	my $xml;
 	$response->set_handler( XML::SAX::Writer->new( Output => \$xml ) );
 	$response->generate;
@@ -687,45 +697,53 @@ sub _output {
 If $provider->{requestURL} exists take that value and overwrite the requestURL
 in the responseURL. requestURL specified in this module consists only of
 	http://blablabla.com:8080
-All params following the quetion mark will be preserved.
-$provider->{requestURL} should a config value, e.g. to make the cache appear
-to be real.
+
+All params following the question mark are preserved.
+
+I use this to correct the url of data provider which is hosted on two different 
+server. One hosts the perl webapp and the other one caches the app for the 
+public.
 
 =cut
 
 sub overwriteRequestURL {
-	my $self     = shift;    #$provider
-	my $response = shift;    #e.g. HTTP::OAI::ListRecord
+	my $self = shift or croak "Need myself";
+	my $response = shift
+	  or croak "Need response";    #e.g. HTTP::OAI::ListRecord
 
-	if ( $self->requestURL ) {
+	return $response if ( !$self->requestURL );    
 
-		#replace part before question mark
-		if ( $response->requestURL =~ /\?/ ) {
-			my @f = split( /\?/, $response->requestURL, 2 );
-			if ( $f[1] ) {
-				my $new = $self->requestURL . '?' . $f[1];
+	#replace part before question mark
+	if ( $response->requestURL =~ /\?/ ) {
 
-				#very dirty
-				if ( $new =~ /verb=/ ) {
-					$self->{engine}->{chunkRequest}->{_requestURI} = $new;
-				}
-				else {
-					$new = $self->{engine}->{chunkRequest}->{_requestURI};
-				}
+		my @f = split( /\?/, $response->requestURL, 2 );
+		if ( $f[1] ) {
+			my $new = $self->requestURL . '?' . $f[1];
 
-				$response->requestURL($new);
-
-				#Debug "overwriteRequestURL: "
-				#  . $response->requestURL . '->'
-				#  . $new;
+			#very dirty
+			if ( $new =~ /verb=/ ) {
+				#why? untested
+				$self->{engine}->{chunkRequest}->{_requestURI} = $new;
 			}
 			else {
-
-				#requestURL has no ? in case of an badVerb
-				$response->requestURL( $self->requestURL );
+				#why? untested
+				$new = $self->{engine}->{chunkRequest}->{_requestURI};
 			}
+
+			$response->requestURL($new);
+			return $response;		
+			#Debug "overwriteRequestURL: "
+			#  . $response->requestURL . '->'
+			#  . $new;
 		}
 	}
+	else {
+
+		#requestURL has no ? in case of an badVerb
+		$response->requestURL( $self->requestURL );
+		#say "GGGGGGGGGGGGGGGGGGGGGGG" . $response->requestURL;
+	}
+	return $response;
 }
 
 =method $obj= $self->_init_xslt($obj)
@@ -756,15 +774,15 @@ params does not include a verb.
 =cut
 
 sub _validateRequest {
-	my $self   = shift or croak "Need myself!";
-	my %params = @_ or (); #dont croak here, prefer propper OAI error
-	
+	my $self = shift or croak "Need myself!";
+	my %params = @_ or ();    #dont croak here, prefer propper OAI error
+
 	my @errors = validate_request(%params);
 	if (@errors) {
 		$self->{error} = $self->err2XML(@errors);
-		return;    #there was an error during validation
+		return;               #there was an error during validation
 	}
-	return 1;      #no validation error (success)
+	return 1;                 #no validation error (success)
 }
 
 =method $self->_processSetLibrary

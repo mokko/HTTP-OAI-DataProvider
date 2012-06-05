@@ -37,6 +37,7 @@ our @EXPORT;
 
   loadWorkingTestConfig
   testEnvironment
+  testSequence
   xpathTester
 );
 
@@ -45,8 +46,8 @@ our @EXPORT;
   okIfIdentifierExists
 
   okOaiResponse
-  okValidateOAI
-  okValidateOAILax
+  okValidateOAIgone
+  okValidateOAILaxgone
 
   isOAIerror
   isMetadataFormat
@@ -209,7 +210,7 @@ Instead use:
 
 =cut
 
-sub okIfBadArgument {
+sub _okIfBadArgument {
 	my $response = shift or croak "Error: Need response!";
 	isOAIerror( $response, 'badArgument' );
 }
@@ -302,10 +303,10 @@ sub oaiError {
 		#print "badewanne".$doc->toString."\n";
 		if ($code) {
 			$error->{$code} = $desc;
-			return $error;
+			return $error; #success, i.e. error exists
 		}
 	}
-	return;
+	return; #failure,i.e. no error
 }
 
 =func failOnRequestError(%params);
@@ -322,6 +323,46 @@ sub failOnRequestError {
 		exit 1;
 	}
 }
+
+
+=head2 testSequence (%opts);
+
+my @sequence = (
+	{ verb => 'Identify' },
+	{
+		verb           => 'ListIdentifiers',
+		metadataPrefix => 'oai_dc'
+	}
+);
+
+$codeRef=sub {
+	my ($provider, $verb, $params)=@_;
+	my $response = $provider->$verb( %{$params} );
+	ok ($response, 'response exists');
+};
+
+testSequence (
+	config=>\%config, 
+	sequence=>\@sequence, 
+	codeRef=>$codeRef
+);
+
+=cut
+
+sub testSequence {
+	my %opts = @_;
+	my @sequence = @{ $opts{sequence} };
+	my $provider = new HTTP::OAI::DataProvider( %{ $opts{config} } );
+
+	foreach my $params (@sequence) {
+		my $verb = $params->{verb};
+		delete( $params->{verb} );
+
+		$opts{codeRef}( $provider, $verb, $params );
+	}
+}
+
+
 
 =func my $xt=xpathTester($response);
 

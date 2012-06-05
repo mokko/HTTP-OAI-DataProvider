@@ -33,85 +33,59 @@ my @sequence = (
 	},
 );
 
-plan tests => @sequence * 2 + 1;
+plan tests => @sequence * 2 + 3; #put number of tests as early as possible
+
+my $newURL = 'http://somethingelse.com';
+my $oldURL = 'http://localhost';
+
+my $codeRef = sub {
+	my ( $provider, $verb, $params ) = @_;
+
+	foreach my $url ( $oldURL, $newURL ) {
+		$provider->requestURL($url);
+		my $response = $provider->$verb( %{$params} );
+
+		if ( $provider->error ) {
+			die "provider error:" . $provider->error;
+		}
+		fail "oaiError where there should be none" if oaiErrorResponse($response);
+
+		my $xt = xpathTester($response);
+		$xt->is( $xpath, $url, "expect $url" );
+	}
+
+};
 
 #
 # let's go
 #
 
-my $provider = new HTTP::OAI::DataProvider(loadWorkingTestConfig);
+my %config = loadWorkingTestConfig();
 
-ok( !$provider->requestURL, 'no requestURL expected at this point' );
+#say Dumper (%config);
 
-my $newURL = 'http://somethingelse.com';
-my $oldURL = 'http://localhost';
-
-foreach my $params (@sequence) {
-	my $verb = $params->{verb};
-	delete( $params->{verb} );
-
-	#say "v:$verb";
-	#say Dumper ($params);
-
-	#first time
-	my $response = $provider->$verb( %{$params} )
-	  or say $provider->error;
-	my $xt = xpathTester($response);
-	$xt->is( $xpath, $oldURL, 'expect localhost' );
-
-	#2nd time
+{
+	my $provider = new HTTP::OAI::DataProvider(%config);
+	ok( !$provider->requestURL, 'no requestURL expected at this point' );
+	$provider->requestURL($oldURL);
+	ok ($provider->requestURL eq $oldURL, 'setting requestURL to old');
 	$provider->requestURL($newURL);
-	$response = $provider->$verb( %{$params} )
-	  or say $provider->error;
-	$xt = xpathTester($response);
-	$xt->is( $xpath, $newURL, 'expect localhost' );
-
+	ok ($provider->requestURL eq $newURL, 'setting requestURL to new');
 }
+
+testSequence(
+	sequence => \@sequence,
+	config   => \%config,
+	codeRef  => $codeRef
+);
 
 ###
 ### SUBS
 ###
+
+#not used at the moment
 sub showRequestURL {
 	my $xt = shift or return;
 	print ">>>>>requestURL:" . $xt->xpc->findvalue($xpath) . "!\n";
-}
-
-=head2 testSequence (%opts);
-
-my @sequence = (
-	{ verb => 'Identify' },
-	{
-		verb           => 'ListIdentifiers',
-		metadataPrefix => 'oai_dc'
-	}
-);
-
-$codeRef=sub {
-	my ($provider, $verb, $params)=@_;
-	my $response = $provider->$verb( %{$params} );
-	ok ($response, 'response exists');
-};
-
-testSequence (
-	config=>\%config, 
-	sequence=>\@sequence, 
-	codeRef=>$codeRef
-);
-
-=cut
-
-sub testSequence {
-	my %opts = @_;
-
-	my @sequence = @{ $opts{sequence} };
-
-	my $provider = new HTTP::OAI::DataProvider( %{ $opts{config} } );
-
-	foreach my $params (@sequence) {
-		my $verb = $params->{verb};
-		delete( $params->{verb} );
-
-		$opts{codeRef}( $provider, $verb, $params );
-	}
 }
 

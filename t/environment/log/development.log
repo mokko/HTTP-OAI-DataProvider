@@ -47,3 +47,29 @@
 [6528] debug @0.013459> [hit #20]chunkSize10 in /home/maurice/projects/HTTP-OAI-DataProvider/bin/../lib/HTTP/OAI/DataProvider/Engine.pm l. 43
 [6528] debug @0.013719> [hit #20]planChunking: total records:1, maxChunkNo:1 in /home/maurice/projects/HTTP-OAI-DataProvider/bin/../lib/HTTP/OAI/DataProvider/Common.pm l. 124
 [6528] debug @0.014093> [hit #20]queryChunk: this is the last chunk! in /home/maurice/projects/HTTP-OAI-DataProvider/bin/../lib/HTTP/OAI/DataProvider/Common.pm l. 124
+[7904] error @0.001427> [hit #1]request to GET / crashed: Can't locate object method "" via package "HTTP::OAI::DataProvider" at bin/webapp.pl line 48, <DATA> line 16. in /usr/lib/perl5/site_perl/5.10/Dancer/Handler.pm l. 98
+[5840] debug @0.001303> [hit #4]_countTotals: SELECT COUNT (records.identifier) FROM records LEFT JOIN sets ON records.identifier = sets.identifier
+	WHERE 1=1 in /home/maurice/projects/HTTP-OAI-DataProvider/bin/../lib/HTTP/OAI/DataProvider/Common.pm l. 133
+[5840] debug @0.011815> [hit #4]planChunking: total records:1448, maxChunkNo:145 in /home/maurice/projects/HTTP-OAI-DataProvider/bin/../lib/HTTP/OAI/DataProvider/Common.pm l. 133
+[5840] debug @0.001242> [hit #8]_countTotals: SELECT COUNT (records.identifier) FROM records LEFT JOIN sets ON records.identifier = sets.identifier
+	WHERE 1=1 in /home/maurice/projects/HTTP-OAI-DataProvider/bin/../lib/HTTP/OAI/DataProvider/Common.pm l. 133
+[5840] debug @0.011007> [hit #8]planChunking: total records:1448, maxChunkNo:145 in /home/maurice/projects/HTTP-OAI-DataProvider/bin/../lib/HTTP/OAI/DataProvider/Common.pm l. 133
+[5840] debug @0.007895> [hit #12]Enter setLibrary::expand in /home/maurice/projects/HTTP-OAI-DataProvider/bin/../lib/HTTP/OAI/DataProvider/Common.pm l. 133
+[5840]  warn @0.001292> [hit #15] Enter ListMetadataFormats  in /home/maurice/projects/HTTP-OAI-DataProvider/bin/../lib/HTTP/OAI/DataProvider/Common.pm l. 152
+[5840] debug @0.001000> [hit #18]_countTotals: SELECT COUNT (records.identifier) FROM records LEFT JOIN sets ON records.identifier = sets.identifier
+	WHERE 1=1 in /home/maurice/projects/HTTP-OAI-DataProvider/bin/../lib/HTTP/OAI/DataProvider/Common.pm l. 133
+[5840] debug @0.012903> [hit #18]planChunking: total records:1448, maxChunkNo:145 in /home/maurice/projects/HTTP-OAI-DataProvider/bin/../lib/HTTP/OAI/DataProvider/Common.pm l. 133
+[5840] debug @0.001393> [hit #21]_countTotals: SELECT COUNT (records.identifier) FROM records LEFT JOIN sets ON records.identifier = sets.identifier
+	WHERE 1=1 in /home/maurice/projects/HTTP-OAI-DataProvider/bin/../lib/HTTP/OAI/DataProvider/Common.pm l. 133
+[5840] debug @0.011435> [hit #21]planChunking: total records:1448, maxChunkNo:145 in /home/maurice/projects/HTTP-OAI-DataProvider/bin/../lib/HTTP/OAI/DataProvider/Common.pm l. 133
+[7012] debug @0.001277> [hit #4]_countTotals: SELECT COUNT (records.identifier) FROM records LEFT JOIN sets ON records.identifier = sets.identifier
+	WHERE 1=1 in /home/maurice/projects/HTTP-OAI-DataProvider/bin/../lib/HTTP/OAI/DataProvider/Common.pm l. 133
+[7012] debug @0.011740> [hit #4]planChunking: total records:1448, maxChunkNo:145 in /home/maurice/projects/HTTP-OAI-DataProvider/bin/../lib/HTTP/OAI/DataProvider/Common.pm l. 133
+[7012] debug @0.007908> [hit #8]Enter setLibrary::expand in /home/maurice/projects/HTTP-OAI-DataProvider/bin/../lib/HTTP/OAI/DataProvider/Common.pm l. 133
+[7012]  warn @0.001139> [hit #11] Enter ListMetadataFormats  in /home/maurice/projects/HTTP-OAI-DataProvider/bin/../lib/HTTP/OAI/DataProvider/Common.pm l. 152
+[7012] debug @0.003008> [hit #14]_countTotals: SELECT COUNT (records.identifier) FROM records LEFT JOIN sets ON records.identifier = sets.identifier
+	WHERE 1=1 in /home/maurice/projects/HTTP-OAI-DataProvider/bin/../lib/HTTP/OAI/DataProvider/Common.pm l. 133
+[7012] debug @0.013392> [hit #14]planChunking: total records:1448, maxChunkNo:145 in /home/maurice/projects/HTTP-OAI-DataProvider/bin/../lib/HTTP/OAI/DataProvider/Common.pm l. 133
+[7012] debug @0.001312> [hit #17]_countTotals: SELECT COUNT (records.identifier) FROM records LEFT JOIN sets ON records.identifier = sets.identifier
+	WHERE 1=1 in /home/maurice/projects/HTTP-OAI-DataProvider/bin/../lib/HTTP/OAI/DataProvider/Common.pm l. 133
+[7012] debug @0.011069> [hit #17]planChunking: total records:1448, maxChunkNo:145 in /home/maurice/projects/HTTP-OAI-DataProvider/bin/../lib/HTTP/OAI/DataProvider/Common.pm l. 133
