@@ -10,7 +10,7 @@ use Test::More tests => 2;
 use HTTP::OAI::DataProvider::Ingester;
 use File::Spec;
 use lib testEnvironment('dir');    #to load MPX from testEnviron
-use MPX;
+use HTTP::OAI::DataProvider::Mapping::MPX;
 
 my $zipfile = testEnvironment( 'dir', 'sampleData.zip' );
 my $target  = testEnvironment( 'dir', 'sampleData-big.mpx' );
@@ -62,10 +62,10 @@ else {
 	  . 'should be initialized. You may have to adjust the date for earliestDate '
 	  . "in this case\n";
 
-	my $ret =
-	  $ingester->digest( source => $target, mapping => \&MPX::extractRecords )
-	  or die "Can'
-		  t digest ";
+	my $ret = $ingester->digest(
+		source  => $target,
+		mapping => \&HTTP::OAI::DataProvider::Mapping::MPX::extractRecords
+	) or die "Can't digest!";
 	ok( $ret, " import of $target seems to have worked( returned true ) " );
 
 }

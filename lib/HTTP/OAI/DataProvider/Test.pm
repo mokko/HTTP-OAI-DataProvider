@@ -180,13 +180,14 @@ sub isOAIerror {
 	my $code     = shift or croak "Need error type to look for!";
 	isScalar($response);
 	isScalar($code);
+	
 	my @errors = qw (
 	  badArgument
 	  badResumptionToken
 	  cannotDisseminateFormat
 	  idDoesNotExist
 	  noMetadataFormats
-	  noRecordsMatches
+	  noRecordsMatch
 	  noSetHierarchy);
 
 	if ( !grep ( $_ eq $code, @errors ) ) {

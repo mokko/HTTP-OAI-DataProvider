@@ -19,8 +19,7 @@ use HTTP::OAI::DataProvider::Common qw(
   testEnvironment
   Warning
 );
-use lib testEnvironment('dir');
-use MPX;
+use HTTP::OAI::DataProvider::Mapping::MPX;
 
 sub verbose;
 sub error;

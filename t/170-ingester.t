@@ -4,12 +4,11 @@ use Test::More tests => 4;
 use Scalar::Util qw(blessed);
 use HTTP::OAI::DataProvider::Test;
 use HTTP::OAI::DataProvider::Common qw(Debug Warning);
-use lib testEnvironment('dir'); #to load MPX from testEnviron
-use MPX; 
+use HTTP::OAI::DataProvider::Mapping::MPX;
 
-my %engine = loadWorkingTestConfig('engine');
-my %nativeFormat=loadWorkingTestConfig('nativeFormat');
-my $nativePrefix=(keys %nativeFormat)[0];
+my %engine       = loadWorkingTestConfig('engine');
+my %nativeFormat = loadWorkingTestConfig('nativeFormat');
+my $nativePrefix = ( keys %nativeFormat )[0];
 die "No config! " if ( !%engine );
 
 =head1 CONCEPT
@@ -35,19 +34,21 @@ BEGIN {
 	ok( $@, 'new should fail' );
 }
 
-
 my $ingester = new HTTP::OAI::DataProvider::Ingester(
 	engine       => $engine{engine},
 	nativePrefix => $nativePrefix,
 	nativeURI    => $nativeFormat{$nativePrefix},
-	dbfile    => $engine{dbfile},
+	dbfile       => $engine{dbfile},
 );
 
 ok( blessed $ingester eq 'HTTP::OAI::DataProvider::Ingester',
 	'ingester initialized' );
 
-
-my $small=File::Spec->catfile (testEnvironment('dir'),'sampleData-small.mpx');
-my $ret=$ingester->digest( source => $small, mapping => \&MPX::extractRecords ) or die "Can't digest";
-ok ( $ret, "import of $small seems to work (returns true)");
+my $small =
+  File::Spec->catfile( testEnvironment('dir'), 'sampleData-small.mpx' );
+my $ret = $ingester->digest(
+	source  => $small,
+	mapping => \&HTTP::OAI::DataProvider::Mapping::MPX::extractRecords
+) or die "Can't digest";
+ok( $ret, "import of $small seems to work (returns true)" );
 

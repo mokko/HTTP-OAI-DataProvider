@@ -167,7 +167,7 @@ sub GetRecord {
 	my @errors;
 
 	$params{verb} = 'GetRecord';
-	$self->_validateRequest(%params) or return;
+	$self->_validateRequest(%params) or return $self->OAIerror;
 
 	my $engine        = $self->{Engine};
 	my $globalFormats = $self->{globalFormats};
@@ -211,7 +211,7 @@ sub Identify {
 	my %params   = @_ or ();          #dont croak here, prefer propper OAI error
 	my $identify = $self->identify;
 	$params{verb} = 'Identify';
-	$self->_validateRequest(%params) or return;
+	$self->_validateRequest(%params) or return $self->OAIerror;
 
 	#Debug "Enter Identify";
 
@@ -265,13 +265,14 @@ sub ListMetadataFormats {
 	#
 	# Error handling
 	#
-	$self->_validateRequest(%params) or return;
+	$self->_validateRequest(%params) or return $self->OAIerror;
+
 
 	#only if there is actually an identifier
 	if ( $params{identifier} ) {
 		my $header = $engine->findByIdentifier( $params{identifier} );
 		if ( !$header ) {
-			$self->raiseError('idDoesNotExist');
+			$self->raiseOAIerror('idDoesNotExist');
 			return;
 		}
 	}
@@ -296,7 +297,7 @@ sub ListMetadataFormats {
 
 	#check if noMetadataFormats
 	if ( $list->metadataFormat() == 0 ) {
-		$self->raiseError('noMetadataFormats');
+		$self->raiseOAIerror('noMetadataFormats');
 		return;
 	}
 
@@ -346,7 +347,8 @@ sub ListIdentifiers {
 	my @errors;               #stores errors before there is a result object
 	$params{verb} = 'ListIdentifiers';
 
-	$self->_validateRequest(%params) or return;
+	$self->_validateRequest(%params) or return $self->OAIerror;
+
 
 	#my $request = $self->requestURL();
 
@@ -358,8 +360,8 @@ sub ListIdentifiers {
 		if ($chunk) {
 			return $self->_output($chunk);    #success
 		}
-		$self->raiseError('badResumptionToken');
-		return;                               #error
+		$self->raiseOAIerror('badResumptionToken');
+		return $self->OAIerror;    #success
 
 	}
 
@@ -380,7 +382,7 @@ sub ListIdentifiers {
 
 	if (@errors) {
 		$self->raiseOAIerrors(@errors);
-		return;    #failure
+		return $self->OAIerror;    #success
 	}
 
 	#Metadata handling: query returns response
@@ -430,7 +432,7 @@ sub ListRecords {
 	my $self = shift;
 	my %params = @_ or ();    #dont croak here, prefer propper OAI error
 	$params{verb} = 'ListRecords';
-	$self->_validateRequest(%params) or return;
+	$self->_validateRequest(%params) or return $self->OAIerror;
 
 	#Warning 'Enter ListRecords (prefix:' . $params->{metadataPrefix};
 
@@ -473,7 +475,7 @@ sub ListRecords {
 	my $response = $engine->query( \%params, $self->requestURL );    #todo!
 
 	if ( !$response ) {
-		$self->raiseError('noRecordsMatch');
+		$self->raiseOAIerror('noRecordsMatch');
 		return;
 	}
 
@@ -503,7 +505,8 @@ sub ListSets {
 	my $engine = $self->{Engine};
 
 	$params{verb} = 'ListSets';
-	$self->_validateRequest(%params) or return;
+	$self->_validateRequest(%params) or return $self->OAIerror;
+
 
 	#print "Enter ListSets $self\n";
 
@@ -513,7 +516,7 @@ sub ListSets {
 
 	#resumptionTokens not supported/TODO
 	if ( $params{resumptionToken} ) {
-		$self->raiseError('badResumptionToken');
+		$self->raiseOAIerror('badResumptionToken');
 		return;
 	}
 
@@ -523,7 +526,7 @@ sub ListSets {
 
 	#if none then noSetHierarchy (untested)
 	if ( !@used_sets ) {
-		$self->raiseError('noSetHierarchy');
+		$self->raiseOAIerror('noSetHierarchy');
 		return;
 	}
 
@@ -561,7 +564,7 @@ sub ListSets {
 USED TO BE $provider->errorMessage;
 
 Returns an internal error message (if any). Error message is a single scalar 
-(string) ready for print.
+(string).
 
 Just a getter, no setter! The error is set internally, e.g.
 	$provider->_validateRequest (%params) or return provider->error;
@@ -572,6 +575,13 @@ sub error {
 	my $self = shift or croak "Need myself!";
 	return $self->{error} if ( $self->{error} );
 }
+
+
+sub OAIerror {
+	my $self = shift or croak "Need myself!";
+	return $self->{OAIerror} if ( $self->{OAIerror} );
+}
+
 
 #
 #
@@ -636,18 +646,18 @@ message which can be retrieved using $self->error.
 sub raiseOAIerrors {
 	my $self = shift or die "Need myself";
 	if (@_) {
-		$self->{error} = $self->err2XML(@_);
+		$self->{OAIerror} = $self->err2XML(@_);
 	}
 }
 
-=method $self->raiseError('noRecordsMatch', 'optional message');
+=method $self->raiseOAIerror('noRecordsMatch', 'optional message');
 
 Expects an OAI error code as string. The error message is optional. Sets the 
 error message which can be retrieved using $self->error.
 
 =cut
 
-sub raiseError {
+sub raiseOAIerror {
 	my $self = shift or croak "Need myself!";
 	my $code = shift or croak "Need code!";
 	my %opts = ( code => $code );
@@ -656,7 +666,7 @@ sub raiseError {
 		$opts{message} = $msg;
 	}
 
-	$self->{error} = $self->err2XML( new HTTP::OAI::Error(%opts) );
+	$self->{OAIerror} = $self->err2XML( new HTTP::OAI::Error(%opts) );
 }
 
 =method my $xml=$self->_output($response);
@@ -779,7 +789,7 @@ sub _validateRequest {
 
 	my @errors = validate_request(%params);
 	if (@errors) {
-		$self->{error} = $self->err2XML(@errors);
+		$self->{OAIerror} = $self->err2XML(@errors);
 		return;               #there was an error during validation
 	}
 	return 1;                 #no validation error (success)

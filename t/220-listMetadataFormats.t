@@ -11,7 +11,7 @@ use XML::LibXML;
 my %config   = HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
 my $provider = new HTTP::OAI::DataProvider(%config);
 
-plan tests => ( ( keys %{ $config{GlobalFormats} } ) + 5 );
+plan tests => ( ( keys %{ $config{globalFormats} } ) + 4 );
 
 #
 # 1 - ListMetadataFormats without identifier and basic response tests
@@ -24,7 +24,7 @@ my $baseURL = 'http://localhost:3000/oai';
 	  $provider->ListMetadataFormats();    #response should be a xml string
 	  	okListMetadataFormats($response);
 
-	foreach my $prefix ( keys %{ $config{GlobalFormats} } ) {
+	foreach my $prefix ( keys %{ $config{globalFormats} } ) {
 		isLMFprefix( $response, $prefix );
 	}
 }
@@ -50,7 +50,7 @@ my $baseURL = 'http://localhost:3000/oai';
 {
 	my $response = $provider->ListMetadataFormats(
 		identifier => 'spk-berlin.de:EM-objId-01234567890A' );
-	if ( !$response ) {
+	if ( $response ) {
 		#print $provider->error;
 		isOAIerror( $provider->error, 'idDoesNotExist' );
 	}

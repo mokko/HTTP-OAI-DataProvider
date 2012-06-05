@@ -4,28 +4,12 @@
 use strict;
 use warnings;
 use FindBin;
-use File::Spec;
 use Dancer;
+use File::Spec;
 #so you don't have to type 'perl -Ilib bin/webapp.pl'
 use lib File::Spec->catfile($FindBin::Bin,'..','lib');
 use HTTP::OAI::DataProvider;
 use HTTP::OAI::DataProvider::Test;
-
-=head1 INTRODCUTION
-
-This is an example of how to use HTTP::OAI::DataProvider in a webapp. I use 
-Dancer because I like it. I tested the provider only with Dancer, but I assume 
-that it should also work with in CGI or the PSGI webframework of your choice.
-
-=head1 INSTRUCTIONS
-
-1) start this app in the shell: bin/webapp.pl
-
-2) In your webbrowser point to http:://localhost:3000/?verb=Identify
-
-3) check log at t/environment/development.log
-
-=cut
 
 my $rootdir=File::Spec->catfile($FindBin::Bin,'..','t','environment');
 my %config   = loadWorkingTestConfig();
@@ -48,6 +32,17 @@ any [ 'get', 'post' ] => '/' => sub {
 
 dance;
 
+=head1 INTRODCUTION
+
+A working demo of HTTP::OAI::DataProvider inside a webapp. I use the web 
+framework Dancer because I like it. You could use anything else (catalyst, 
+mojolicious) if you like.  
+
+1) start this app from the shell: bin/webapp.pl
+   (it expects config file at '../t/environment/config.pl')
+
+2) In your webbrowser point to http:://localhost:3000/?verb=Identify
+
 =head1 SEE ALSO
 
-L<Dancer>, L<HTTP::OAI>
+L<http://perldancer.org|Dancer>, L<HTTP::OAI>
