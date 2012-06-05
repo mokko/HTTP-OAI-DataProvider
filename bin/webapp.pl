@@ -1,5 +1,5 @@
 #!/usr/bin/perl
-#PODNAME: webapp
+#PODNAME: webapp.pl
 #ABSTRACT: demo of web frontend to HTTP::OAI::DataProvider
 use strict;
 use warnings;
@@ -28,36 +28,23 @@ that it should also work with in CGI or the PSGI webframework of your choice.
 =cut
 
 my $rootdir=File::Spec->catfile($FindBin::Bin,'..','t','environment');
-my $logdir=File::Spec->catfile($rootdir,'log');
-die "Logdir doesn't exist!" if (!-e $logdir); 
-
 my %config   = loadWorkingTestConfig();
-#use Dancer's debug and warning irrespective of the test configuration
-$config{debug}=\&debug;
-$config{warning}=\&warning;
 
-set logger => 'file';
-setting log_path => $logdir;
+#use Dancer's debug and warning irrespective of the test configuration
+$config{debug}=\&Dancer::debug;
+$config{warning}=\&Dancer::warning;
+
+set logger => 'console';
 setting public => File::Spec->catfile($rootdir,'public'); #for oai2.xsl
 
 my $provider = new HTTP::OAI::DataProvider(%config) or die "Cant create provider!";
 
 any [ 'get', 'post' ] => '/' => sub {
 	content_type 'text/xml'; #to make browser use oai2.xsl
-	my ( $verb, %params ) = prepareParams();
-	return $provider->$verb(%params);
+	my $params=params();
+	my $verb =delete $params->{verb};
+	return $provider->$verb(%{$params});
 };
-
-sub prepareParams {
-	my %params;
-	my $verb = param('verb') or return;
-	foreach my $key ( keys %{ params() } ) {
-		if ( $key ne 'verb' ) {
-			$params{$key} = param $key;
-		}
-	}
-	return $verb, %params;
-}
 
 dance;
 
