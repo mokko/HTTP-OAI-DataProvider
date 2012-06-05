@@ -159,11 +159,11 @@ Errors
 
 sub GetRecord {
 	my $self   = shift;
-	my %params = @_;
+	my %params = @_ or ();    #dont croak here, prefer propper OAI error
 	my @errors;
 
 	$params{verb} = 'GetRecord';
-	$self->_validateRequest(%params) or return $self->error;
+	$self->_validateRequest(%params) or return;
 
 	my $engine        = $self->{Engine};
 	my $globalFormats = $self->{globalFormats};
@@ -204,10 +204,10 @@ granularity).
 
 sub Identify {
 	my $self     = shift;
-	my %params   = @_;
+	my %params = @_ or ();    #dont croak here, prefer propper OAI error
 	my $identify = $self->identify;
 	$params{verb} = 'Identify';
-	$self->_validateRequest(%params) or return $self->error;
+	$self->_validateRequest(%params) or return;
 
 	#Debug "Enter Identify";
 
@@ -254,14 +254,14 @@ sub ListMetadataFormats {
 	my $self = shift;
 
 	Warning ' Enter ListMetadataFormats ';
-	my %params = @_;
+	my %params = @_ or ();    #dont croak here, prefer propper OAI error
 	$params{verb} = 'ListMetadataFormats';
 	my $engine = $self->{Engine};
 
 	#
 	# Error handling
 	#
-	$self->_validateRequest(%params) or return $self->error;
+	$self->_validateRequest(%params) or return;
 
 	#only if there is actually an identifier
 	if ( $params{identifier} ) {
@@ -336,13 +336,13 @@ TODO: Hierarchical sets
 =cut
 
 sub ListIdentifiers {
-	my $self   = shift           or croak "Need myself!";
-	my %params = @_              or croak "Need params";
+	my $self = shift or croak "Need myself!";
 	my $engine = $self->{Engine} or croak "Internal error: Data store missing!";
+	my %params = @_ or ();    #dont croak here, prefer propper OAI error
 	my @errors;    #stores errors before there is a result object
 	$params{verb} = 'ListIdentifiers';
 
-	$self->_validateRequest(%params) or return;
+	$self->_validateRequest(%params) or return; 
 
 	#my $request = $self->requestURL();
 
@@ -424,9 +424,9 @@ ERRORS
 
 sub ListRecords {
 	my $self   = shift;
-	my %params = @_;
+	my %params = @_ or ();    #dont croak here, prefer propper OAI error
 	$params{verb} = 'ListRecords';
-	$self->_validateRequest(%params) or return $self->error;
+	$self->_validateRequest(%params) or return;
 
 	#Warning 'Enter ListRecords (prefix:' . $params->{metadataPrefix};
 
@@ -494,12 +494,12 @@ ERRORS
 
 sub ListSets {
 	my $self   = shift;
-	my %params = @_;
+	my %params = @_ or ();    #dont croak here, prefer propper OAI error
 
 	my $engine = $self->{Engine};
 
 	$params{verb} = 'ListSets';
-	$self->_validateRequest(%params) or return $self->error;
+	$self->_validateRequest(%params) or return;
 
 	#print "Enter ListSets $self\n";
 
@@ -757,7 +757,8 @@ params does not include a verb.
 
 sub _validateRequest {
 	my $self   = shift or croak "Need myself!";
-	my %params = @_    or return;
+	my %params = @_ or (); #dont croak here, prefer propper OAI error
+	
 	my @errors = validate_request(%params);
 	if (@errors) {
 		$self->{error} = $self->err2XML(@errors);

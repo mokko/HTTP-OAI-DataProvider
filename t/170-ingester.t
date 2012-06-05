@@ -3,7 +3,7 @@ use warnings;
 use Test::More tests => 4;
 use Scalar::Util qw(blessed);
 use HTTP::OAI::DataProvider::Test;
-use HTTP::OAI::DataProvider::Common qw(testEnvironment Debug Warning);
+use HTTP::OAI::DataProvider::Common qw(Debug Warning);
 use lib testEnvironment('dir'); #to load MPX from testEnviron
 use MPX; 
 
