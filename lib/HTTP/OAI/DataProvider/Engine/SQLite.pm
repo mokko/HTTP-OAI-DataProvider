@@ -169,7 +169,8 @@ sub queryChunk {
 				$header->status('deleted');
 			}
 			if ( $aref->[4] ) {
-				$md = $aref->[4];
+				$md =  $aref->[4];
+				#Debug "GET HERE $md";
 			}
 			else {
 
@@ -447,7 +448,7 @@ sub planChunking {
 	my $first;
 	my $chunkNo      = 1;
 	my $currentToken = $self->mkToken();
-	my $chunkCache   = $self->{ChunkCache};
+	my $chunkCache   = $self->{ChunkCache}; #object
 	my $chunkSize    = $self->{chunkCache}->{recordsPerChunk};
 
 	#create all chunkDescriptions in chunkCache

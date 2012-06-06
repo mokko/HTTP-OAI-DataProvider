@@ -402,17 +402,11 @@ sub save {
 	if ( $args{md} ) {
 
 		#currently md is a string, possibly in a wrong encoding
+		#$args{md} = encode_utf8($args{md});
 		$args{md} = decode( "utf8", $args{md} );
 
 		#this line fails on encoding problem
 		my $dom = XML::LibXML->load_xml( string => $args{md} );
-
-		#Debug "----- dom's actual encoding: ".$dom->actualEncoding;
-		#load $dom from source file works perfectly
-		#my $dom = XML::LibXML->load_xml( location =>
-		#'/home/Mengel/projects/Salsa_OAI2/data/fs/objId-1305695.mpx' )
-		# or return "Salsa Error: Loading xml file failed for strange reason";
-		#now md should become appropriate metadata
 
 		my $prefix = $args{params}{metadataPrefix} or croak "still no prefix?";
 

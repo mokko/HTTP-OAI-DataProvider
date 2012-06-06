@@ -143,9 +143,7 @@ sub query {
 	}
 
 	my $response = $self->queryChunk($first, $params);
-
 	#todo: we still have to test if result has any result at all
-
 	return $response;
 }
 

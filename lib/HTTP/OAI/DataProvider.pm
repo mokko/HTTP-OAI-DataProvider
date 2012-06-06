@@ -8,18 +8,19 @@ use Carp qw/croak carp/;
 use Moose;
 use Moose::Util::TypeConstraints;
 use namespace::autoclean;
+use Encode qw(encode_utf8);
 
 use HTTP::OAI;
 use HTTP::OAI::Repository qw/validate_request/;
-use HTTP::OAI::DataProvider::SetLibrary;
 use HTTP::OAI::DataProvider::Engine;
+use HTTP::OAI::DataProvider::SetLibrary;
 use HTTP::OAI::DataProvider::Common qw/Debug Warning say/;
 use XML::SAX::Writer;
 
 #use Data::Dumper qw/Dumper/; #for debugging
 
 subtype 'identifyType', as 'HashRef', where {
-	defined $_->{adminEmail}    #use defined instead?
+	defined $_->{adminEmail}                #use defined instead?
 	  && defined $_->{baseURL}
 	  && defined $_->{deletedRecord}
 	  && defined $_->{repositoryName};
@@ -184,16 +185,12 @@ sub GetRecord {
 
 	if (@errors) {
 		$self->raiseOAIerrors(@errors);
-		return $self->OAIerror;              #failure
+		return $self->OAIerror;
 	}
 
 	# Metadata handling
 	my $response = $engine->query( \%params );    #todo
-
-	if (!$response) {
-		die "bla"
-	}
-	return $self->_output($response);             #success
+	return $self->_output($response);
 }
 
 =method my $response=$provider->Identify(%params);
@@ -268,7 +265,6 @@ sub ListMetadataFormats {
 	# Error handling
 	#
 	$self->_validateRequest(%params) or return $self->OAIerror;
-
 
 	#only if there is actually an identifier
 	if ( $params{identifier} ) {
@@ -351,7 +347,6 @@ sub ListIdentifiers {
 
 	$self->_validateRequest(%params) or return $self->OAIerror;
 
-
 	#my $request = $self->requestURL();
 
 	if ( $params{resumptionToken} ) {
@@ -363,7 +358,7 @@ sub ListIdentifiers {
 			return $self->_output($chunk);    #success
 		}
 		$self->raiseOAIerror('badResumptionToken');
-		return $self->OAIerror;    #success
+		return $self->OAIerror;               #success
 
 	}
 
@@ -509,7 +504,6 @@ sub ListSets {
 	$params{verb} = 'ListSets';
 	$self->_validateRequest(%params) or return $self->OAIerror;
 
-
 	#print "Enter ListSets $self\n";
 
 	#errors in using this package...
@@ -578,12 +572,10 @@ sub error {
 	return $self->{error} if ( $self->{error} );
 }
 
-
 sub OAIerror {
 	my $self = shift or croak "Need myself!";
 	return $self->{OAIerror} if ( $self->{OAIerror} );
 }
-
 
 #
 #
@@ -680,28 +672,26 @@ $self->{xslt} if set.
 
 sub _output {
 	my $self     = shift;
-	my $response = shift;    #a HTTP::OAI::Response object
+	my $response = shift or die "No response";    #a HTTP::OAI::Response object
 
-	if ( !$response ) {
-		die "No response!";
-	}
 	#response is a HTTP::OAI::$verb object
 	#say "response: $response";
 
 	$self->_init_xslt($response);
 
 	#overwrites real requestURL with config value
-	#$self->overwriteRequestURL($response);
-	$response=$self->overwriteRequestURL($response);
+	$response = $self->overwriteRequestURL($response);
+
 	#say "response: $response";
 
-	#i dont know why this doesn't work
-	#return $dom=$response->toDOM->toString;
-	#alternative output
+	#return encode_utf8($response->toDOM->toString); #alternative output
+	#there is some error here
 	my $xml;
 	$response->set_handler( XML::SAX::Writer->new( Output => \$xml ) );
 	$response->generate;
-	return $xml;
+	return encode_utf8($xml);
+
+#as per https://groups.google.com/forum/?fromgroups#!topic/psgi-plack/J0IiUanfgeU
 }
 
 =method $obj= $self->overwriteRequestURL($obj)
@@ -723,7 +713,7 @@ sub overwriteRequestURL {
 	my $response = shift
 	  or croak "Need response";    #e.g. HTTP::OAI::ListRecord
 
-	return $response if ( !$self->requestURL );    
+	return $response if ( !$self->requestURL );
 
 	#replace part before question mark
 	if ( $response->requestURL =~ /\?/ ) {
@@ -734,16 +724,19 @@ sub overwriteRequestURL {
 
 			#very dirty
 			if ( $new =~ /verb=/ ) {
+
 				#why? untested
 				$self->{engine}->{chunkRequest}->{_requestURI} = $new;
 			}
 			else {
+
 				#why? untested
 				$new = $self->{engine}->{chunkRequest}->{_requestURI};
 			}
 
 			$response->requestURL($new);
-			return $response;		
+			return $response;
+
 			#Debug "overwriteRequestURL: "
 			#  . $response->requestURL . '->'
 			#  . $new;
@@ -753,6 +746,7 @@ sub overwriteRequestURL {
 
 		#requestURL has no ? in case of an badVerb
 		$response->requestURL( $self->requestURL );
+
 		#say "GGGGGGGGGGGGGGGGGGGGGGG" . $response->requestURL;
 	}
 	return $response;
