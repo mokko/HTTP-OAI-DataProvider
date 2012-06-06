@@ -50,6 +50,8 @@ has 'requestURL' => ( isa => 'Str',     is => 'rw', required => 0 );
 has 'warning'    => ( isa => 'CodeRef', is => 'ro', required => 0 );
 has 'xslt'       => ( isa => 'Str',     is => 'ro', required => 0 );
 
+#TODO MESSAGES
+
 =head1 SYNOPSIS
 
 	#Init
@@ -59,13 +61,13 @@ has 'xslt'       => ( isa => 'Str',     is => 'ro', required => 0 );
 	#Verbs: GetRecord, Identify ...
 	my $response=$provider->$verb(%params);
 
-	#$response is a string containing OAI-PMH XML, either one of the six OAI 
-	#verbs or an error. Might be empty or croak on important errors.
+	#$response is a string in OAI-PMH XML, either one of the six OAI 
+	#verbs or an error. 
 
 	#New Error Checking 
-	#TODO check if it actually works
-	if ($provider->error) {
-		print $provider->error	
+	if ($provider->OAIerror) {
+		debug $provider->error;
+		return $provider->OAIerror;	
 	}
 
 =method my $provider->new ($options);
@@ -74,62 +76,90 @@ Initialize the HTTP::OAI::DataProvider object with the options of your choice.
 
 On failure return nothing. 
 
-=head3 OAI Parameters TODO UPDATE DOC!
-see OAI specification for details on the following parameters
+=head3 Identify 
 
-* adminEmail =>'bla@email.com'
-* baseURL =>'http://base.url'
-* deletedRecord => 'transient'
-* repositoryName => 'Repo Name Example'
+expects a hashref with key value pairs inside all of which are required:
 
-=head3 Chunking Parameters
+	identify => {
+		adminEmail     => 'mauricemengel@gmail.com',
+		baseURL        => 'http://localhost:3000/oai',
+		deletedRecord  => 'transient',
+		repositoryName => 'test config OAI Data Provider',
+	},
 
-* chunkCacheMaxSize => 4000
-Number of chunk descriptions to store in memory before old ones are deleted.
-Multiply with chunkSize to get number of records provider can return in one
-request.
-	
-* chunkSize         => 10
-Number of records per chunk. See chunkCacheMaxSize.
+See OAI specification (Identify) for available options and details of 
+parameters.
 
-=head3 Parameters for MetadataFormats and Transformation
+=head3 Engine Parameters
 
-* GlobalFormats => {
+engine->{engine} specifies the engine you use. Everything else depends on the
+engine you use. Engine parameters are handed down to the engine you use. 
+
+This is an example configuration for DP::Engine::SQLite:
+
+	engine => {
+		chunkCache => {
+			maxChunks       => 4000,    #was chunkCacheMaxSize
+			recordsPerChunk => 10,      #was chunkSize
+		},
+		dbfile    => "$FindBin::Bin/../t/environment/db",
+		engine    => 'HTTP::OAI::DataProvider::Engine::SQLite',
+		locateXSL => sub {
+			my $prefix       = shift;
+			my $nativePrefix = ( keys %{ $config{engine}{nativeFormat} } )[0]
+			  or die "nativePrefix missing";
+			return "$FindBin::Bin/../t/environment/$nativePrefix" . '2'
+			  . "$prefix.xsl";
+		},
+		nativeFormat => { 'mpx' => 'http://www.mpx.org/mpx' }
+	},
+
+=head3 Messages (Debug and Warnings)
+
+	messages => {
+		debug   => sub { my $msg = shift; print "<<$msg\n" if $msg; },
+		warning => sub { my $msg = shift; warn ">>$msg"    if $msg; },
+	},
+
+=head3 Metadata Formats
+
+	globalFormats => {
+		mpx => {
+			ns_uri => "http://www.mpx.org/mpx",
+			ns_schema =>
+			  "http://github.com/mokko/MPX/raw/master/latest/mpx.xsd",
+		},
 		oai_dc => {
 			ns_uri    => "http://www.openarchives.org/OAI/2.0/oai_dc/",
 			ns_schema => "http://www.openarchives.org/OAI/2.0/oai_dc.xsd",
 		},
 	},
 
-* locateXSL      => sub {
-	my $prefix = shift or croak "Need prefix";
-	return "someDir/$prefix.xsl";
-  }
+=head3 Sets
 
-Callback locating the xsl for a specific target prefix. Expects a prefix and 
-returns a path.
+	setLibrary => {
+		'78' => {
+			    'setName' => 'Schellackplatten aus dem Phonogramm-Archiv'
+			  . ' (ursprünglich für DISMARC exportiert)'
+		},
+		'MIMO' =>
+		  { 'setName' => 'Musical Instruments selected for MIMO project' },
+		'test' => {
+			'setName' => 'testing setSpecs - might not work without this one',
+		},
+	},
 
-* nativePrefix   => 'mpx'
-* native_ns_uri =>'http://bla'
-	TODO: should be combined with nativePrefix: nativeNamespace => bla => { 'http://bla'};
+=head3 Other Parameters
 
-* xslt=>'path/to/style.xslt' [OPTIONAL]
+all of them option:
+
+	xslt => '/oai2.xsl',
+
 	Adds this path to HTTP::OAI::Repsonse objects to modify output in browser.
-	[Doc TODO. Info should be here not in _init_xslt]
-=head3 Parameters for the Database Engine
-
-* dbfile => 'path/to/dbfile'
-
-=head3 Other Parameters (optional)
-
-* debug=>callback
-	If a callback is supplied use this callback for debug output
-
-* warning =>callback 
-	If a callback is supplied use this callback for Warning output
-
-* requestURL => 'http://bla.url'
-	Overwrite normal requestURL, e.g. when using a reverse proxy cache etc.
+	
+	requestURL => 'http://bla.url'
+	
+	Overwrite normal requestURL, e.g. when using a reverse proxy etc.
 	Note that requestURL specified during new is only the http://domain.com:port
 	part (without ? followed by GET params), but that HTTP::OAI treats the
 	complete URL as requestURL
@@ -442,9 +472,7 @@ sub ListRecords {
 	my @errors;
 	my $engine = $self->{Engine};
 
-	#
 	# Error handling
-	#
 
 	if ( $params{resumptionToken} ) {
 		my $chunk = $self->chunkExists(%params);
@@ -465,9 +493,7 @@ sub ListRecords {
 		return;              #errors
 	}
 
-	#
 	# Metadata handling
-	#
 
 	my $response = $engine->query( \%params, $self->requestURL );    #todo!
 
@@ -523,7 +549,7 @@ sub ListSets {
 	#if none then noSetHierarchy (untested)
 	if ( !@used_sets ) {
 		$self->raiseOAIerror('noSetHierarchy');
-		return;
+		return $self->errorOAI;
 	}
 
 	my $listSets = $self->_processSetLibrary();
@@ -572,14 +598,24 @@ sub error {
 	return $self->{error} if ( $self->{error} );
 }
 
+
+=method return $provider->errorOAI;
+
+Returns an internal error message (if any). Error message is a single scalar 
+(string). Just a getter, no setter! 
+
+=cut
+
 sub OAIerror {
 	my $self = shift or croak "Need myself!";
 	return $self->{OAIerror} if ( $self->{OAIerror} );
 }
 
+
 #
 #
 #
+
 
 =head1 PRIVATE METHODS
 
@@ -672,19 +708,13 @@ $self->{xslt} if set.
 
 sub _output {
 	my $self     = shift;
-	my $response = shift or die "No response";    #a HTTP::OAI::Response object
+	my $response = shift or croak "No response";    #a HTTP::OAI::Response object
 
-	#response is a HTTP::OAI::$verb object
-	#say "response: $response";
-
-	$self->_init_xslt($response);
-
-	#overwrites real requestURL with config value
+	$self->_init_xslt($response); #response is a HTTP::OAI::$verb object
 	$response = $self->overwriteRequestURL($response);
 
-	#say "response: $response";
-
-	#return encode_utf8($response->toDOM->toString); #alternative output
+	#alternative output
+	#return encode_utf8($response->toDOM->toString); 
 	#there is some error here
 	my $xml;
 	$response->set_handler( XML::SAX::Writer->new( Output => \$xml ) );
