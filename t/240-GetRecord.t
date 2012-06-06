@@ -1,6 +1,6 @@
 #!perl
 
-use Test::More tests => 6;
+use Test::More tests => 8;
 use HTTP::OAI::DataProvider;
 use HTTP::OAI::DataProvider::Test;
 use XML::LibXML;
@@ -25,7 +25,7 @@ my $baseURL = 'http://localhost:3000/oai';
 		metadataPrefix => 'mpx',
 		identifier     => 'spk-berlin.de:EM-objId-40008',
 	);
-	my $response = $provider->GetRecord( %params );
+	my $response = $provider->GetRecord(%params);
 	okGetRecord($response);
 }
 
@@ -35,20 +35,20 @@ my $baseURL = 'http://localhost:3000/oai';
 
 {
 	my %params = ( identifier => 'spk-berlin.de:EM-objId-40008', );
-	my $response = $provider->GetRecord( %params );
-	if (!$response) {
-		$response = $provider->error
+	my $response = $provider->GetRecord(%params);
+	if ( !$response ) {
+		$response = $provider->error;
 	}
-	isOAIerror($response, 'badArgument');
+	isOAIerror( $response, 'badArgument' );
 }
 
 {
 	my %params = ( metadataPrefix => 'mpx', );
-	my $response = $provider->GetRecord( %params );
-	if (!$response) {
-		$response = $provider->error
+	my $response = $provider->GetRecord(%params);
+	if ( !$response ) {
+		$response = $provider->error;
 	}
-	isOAIerror($response, 'badArgument');
+	isOAIerror( $response, 'badArgument' );
 }
 
 {
@@ -57,11 +57,11 @@ my $baseURL = 'http://localhost:3000/oai';
 		identifier     => 'spk-berlin.de:EM-objId-40008',
 		meschugge      => 'schixe',
 	);
-	my $response = $provider->GetRecord( %params );
-	if (!$response) {
-		$response = $provider->error
+	my $response = $provider->GetRecord(%params);
+	if ( !$response ) {
+		$response = $provider->error;
 	}
-	isOAIerror($response, 'badArgument');
+	isOAIerror( $response, 'badArgument' );
 }
 
 {
@@ -69,11 +69,10 @@ my $baseURL = 'http://localhost:3000/oai';
 		metadataPrefix => 'mpx',
 		identifier     => 'spk-berlin.de:EM-objId-meschugge',
 	);
-	my $response = $provider->GetRecord( %params );
-	if (!$response) {
-		$response = $provider->error
-	}
-	isOAIerror($response, 'idDoesNotExist');
+	my $response = $provider->GetRecord(%params);
+	isOAIerror( $response, 'idDoesNotExist' );
+	$response = $provider->OAIerror;
+	isOAIerror( $response, 'idDoesNotExist' );
 }
 
 {
@@ -81,11 +80,9 @@ my $baseURL = 'http://localhost:3000/oai';
 		metadataPrefix => 'meschugge',
 		identifier     => 'spk-berlin.de:EM-objId-40008',
 	);
-	my $response = $provider->GetRecord( %params );
-	if (!$response) {
-		$response = $provider->error
-	}
-	isOAIerror($response, 'cannotDisseminateFormat');
+	my $response = $provider->GetRecord(%params);
+	isOAIerror( $response, 'cannotDisseminateFormat' );
+	$response = $provider->OAIerror;
+	isOAIerror( $response, 'cannotDisseminateFormat' );
 }
- 
 

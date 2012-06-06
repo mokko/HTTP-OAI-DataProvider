@@ -184,13 +184,15 @@ sub GetRecord {
 
 	if (@errors) {
 		$self->raiseOAIerrors(@errors);
-		return;              #failure
+		return $self->OAIerror;              #failure
 	}
 
 	# Metadata handling
 	my $response = $engine->query( \%params );    #todo
 
-	#noRecordsMatch is now done inside query
+	if (!$response) {
+		die "bla"
+	}
 	return $self->_output($response);             #success
 }
 
