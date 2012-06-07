@@ -10,13 +10,10 @@ use XML::SAX::Writer;
 use URI;
 use Moose;
 use Moose::Util::TypeConstraints;
-
-#use MooseX::Types::URI;
 use namespace::autoclean;
 
 use HTTP::OAI;
 use HTTP::OAI::Repository qw/validate_request/;
-
 use HTTP::OAI::DataProvider::Engine;
 use HTTP::OAI::DataProvider::SetLibrary;
 use HTTP::OAI::DataProvider::Common qw/Debug Warning say/;
@@ -28,12 +25,12 @@ subtype 'identifyType', as 'HashRef', where {
 	  && defined $_->{baseURL}
 	  && defined $_->{deletedRecord}
 	  && defined $_->{repositoryName}
-	  && URI->new($_->{baseURL})->scheme; ;
+	  && URI->new( $_->{baseURL} )->scheme;
 };
 
 subtype 'globalFormatsType', as 'HashRef', where {
 	foreach my $prefix ( keys %{$_} ) {
-		return if (! _uriTest( $_->{$prefix} ) );
+		return if ( !_uriTest( $_->{$prefix} ) );
 	}
 	return 1;    #success
 };
@@ -80,7 +77,7 @@ Initialize the HTTP::OAI::DataProvider object with the options of your choice.
 
 On failure return nothing. 
 
-=head3 Identify 
+=head3 Identify Parameters 
 
 expects a hashref with key value pairs inside all of which are required:
 
@@ -118,14 +115,14 @@ This is an example configuration for DP::Engine::SQLite:
 		nativeFormat => { 'mpx' => 'http://www.mpx.org/mpx' }
 	},
 
-=head3 Messages (Debug and Warnings)
+=head3 Message Parameters 
 
 	messages => {
 		debug   => sub { my $msg = shift; print "<<$msg\n" if $msg; },
 		warning => sub { my $msg = shift; warn ">>$msg"    if $msg; },
 	},
 
-=head3 Metadata Formats
+=head3 Metadata Format Parameters 
 
 	globalFormats => {
 		mpx => {
@@ -139,7 +136,7 @@ This is an example configuration for DP::Engine::SQLite:
 		},
 	},
 
-=head3 Sets
+=head3 Set Parameters 
 
 	setLibrary => {
 		'78' => {
@@ -153,13 +150,11 @@ This is an example configuration for DP::Engine::SQLite:
 		},
 	},
 
-=head3 Other Parameters
-
-all of them option:
+=head3 Other Parameters (Optional)
 
 	xslt => '/oai2.xsl',
 
-	Adds this path to HTTP::OAI::Repsonse objects to modify output in browser.
+	Adds path to HTTP::OAI::Repsonse objects to modify output in browser.
 	
 	requestURL => 'http://bla.url'
 	
@@ -228,7 +223,7 @@ sub GetRecord {
 	return $self->_output($response);
 }
 
-=method my $response=$provider->Identify(%params);
+=method my $response=$provider->Identify([%params]);
 
 Arguments: none
 
@@ -266,7 +261,7 @@ sub Identify {
 	return $self->_output($obj);    #success
 }
 
-=method ListMetadataFormats (identifier);
+=method ListMetadataFormats (%params);
 
 "This verb is used to retrieve the metadata formats available from a
 repository. An optional argument restricts the request to the formats available
@@ -367,9 +362,9 @@ the request has been deleted.
 LIMITATIONS
 By making the metadataPrefix required, the specification suggests that
 ListIdentifiers returns different sets of headers depending on which
-metadataPrefix is chose. HTTP:OAI::DataProvider assume, however, that there are
-only global metadata formats, so it will return the same set for all supported
-metadataFormats.
+metadataPrefix is chose. HTTP:OAI::DataProvider assumes, however, that there 
+are only global metadata formats, so it will return the same set for all 
+supported metadataFormats.
 
 TODO: Hierarchical sets
 
@@ -436,7 +431,7 @@ sub ListIdentifiers {
 	return $self->_output($response);
 }
 
-=method ListRecords
+=method my $response=$provider->ListRecords(%params);
 
 returns multiple items (headers plus records) at once. In its capacity to
 return multiple objects it is similar to the other list verbs
@@ -515,7 +510,7 @@ sub ListRecords {
 	return $self->_output($response);
 }
 
-=method ListSets
+=method my $response=$provider->ListSets(%params);
 
 ARGUMENTS
 
@@ -594,10 +589,9 @@ sub ListSets {
 
 =method return $provider->error;
 
-USED TO BE $provider->errorMessage;
-
 Returns an internal error message (if any). Error message is a single scalar 
-(string).
+(string). TODO: at the monent it is not guaranteed to have an error every time
+an error actually occured. See OAIerror instead.
 
 Just a getter, no setter! The error is set internally, e.g.
 	$provider->_validateRequest (%params) or return provider->error;
@@ -620,15 +614,6 @@ sub OAIerror {
 	my $self = shift or croak "Need myself!";
 	return $self->{OAIerror} if ( $self->{OAIerror} );
 }
-
-#
-#
-#
-
-=head1 PRIVATE METHODS
-
-You should not need any of the stuff below whether it starts with an underline
-or not.
 
 =method checkFormatSupported ($prefixWanted);
 
@@ -781,12 +766,8 @@ sub overwriteRequestURL {
 			#  . $new;
 		}
 	}
-	else {
-
-		#requestURL has no ? in case of an badVerb
+	else {    #requestURL has no ? in case of an badVerb
 		$response->requestURL( $self->requestURL );
-
-		#say "GGGGGGGGGGGGGGGGGGGGGGG" . $response->requestURL;
 	}
 	return $response;
 }
@@ -817,16 +798,18 @@ sub _uriTest {
 
 	foreach my $key (@keys) {
 		if ( !$format->{$key} ) {
+
 			#print "$key not defined\n";
 			return;
 		}
 		my $uri = URI->new( $format->{$key} );
 		if ( !$uri->scheme ) {
+
 			#print "ns_uri is not URI\n";
 			return;
 		}
 	}
-	return 1; #exists and is uri
+	return 1;    #exists and is uri
 }
 
 =method $self->_validateRequest(%params) or return $self->error;
@@ -849,21 +832,11 @@ sub _validateRequest {
 	return 1;      #no validation error (success)
 }
 
-=method $self->_processSetLibrary
-
-debugging...
-
-=cut
-
 sub _processSetLibrary {
 	my $self = shift or croak "Need myself!";
 
 	#debug "Enter salsa_setLibrary";
 	my $setLibrary = $self->{setLibrary};
-
-	if ( !$self->{setLibrary} ) {
-		die "No setLibrary";
-	}
 
 	if ( %{$setLibrary} ) {
 		my $listSets = new HTTP::OAI::ListSets;
@@ -895,7 +868,6 @@ sub _processSetLibrary {
 		}
 		return $listSets;
 	}
-	warn "no setLibrary found in Dancer's config file";
 }
 
 __PACKAGE__->meta->make_immutable;
