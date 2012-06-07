@@ -1,4 +1,4 @@
-=pod
-This is the README of the devel branch. See README in "Master" branch for more info on this package (L<https://github.com/mokko/HTTP-OAI-DataProvider/tree/master>).
+This is only a dummy for the README. For the real readme see the "Master" branch at 
+	https://github.com/mokko/HTTP-OAI-DataProvider/tree/master
 
-It seems that readmeFromPod requires a file like this in my devel branch, so this file functions as a dummy.
+It seems that dzil's readmeFromPod plugin requires a file that it can overwrite. 
