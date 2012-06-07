@@ -475,7 +475,7 @@ sub ListRecords {
 	# Error handling
 
 	if ( $params{resumptionToken} ) {
-		my $chunk = $self->chunkExists(%params);
+		my $chunk = $engine->chunkExists(%params);
 		if ($chunk) {
 			return $self->_output($chunk);
 		}

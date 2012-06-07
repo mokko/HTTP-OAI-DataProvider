@@ -49,7 +49,6 @@ my $result = minimalResult();
 ok( blessed($result) eq 'HTTP::OAI::DataProvider::Engine::Result',
 	'minimal new works' );
 
-
 #
 # 2-$result->requestURL
 #
@@ -126,10 +125,6 @@ eval { $result->getResponse(); };
 
 ok( $@, '$r->getResponse should fail' );
 
-#
-# 9-
-#
-
 ###
 ### SUBS
 ###
@@ -142,7 +137,12 @@ sub minimalResult {
 	);
 
 	return new HTTP::OAI::DataProvider::Engine::Result(
-		transformer => $t,
-		verb        => 'GetRecord',
+		transformer  => $t,
+		verb         => 'GetRecord',
+		chunkNo      => '1',
+		chunkSize    => $engine{chunkCache}{recordsPerChunk},
+		targetPrefix => $nativePrefix,
+		token        => '12345',
+		total        => '12',
 	);
 }

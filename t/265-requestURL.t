@@ -2,7 +2,7 @@ use strict;
 use warnings;
 use Test::More;
 use HTTP::OAI::DataProvider::Test;
-use HTTP::OAI::DataProvider::Common qw(hashRef2hash say);
+use HTTP::OAI::DataProvider::Common qw(say);
 use HTTP::OAI::DataProvider;
 use XML::LibXML;
 use Data::Dumper qw(Dumper);    #only dor debug

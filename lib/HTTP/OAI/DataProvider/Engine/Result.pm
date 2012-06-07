@@ -17,16 +17,14 @@ use HTTP::OAI::DataProvider::Common qw(Warning Debug);
 has 'transformer' => ( isa => 'Object', is => 'ro', required => 1 );
 has 'verb'        => ( isa => 'Str',    is => 'ro', required => 1 );
 
-has 'chunkSize'  => ( isa => 'Str',    is => 'ro', required => 0 );
-has 'chunkNo'  => ( isa => 'Str',    is => 'ro', required => 0 );
-has 'targetPrefix'  => ( isa => 'Str',    is => 'ro', required => 0 );
-has 'token'  => ( isa => 'Str',    is => 'ro', required => 0 );
-has 'total'  => ( isa => 'Str',    is => 'ro', required => 0 );
+has 'chunkSize'  => ( isa => 'Str',    is => 'ro', required => 1 );
+has 'chunkNo'  => ( isa => 'Str',    is => 'ro', required => 1 );
+has 'token'  => ( isa => 'Str',    is => 'ro', required => 1 );
+has 'targetPrefix'  => ( isa => 'Str',    is => 'ro', required => 1 );
+has 'total'  => ( isa => 'Str',    is => 'ro', required => 1 );
 
+has 'next'  => ( isa => 'Str',    is => 'rw', required => 0 );
 has 'requestURL'  => ( isa => 'Str',    is => 'rw', required => 0 );
-
-
-
 
 =head1 DESCRIPTIOPN
 
@@ -372,13 +370,13 @@ Expects parts for the result, constructs a result and saves it into the result
 object.
 
 This is an abstracted version of saveRecord that automatically does the right
-thing whether being passed header or record information. It makes addHeader
-and addRecord private methods (and saveRecord obsolete).
+thing whether being passed header or record information. It makes _addHeader
+and _addRecord private methods.
 
 Gets called in engine's queryChunk.
 
-How do I decide whether something is header or record? At first I thought I
-just check whether metadata info is there or not, but this would fail with
+How do I decide whether something is a header or record? At first I thought I
+just check whether metadata info is there or not, but this fails in case of
 deleted records, so now I check for the verb. That means I have to pass the
 verb to result->{verb} when result is born.
 
@@ -394,22 +392,18 @@ sub save {
 	#md is optional, a deleted record wd have none
 	if ( $result->{verb} eq 'ListIdentifiers' ) {
 		$result->_addHeader( $args{header} );
-		return 0;     #success;
+		return 1;     #success;
 	}
 
 	#assume it is either GetRecord or ListRecords
 
 	if ( $args{md} ) {
 
-		#currently md is a string, possibly in a wrong encoding
-		#$args{md} = encode_utf8($args{md});
+		#i believe encoding issue is fixed now
 		$args{md} = decode( "utf8", $args{md} );
-
-		#this line fails on encoding problem
 		my $dom = XML::LibXML->load_xml( string => $args{md} );
 
-		my $prefix = $args{params}{metadataPrefix} or croak "still no prefix?";
-
+		my $prefix = $result->targetPrefix or croak "still no prefix?";
 		#Debug "prefix:$prefix-----------------------";
 
 		my $transformer = $result->{transformer};
