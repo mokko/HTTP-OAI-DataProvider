@@ -1,32 +1,20 @@
 RELEASE HISTORY
-
-TODO
- Bug Fixes
- Tests
- -todo: even more tests for ingest and data consistency
- -todo: finish tests for OAI errors from spec
- API Changes
- -make it a complete working dataProvider without HTTP features
- -turn into moose
- -$baseURL in $provider->$verb($baseURL,%params) is about to go in new DataProvider (%params)
- -improve db interface so I can write alternative db implementations
-
-$next (0.07)
- -The first packages turned into moose classes.
+$next (0.07) Major Refactoring
+ -all OO packages now have antlers (Moose).
  Major Interface changes
  -HTTP::OAI::DataProvider now wants arguments as HASH (instead of HashRef).
  -requestURL is not a method of DataProvider and not any longer an argument of some verbs!
- -new interface for error checking: $provider->errorMessage
- New Tools
- -dp.pl - a command line interface to HTTP::OAI::DataProvider
- -eg-app.pl - a simple Dancer front end to the provider
- Bug Fixes
- -many small fixes 
+ -new interface for error checking: $provider->errorOAI 
+ 		Todo: not properly tested yet...
+ New Tools (command line tools)
+ -dp.pl: a command line interface to HTTP::OAI::DataProvider
+ -webapp.pl: a simple web frontend for manual testing and as demo (using Dancer)
+ -ingest.pl: read an XML file and parse it into the database
  Tests
- -lots more tests for verbs, oai errors, validation etc.
- Feature Enhancements
+ -some basic tests for almost everything, but still not very thorough.
  API Changes
- -new packages DP::Test, DP::Common, DP::Valid
+ -new packages DP::Test, DP::Common, DP::Valid; DP::Ingester; 
+  ChunkCache::Description; DP::Interface
  -config value setLibraryCB is not necessary anymore
 
 0.06 with dist::zilla (version used in production at SALSA_OAI)
