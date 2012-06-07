@@ -30,10 +30,7 @@ subtype 'chunkCacheType', as 'HashRef', where {
 	return 1;                                    #success
 };
 
-subtype 'Uri', as 'Str', where {
-	return if ( !URI->new($_)->scheme ); 
-	return 1; #success
-};
+subtype 'Uri', as 'Str', where { URI->new($_)->scheme; };
 
 has 'chunkCache'   => ( isa => 'chunkCacheType',   is => 'ro', required => 1 );
 has 'dbfile'       => ( isa => 'Str',              is => 'ro', required => 1 );

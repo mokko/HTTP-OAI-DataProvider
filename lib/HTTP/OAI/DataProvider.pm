@@ -27,7 +27,8 @@ subtype 'identifyType', as 'HashRef', where {
 	     defined $_->{adminEmail}
 	  && defined $_->{baseURL}
 	  && defined $_->{deletedRecord}
-	  && defined $_->{repositoryName};
+	  && defined $_->{repositoryName}
+	  && URI->new($_->{baseURL})->scheme; ;
 };
 
 subtype 'globalFormatsType', as 'HashRef', where {

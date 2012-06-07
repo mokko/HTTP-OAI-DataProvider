@@ -3,13 +3,12 @@ use strict;
 use warnings;
 use HTTP::OAI::DataProvider;
 use HTTP::OAI::DataProvider::Test;
-use Test::More tests => 14;
+use Test::More tests => 15;
 
 #use Data::Dumper qw(Dumper); #only for debugging tests
 
-
 #load a working standard test config which should have ONLY required values
-my %config=HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
+my %config  = HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
 my @options = qw(debug requestURL warning xslt);
 
 # 1. Does it work? Return value right?
@@ -33,10 +32,10 @@ my @required = qw(
 );
 
 foreach my $value (@required) {
-	my $config=HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
+	my $config = HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
 	undef $config{$value};
 	eval { my $provider = HTTP::OAI::DataProvider->new(%config) };
-	ok( $@, "should fail without $value" );
+	ok( $@, "fail without $value" );
 }
 
 #
@@ -44,15 +43,16 @@ foreach my $value (@required) {
 #
 
 foreach my $value (@options) {
+
 	#print "Try without $value\n";
-	my %config=HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
+	my %config = HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
 	delete $config{$value};
 	my $provider;
 	eval { $provider = HTTP::OAI::DataProvider->new(%config); };
 
-	my $msg="should succeed without $value ";
-	$msg.=$@ if ($@);
-	ok(ref $provider eq 'HTTP::OAI::DataProvider', $msg);
+	my $msg = "succeed without $value ";
+	$msg .= $@ if ($@);
+	ok( ref $provider eq 'HTTP::OAI::DataProvider', $msg );
 }
 
 #
@@ -60,45 +60,57 @@ foreach my $value (@options) {
 #
 
 {
-	my %config=HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
+	my %config = HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
 	delete $config{globalFormats}{mpx}{ns_uri};
 	eval { my $provider = HTTP::OAI::DataProvider->new(%config) };
-	ok( $@, "should fail without ns_uri" );
+	ok( $@, "fail without ns_uri" );
 
 }
 
 {
-	my %config=HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
+	my %config = HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
 	delete $config{globalFormats}{mpx}{ns_schema};
 	eval { my $provider = HTTP::OAI::DataProvider->new(%config) };
-	ok( $@, "should fail without ns_schema" );
+	ok( $@, "fail without ns_schema" );
 
 }
 
 {
-	my %config=HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
-	$config{globalFormats}{mpx}{ns_schema}='this is Not a url';
+	my %config = HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
+	$config{globalFormats}{mpx}{ns_schema} = 'this is Not a url';
 	eval { my $provider = HTTP::OAI::DataProvider->new(%config) };
-	ok( $@, "should fail without ns_schema" );
+	ok( $@, "fail without ns_schema" );
 
 }
 
 {
-	my %config=HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
-	$config{globalFormats}{mpx}{ns_uri}='this is Not a url';
+	my %config = HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
+	$config{globalFormats}{mpx}{ns_uri} = 'this is Not a url';
 	eval { my $provider = HTTP::OAI::DataProvider->new(%config) };
-	ok( $@, "should fail without ns_uri" );
+	ok( $@, "fail without ns_uri" );
 
 }
 
 #
-# fail with requestURL that is not an uri
+# fail with requestURL that is no uri
 #
 
 {
-	my %config=HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
-	$config{requestURL}='this is Not a url';
+	my %config = HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
+	$config{requestURL} = 'this is Not a url';
 	eval { my $provider = HTTP::OAI::DataProvider->new(%config) };
-	ok( $@, "should fail when requestURL has not an uri" );
+	ok( $@, "fail when requestURL has no uri" );
+
+}
+
+#
+# fail with baseURL that is no uri
+#
+
+{
+	my %config = HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
+	$config{identify}{baseURL} = 'this is Not a url';
+	eval { my $provider = HTTP::OAI::DataProvider->new(%config) };
+	ok( $@, "fail when baseURL has no uri" );
 
 }
