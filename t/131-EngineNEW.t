@@ -2,9 +2,9 @@
 
 use strict;
 use warnings;
-use Test::More tests => 14;
+use Test::More tests => 21;
 use HTTP::OAI::DataProvider::Test;
-use HTTP::OAI::DataProvider::Common qw(hashRef2hash);
+#use HTTP::OAI::DataProvider::Common;
 use Cwd qw(realpath);
 
 =head1 CONCEPT
@@ -34,6 +34,62 @@ die "No config! " if ( !%config );
 #	nativePrefix => $config{nativePrefix},
 #	nativeURI    => $config{native_ns_uri},
 my $engine = new HTTP::OAI::DataProvider::Engine(%config);
+
+###
+### test configuration
+###
+
+{
+my %config = loadWorkingTestConfig('engine');
+$config{nativeFormat}='';
+eval {my $engine = new HTTP::OAI::DataProvider::Engine(%config);};
+ok( $@, 'should fail with malformed nativeFormat  ' );	
+}
+
+{
+my %config = loadWorkingTestConfig('engine');
+$config{nativeFormat}{mpx}='';
+eval {my $engine = new HTTP::OAI::DataProvider::Engine(%config);};
+ok( $@, 'should fail with malformed nativeFormat  ' );	
+}
+
+{
+my %config = loadWorkingTestConfig('engine');
+$config{nativeFormat}{mpx}='this is not an url';
+eval {my $engine = new HTTP::OAI::DataProvider::Engine(%config);};
+ok( $@, 'should fail with malformed nativeFormat  ' );	
+}
+
+#chunkCache
+{
+my %config = loadWorkingTestConfig('engine');
+$config{chunkCache}='this is not an url';
+eval {my $engine = new HTTP::OAI::DataProvider::Engine(%config);};
+ok( $@, 'should fail with malformed chunkCache' );	
+}
+
+
+{
+my %config = loadWorkingTestConfig('engine');
+$config{chunkCache}{maxChunks}='this is not an url';
+eval {my $engine = new HTTP::OAI::DataProvider::Engine(%config);};
+ok( $@, 'should fail with malformed chunkCache' );	
+}
+
+{
+my %config = loadWorkingTestConfig('engine');
+$config{chunkCache}{recordsPerChunk}='this is not an url';
+eval {my $engine = new HTTP::OAI::DataProvider::Engine(%config);};
+ok( $@, 'should fail with malformed chunkCache' );	
+}
+
+#requestURL
+{
+my %config = loadWorkingTestConfig('engine');
+$config{requestURL}='this is not an url';
+eval {my $engine = new HTTP::OAI::DataProvider::Engine(%config);};
+ok( $@, 'should fail with malformed requestURL' );	
+}
 
 ###
 ### test inherited stuff from Interface

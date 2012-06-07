@@ -3,7 +3,7 @@ use strict;
 use warnings;
 use HTTP::OAI::DataProvider;
 use HTTP::OAI::DataProvider::Test;
-use Test::More tests => 9;
+use Test::More tests => 14;
 
 #use Data::Dumper qw(Dumper); #only for debugging tests
 
@@ -55,3 +55,50 @@ foreach my $value (@options) {
 	ok(ref $provider eq 'HTTP::OAI::DataProvider', $msg);
 }
 
+#
+# fail with wrong globalFormats
+#
+
+{
+	my %config=HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
+	delete $config{globalFormats}{mpx}{ns_uri};
+	eval { my $provider = HTTP::OAI::DataProvider->new(%config) };
+	ok( $@, "should fail without ns_uri" );
+
+}
+
+{
+	my %config=HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
+	delete $config{globalFormats}{mpx}{ns_schema};
+	eval { my $provider = HTTP::OAI::DataProvider->new(%config) };
+	ok( $@, "should fail without ns_schema" );
+
+}
+
+{
+	my %config=HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
+	$config{globalFormats}{mpx}{ns_schema}='this is Not a url';
+	eval { my $provider = HTTP::OAI::DataProvider->new(%config) };
+	ok( $@, "should fail without ns_schema" );
+
+}
+
+{
+	my %config=HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
+	$config{globalFormats}{mpx}{ns_uri}='this is Not a url';
+	eval { my $provider = HTTP::OAI::DataProvider->new(%config) };
+	ok( $@, "should fail without ns_uri" );
+
+}
+
+#
+# fail with requestURL that is not an uri
+#
+
+{
+	my %config=HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
+	$config{requestURL}='this is Not a url';
+	eval { my $provider = HTTP::OAI::DataProvider->new(%config) };
+	ok( $@, "should fail when requestURL has not an uri" );
+
+}

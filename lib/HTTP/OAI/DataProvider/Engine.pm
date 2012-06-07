@@ -8,32 +8,39 @@ use Moose::Util::TypeConstraints;
 use namespace::autoclean;
 use Time::HiRes qw(gettimeofday);    #to generate unique tokens
 use Carp qw(carp croak);
+use URI;
 use HTTP::OAI::DataProvider::Common qw/Debug hashRef2hash say Warning/;
 use HTTP::OAI::DataProvider::ChunkCache;
 use HTTP::OAI::DataProvider::Transformer;
 
-#TODO:
-#subtype 'nativeFormat'
-#subtype 'chunkCache'
-
 subtype 'nativeFormatType', as 'HashRef', where {
-	return if scalar keys %{$_} > 1;
-	return if ( !( keys %{$_} )[0] );
-	return 1; #success
+	return if scalar keys %{$_} != 1;    #exactly one key
+	my $prefix = ( keys %{$_} )[0];
+	return if ( !$_->{$prefix} );        #value has to be defined
+	my $ns_uri = $_->{$prefix};
+	return if ( !URI->new($ns_uri)->scheme );    #value has to be URI
+	return 1;                                    #success
 };
 
 subtype 'chunkCacheType', as 'HashRef', where {
-	return if ( !$_->{maxChunks} or $_->{maxChunks}==0);
-	return if ( !$_->{recordsPerChunk} or $_->{recordsPerChunk}==0);
+	my @list = qw (maxChunks recordsPerChunk);
+	foreach my $item (@list) {
+		return unless ( $_->{$item} && $_->{$item} > 0 );
+	}
+	return 1;                                    #success
+};
+
+subtype 'Uri', as 'Str', where {
+	return if ( !URI->new($_)->scheme ); 
 	return 1; #success
 };
 
-has 'chunkCache'   => ( isa => 'chunkCacheType',          is => 'ro', required => 1 );
+has 'chunkCache'   => ( isa => 'chunkCacheType',   is => 'ro', required => 1 );
 has 'dbfile'       => ( isa => 'Str',              is => 'ro', required => 1 );
 has 'engine'       => ( isa => 'Str',              is => 'ro', required => 1 );
 has 'locateXSL'    => ( isa => 'CodeRef',          is => 'ro', required => 1 );
 has 'nativeFormat' => ( isa => 'nativeFormatType', is => 'ro', required => 1 );
-has 'requestURL'   => ( isa => 'Str',              is => 'rw', required => 0 );
+has 'requestURL'   => ( isa => 'Uri',              is => 'rw', required => 0 );
 
 =head1 DESCRIPTION
 
@@ -131,7 +138,7 @@ internally
 =cut
 
 sub query {
-	my $self = shift or croak "Need myself!";
+	my $self   = shift or croak "Need myself!";
 	my $params = shift or croak "Need params!";
 
 	my $first = $self->planChunking($params);
@@ -142,7 +149,8 @@ sub query {
 		return;
 	}
 
-	my $response = $self->queryChunk($first, $params);
+	my $response = $self->queryChunk( $first, $params );
+
 	#todo: we still have to test if result has any result at all
 	return $response;
 }
@@ -249,7 +257,6 @@ sub mkToken {
 	my ( $sec, $msec ) = gettimeofday;
 	return time . $msec;
 }
-
 
 #doesn't work if it is immutable
 #__PACKAGE__->meta->make_immutable;

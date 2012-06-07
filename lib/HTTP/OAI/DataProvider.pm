@@ -5,22 +5,26 @@ package HTTP::OAI::DataProvider;
 use warnings;
 use strict;
 use Carp qw/croak carp/;
+use Encode qw(encode_utf8);
+use XML::SAX::Writer;
+use URI;
 use Moose;
 use Moose::Util::TypeConstraints;
+
+#use MooseX::Types::URI;
 use namespace::autoclean;
-use Encode qw(encode_utf8);
 
 use HTTP::OAI;
 use HTTP::OAI::Repository qw/validate_request/;
+
 use HTTP::OAI::DataProvider::Engine;
 use HTTP::OAI::DataProvider::SetLibrary;
 use HTTP::OAI::DataProvider::Common qw/Debug Warning say/;
-use XML::SAX::Writer;
 
 #use Data::Dumper qw/Dumper/; #for debugging
 
 subtype 'identifyType', as 'HashRef', where {
-	defined $_->{adminEmail}                #use defined instead?
+	     defined $_->{adminEmail}
 	  && defined $_->{baseURL}
 	  && defined $_->{deletedRecord}
 	  && defined $_->{repositoryName};
@@ -28,11 +32,12 @@ subtype 'identifyType', as 'HashRef', where {
 
 subtype 'globalFormatsType', as 'HashRef', where {
 	foreach my $prefix ( keys %{$_} ) {
-		return if ( !$_->{$prefix}{ns_uri} );
-		return if ( !$_->{$prefix}{ns_schema} );
+		return if (! _uriTest( $_->{$prefix} ) );
 	}
-	return 1;
+	return 1;    #success
 };
+
+#subtype 'Uri' already declared in Engine
 
 #required
 has 'engine' => ( isa => 'HashRef', is => 'ro', required => 1 );
@@ -46,11 +51,9 @@ has 'setLibrary' => ( isa => 'HashRef',      is => 'ro', required => 1 );
 
 #optional
 has 'debug'      => ( isa => 'CodeRef', is => 'ro', required => 0 );
-has 'requestURL' => ( isa => 'Str',     is => 'rw', required => 0 );
+has 'requestURL' => ( isa => 'Uri',     is => 'rw', required => 0 );
 has 'warning'    => ( isa => 'CodeRef', is => 'ro', required => 0 );
 has 'xslt'       => ( isa => 'Str',     is => 'ro', required => 0 );
-
-#TODO MESSAGES
 
 =head1 SYNOPSIS
 
@@ -193,8 +196,9 @@ Errors
 =cut
 
 sub GetRecord {
-	my $self = shift;
-	my %params = @_ or ();    #dont croak here, prefer propper OAI error
+	my $self   = shift;
+	my %params = @_
+	  or ();    #dont croak here, prefer propper OAI error
 	my @errors;
 
 	$params{verb} = 'GetRecord';
@@ -236,8 +240,9 @@ granularity).
 =cut
 
 sub Identify {
-	my $self     = shift;
-	my %params   = @_ or ();          #dont croak here, prefer propper OAI error
+	my $self   = shift;
+	my %params = @_
+	  or ();    #dont croak here, prefer propper OAI error
 	my $identify = $self->identify;
 	$params{verb} = 'Identify';
 	$self->_validateRequest(%params) or return $self->OAIerror;
@@ -287,7 +292,8 @@ sub ListMetadataFormats {
 	my $self = shift;
 
 	Warning ' Enter ListMetadataFormats ';
-	my %params = @_ or ();    #dont croak here, prefer propper OAI error
+	my %params = @_
+	  or ();    #dont croak here, prefer propper OAI error
 	$params{verb} = 'ListMetadataFormats';
 	my $engine = $self->{Engine};
 
@@ -370,9 +376,11 @@ TODO: Hierarchical sets
 
 sub ListIdentifiers {
 	my $self = shift or croak "Need myself!";
-	my $engine = $self->{Engine} or croak "Internal error: Data store missing!";
-	my %params = @_ or ();    #dont croak here, prefer propper OAI error
-	my @errors;               #stores errors before there is a result object
+	my $engine = $self->{Engine}
+	  or croak "Internal error: Data store missing!";
+	my %params = @_
+	  or ();       #dont croak here, prefer propper OAI error
+	my @errors;    #stores errors before there is a result object
 	$params{verb} = 'ListIdentifiers';
 
 	$self->_validateRequest(%params) or return $self->OAIerror;
@@ -456,8 +464,9 @@ ERRORS
 =cut
 
 sub ListRecords {
-	my $self = shift;
-	my %params = @_ or ();    #dont croak here, prefer propper OAI error
+	my $self   = shift;
+	my %params = @_
+	  or ();    #dont croak here, prefer propper OAI error
 	$params{verb} = 'ListRecords';
 	$self->_validateRequest(%params) or return $self->OAIerror;
 
@@ -522,8 +531,9 @@ ERRORS
 =cut
 
 sub ListSets {
-	my $self = shift;
-	my %params = @_ or ();    #dont croak here, prefer propper OAI error
+	my $self   = shift;
+	my %params = @_
+	  or ();    #dont croak here, prefer propper OAI error
 
 	my $engine = $self->{Engine};
 
@@ -598,7 +608,6 @@ sub error {
 	return $self->{error} if ( $self->{error} );
 }
 
-
 =method return $provider->errorOAI;
 
 Returns an internal error message (if any). Error message is a single scalar 
@@ -611,11 +620,9 @@ sub OAIerror {
 	return $self->{OAIerror} if ( $self->{OAIerror} );
 }
 
-
 #
 #
 #
-
 
 =head1 PRIVATE METHODS
 
@@ -708,13 +715,14 @@ $self->{xslt} if set.
 
 sub _output {
 	my $self     = shift;
-	my $response = shift or croak "No response";    #a HTTP::OAI::Response object
+	my $response = shift
+	  or croak "No response";    #a HTTP::OAI::Response object
 
-	$self->_init_xslt($response); #response is a HTTP::OAI::$verb object
+	$self->_init_xslt($response);    #response is a HTTP::OAI::$verb object
 	$response = $self->overwriteRequestURL($response);
 
 	#alternative output
-	#return encode_utf8($response->toDOM->toString); 
+	#return encode_utf8($response->toDOM->toString);
 	#there is some error here
 	my $xml;
 	$response->set_handler( XML::SAX::Writer->new( Output => \$xml ) );
@@ -802,6 +810,24 @@ sub _init_xslt {
 	}
 }
 
+sub _uriTest {
+	my $format = shift or croak "Need format!";
+	my @keys = qw (ns_uri ns_schema);
+
+	foreach my $key (@keys) {
+		if ( !$format->{$key} ) {
+			#print "$key not defined\n";
+			return;
+		}
+		my $uri = URI->new( $format->{$key} );
+		if ( !$uri->scheme ) {
+			#print "ns_uri is not URI\n";
+			return;
+		}
+	}
+	return 1; #exists and is uri
+}
+
 =method $self->_validateRequest(%params) or return $self->error;
 
 You may want to write $self->_validateRequest(verb=>'GetRecord', %params) if 
@@ -811,14 +837,15 @@ params does not include a verb.
 
 sub _validateRequest {
 	my $self = shift or croak "Need myself!";
-	my %params = @_ or ();    #dont croak here, prefer propper OAI error
+	my %params = @_
+	  or ();    #dont croak here, prefer propper OAI error
 
 	my @errors = validate_request(%params);
 	if (@errors) {
 		$self->{OAIerror} = $self->err2XML(@errors);
-		return;               #there was an error during validation
+		return;    #there was an error during validation
 	}
-	return 1;                 #no validation error (success)
+	return 1;      #no validation error (success)
 }
 
 =method $self->_processSetLibrary
