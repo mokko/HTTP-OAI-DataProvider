@@ -16,12 +16,9 @@ use HTTP::OAI;
 use HTTP::OAI::Repository qw/validate_date/;
 use HTTP::OAI::DataProvider::Engine::Result;
 use HTTP::OAI::DataProvider::ChunkCache;
-use HTTP::OAI::DataProvider::Common qw/Debug Warning hashRef2hash/;
+use HTTP::OAI::DataProvider::Common qw/Debug Warning/;
 use HTTP::OAI::DataProvider::Transformer;
 with 'HTTP::OAI::DataProvider::Engine::Interface';
-
-#use XML::LibXML::XPathContext;
-#use XML::SAX::Writer;
 
 =head1 SYNOPSIS
 	use HTTP::OAI::DataProvider::SQLite;
@@ -34,8 +31,8 @@ with 'HTTP::OAI::DataProvider::Engine::Interface';
 
 	#2) Use query engine
 
-		my $header=$engine->findByIdentifier($identifier);
-		my $result=$engine->query($params);
+		my $header=$engine->findByIdentifier($identifier);           #result is 		
+		my $result=$engine->query($params);          #DP::Engine::Result object
 		my $result=$engine->queryHeaders($params);
 		my $result=$engine->queryChunk($params);
 
@@ -50,33 +47,19 @@ with 'HTTP::OAI::DataProvider::Engine::Interface';
 
 =head1 DESCRIPTION
 
-Provide a sqlite for HTTP::OAI::DataProvider and abstract all the database
-action to store, modify and access header and metadata information.
+Provides about the simplest database backend imaginable for 
+HTTP::OAI::DataProvider using SQLite. Modifies and accesses header and metadata
+information.
 
-	HTTP::OAI::DataProvider::Engine
-
-TODO: See if I want to use base or parent?
-only for debug during development
-TODO: consider using SQL::Abstract to make code look nice.
+HTTP::OAI::DataProvider::Engine consumes
+ HTTP::OAI::DataProvider::Engine::SQLite consumes
+  HTTP::OAI::DataProvider::Engine::Interface
 
 =method my $cache=HTTP::OAI::DataRepository::SQLite::new (@args);
 
-Am currently not sure about the arguments. 
+TODO: params
 
-=cut
-
-#required
-has 'nativeFormat' => ( isa => 'HashRef', is => 'ro', required => 1 );
-has 'chunkCache'   => ( isa => 'HashRef', is => 'ro', required => 1 );
-has 'dbfile'       => ( isa => 'Str',     is => 'ro', required => 1 );
-
-=head1 INTERFACE METHODS
-
-In the following, I list the methods which fulfill the interface.
-
-=head2 QUERY
-
-=head2 my $response=$engine->queryChunk($chunkDescription);
+=method my $response=$engine->queryChunk($chunkDescription);
 
 Expects a chunkDescription and outputs xml string response fit for output.
 
@@ -86,7 +69,7 @@ object.
 A chunk descrition is basically an SQL statement and some other contextual info
 in an HTTP::OAI::DataProvider::ChunkCache::ChunkDescription. 
 
-[gets called in queryChunk and in data provider's (the badly named) chunkExist]
+[gets called in queryChunk and in chunkExist]
 
 =cut
 
@@ -204,7 +187,10 @@ sub queryChunk {
 
 =head2 my $date=$engine->earliestDate();
 
-Maybe the Identify verb wants to call this.
+Returns the earliest timestamp in datastore.
+Defaults to '1970-01-01T01:01:01Z' if db is empty.
+
+gets called in DP::identify.
 
 =cut
 
@@ -219,8 +205,6 @@ sub earliestDate {
 
 	if ( !$aref->[0] ) {
 		return '1970-01-01T01:01:01Z';
-
-		#croak "No date";
 	}
 
 	#$aref->[0] =~ /(^\d{4}-\d{2}-\d{2})/;
@@ -280,21 +264,13 @@ sub granularity {
 =head2	$header=$engine->findByIdentifier($identifier)
 	Finds and return a specific header (HTTP::OAI::Header) by identifier.
 
-	If no header with this identifier found, this method returns nothing. Who
-	had expected otherwise? If called with identifier, should I croak? I guess
-	so since it indicates a mistake of the frontend developer. And we want her
-	alert!
+	If no header with this identifier found, this method returns nothing. 
 
 =cut
 
 sub findByIdentifier {
-	my $self       = shift;
-	my $identifier = shift;
-
-	#I am not sure if I should croak or keep silent.
-	if ( !$identifier ) {
-		croak "No identifier specified";
-	}
+	my $self       = shift or croak "Need myself";
+	my $identifier = shift or croak "No identifier specified";
 
 	my $dbh = $self->{connection}->dbh() or die $DBI::errstr;
 
@@ -324,9 +300,6 @@ sub findByIdentifier {
 			datestamp  => $aref->[0]
 		);
 
-		#$h->identifier = $identifier;
-		#$h->datestamp  = $aref->[0];
-
 		#TODO $h->status=$aref->[1];
 
 		while ( $aref = $sth->fetch ) {
@@ -337,9 +310,7 @@ sub findByIdentifier {
 		return $h;
 	}
 
-	#carp "Return empty handed!";
 	return;    #failure
-
 }
 
 =method my @setSpecs=$provider->listSets();
@@ -350,7 +321,7 @@ returns an array of setSpecs as string. Called from DataProvider::ListSets.
 =cut
 
 sub listSets {
-	my $self = shift;
+	my $self = shift or croak "Need myself";
 	my $dbh = $self->{connection}->dbh() or die $DBI::errstr;
 
 	#Debug "Enter ListSets";
@@ -400,23 +371,10 @@ $self->{ChunkCache}.
 sub init {
 	my $self = shift or croak "Need myself!";
 
-	#
-	# First make ChunkCache
-	#
-
-	#object in _chunkCache and options in chunkcache
-	my %opts = hashRef2hash( $self->chunkCache );
-
-	#print "maxSize:$opts{MaxChunks}\n";
-	#use Data::Dumper qw(Dumper);
-	#Debug 'WWWWWWWWWWWEIRD'.Dumper (%opts);
 	$self->{ChunkCache} =
-	     new HTTP::OAI::DataProvider::ChunkCache( maxSize => $opts{maxChunks} )
+	     new HTTP::OAI::DataProvider::ChunkCache( maxSize => $self->{chunkCache}{maxChunks} )
 	  or croak "Cannot init chunkCache";
 
-	#
-	# initDB
-	#
 	$self->_initDB();
 }
 
@@ -486,21 +444,6 @@ sub planChunking {
 		#don't write the 1st chunk into cache, keep it in $first instead
 		$first ? $chunkCache->add($chunk) : $first = $chunk;
 	}
-
-	#TODO
-	#only check for 2nd chunk if there is more than 1
-	#i don't really need this sanity check
-	#if ( $maxChunkNo > 1 && $params->{verb} ne 'GetRecord' ) {
-	#
-	#		#sanity check: can I find the 2nd chunk in chunkCache
-	#		my $secondToken = $first->{next};
-	#
-	#		#Debug "secondToken:".$secondToken;
-	#		my $secondChunk = $chunkCache->get($secondToken);
-	#		if ($secondChunk) {
-	#			Debug "2nd CHUNK FOUND" . $secondChunk->{token};
-	#		}
-	#	}
 
 	#Debug "planChunking RESULT".$self->{chunkCache}->count;
 	return $first;
@@ -904,4 +847,3 @@ sub _updateSets {
 }
 
 1;
-

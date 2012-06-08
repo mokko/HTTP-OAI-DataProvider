@@ -18,7 +18,6 @@ our $Warning;
 
 @EXPORT_OK = qw(
   Debug
-  hashRef2hash
   isScalar
   modDir
   say
@@ -188,13 +187,4 @@ sub testEnvironment {
 	return $return;
 }
 
-#a candidate for Common
-sub hashRef2hash {
-	my $hashRef = shift or croak "Need a hashRef";
-	my %opts;
-	while ( my ( $key, $value ) = each %$hashRef ) {
-		$opts{$key} = $value;
-	}
-	return %opts;
-}
-
+1;

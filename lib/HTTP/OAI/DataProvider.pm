@@ -53,6 +53,19 @@ has 'requestURL' => ( isa => 'Uri',     is => 'rw', required => 0 );
 has 'warning'    => ( isa => 'CodeRef', is => 'ro', required => 0 );
 has 'xslt'       => ( isa => 'Str',     is => 'ro', required => 0 );
 
+=head1 DESCRIPTION
+
+This package implements an OAI data provider according to 
+L<http://www.openarchives.org/OAI/openarchivesprotocol.html>
+
+The data provider itself is database and metadata format agnostic. It comes 
+with simple example implementations that should work out of the box, including 
+an SQLite backend, a metadata format (mapping), web interface and a command 
+line interface.
+
+Starting from version 0.07, the user facing interface should be more or less 
+stable.
+
 =head1 SYNOPSIS
 
 	#Init
@@ -835,7 +848,7 @@ sub _validateRequest {
 sub _processSetLibrary {
 	my $self = shift or croak "Need myself!";
 
-	#debug "Enter salsa_setLibrary";
+	#debug "Enter process_setLibrary";
 	my $setLibrary = $self->{setLibrary};
 
 	if ( %{$setLibrary} ) {
@@ -869,6 +882,21 @@ sub _processSetLibrary {
 		return $listSets;
 	}
 }
+
+=head1 SEE ALSO
+
+=over 1
+
+=item L<http://www.openarchives.org/OAI/openarchivesprotocol.html>
+
+=item Tim Brody's L<HTTP::OAI>
+
+=item Jeff Young's (OCLC) OAICAT (java) at 
+L<http://www.oclc.org/research/activities/oaicat/>
+
+=back
+
+=cut
 
 __PACKAGE__->meta->make_immutable;
 1;
