@@ -9,7 +9,7 @@ use XML::LibXML;
 use Carp qw(carp croak);
 
 #use Scalar::Util;
-use HTTP::OAI::DataProvider::Common qw(hashRef2hash
+use HTTP::OAI::DataProvider::Common qw(
   isScalar
   testEnvironment
   valPackageName
@@ -241,7 +241,7 @@ sub loadWorkingTestConfig {
 
 	#signal in first level?
 	if ( $signal && $config{$signal} ) {
-		return hashRef2hash( $config{$signal} );
+		return %{$config{$signal}};
 	}
 
 	#signal in 2nd level?
@@ -252,7 +252,7 @@ sub loadWorkingTestConfig {
 			}
 		}
 	#return complete hash	
-	return hashRef2hash( $config{$signal} );
+	return %{$config{$signal}};
 	}
 	
 	return %config;

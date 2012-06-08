@@ -9,7 +9,7 @@ use namespace::autoclean;
 use Time::HiRes qw(gettimeofday);    #to generate unique tokens
 use Carp qw(carp croak);
 use URI;
-use HTTP::OAI::DataProvider::Common qw/Debug hashRef2hash say Warning/;
+use HTTP::OAI::DataProvider::Common qw/Debug say Warning/;
 use HTTP::OAI::DataProvider::ChunkCache;
 use HTTP::OAI::DataProvider::Transformer;
 
