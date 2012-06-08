@@ -53,19 +53,6 @@ has 'requestURL' => ( isa => 'Uri',     is => 'rw', required => 0 );
 has 'warning'    => ( isa => 'CodeRef', is => 'ro', required => 0 );
 has 'xslt'       => ( isa => 'Str',     is => 'ro', required => 0 );
 
-=head1 DESCRIPTION
-
-This package implements an OAI data provider according to 
-L<http://www.openarchives.org/OAI/openarchivesprotocol.html>
-
-The data provider itself is database and metadata format agnostic. It comes 
-with simple example implementations that should work out of the box, including 
-an SQLite backend, a metadata format (mapping), web interface and a command 
-line interface.
-
-Starting from version 0.07, the user facing interface should be more or less 
-stable.
-
 =head1 SYNOPSIS
 
 	#Init
@@ -81,8 +68,25 @@ stable.
 	#New Error Checking 
 	if ($provider->OAIerror) {
 		debug $provider->error;
-		return $provider->OAIerror;	
 	}
+
+=head1 DESCRIPTION
+
+This package implements an OAI data provider according to 
+L<http://www.openarchives.org/OAI/openarchivesprotocol.html>
+
+The provider is database and metadata format agnostic. It comes with simple 
+example implementations that should work out of the box, including an SQLite 
+backend (DP::Engine::SQLite), a metadata format (DP::Mapping::MPX), web 
+interface (bin/webapp.pl) and a command line interface (bin/dp.pl).
+
+I try to avoid too many and obscure dependencies. 
+
+Starting from version 0.07, the user-facing interface of this module should be 
+mostly stable.
+
+Please note: I use 'DP::' as an abbreviation of 'HTTP::OAI::DataProvider::' 
+thoughout the documentation.
 
 =method my $provider->new ($options);
 
@@ -101,39 +105,22 @@ expects a hashref with key value pairs inside all of which are required:
 		repositoryName => 'test config OAI Data Provider',
 	},
 
-See OAI specification (Identify) for available options and details of 
-parameters.
+See OAI specification (Identify) for available options and other details.
 
 =head3 Engine Parameters
 
-engine->{engine} specifies the engine you use. Everything else depends on the
-engine you use. Engine parameters are handed down to the engine you use. 
-
-This is an example configuration for DP::Engine::SQLite:
+engine->{engine} specifies the engine you use. Other parameters depend on the
+engine you use. All engine parameters are handed down to the engine you use. 
 
 	engine => {
-		chunkCache => {
-			maxChunks       => 4000,    #was chunkCacheMaxSize
-			recordsPerChunk => 10,      #was chunkSize
-		},
-		dbfile    => "$FindBin::Bin/../t/environment/db",
 		engine    => 'HTTP::OAI::DataProvider::Engine::SQLite',
-		locateXSL => sub {
-			my $prefix       = shift;
-			my $nativePrefix = ( keys %{ $config{engine}{nativeFormat} } )[0]
-			  or die "nativePrefix missing";
-			return "$FindBin::Bin/../t/environment/$nativePrefix" . '2'
-			  . "$prefix.xsl";
-		},
-		nativeFormat => { 'mpx' => 'http://www.mpx.org/mpx' }
+		moreParameters => 'see your engine for more info on those params', 
 	},
 
 =head3 Message Parameters 
 
-	messages => {
-		debug   => sub { my $msg = shift; print "<<$msg\n" if $msg; },
-		warning => sub { my $msg = shift; warn ">>$msg"    if $msg; },
-	},
+	debug   => sub { my $msg = shift; print "<<$msg\n" if $msg; },
+	warning => sub { my $msg = shift; warn ">>$msg"    if $msg; },
 
 =head3 Metadata Format Parameters 
 
@@ -188,8 +175,6 @@ sub BUILD {
 }
 
 =method my $result=$provider->GetRecord(%params);
-
-All verbs expect params as hash and return a response as an xml string.
 
 Arguments
 =for :list
