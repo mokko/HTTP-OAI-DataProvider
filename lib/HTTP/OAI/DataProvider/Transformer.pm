@@ -5,7 +5,6 @@ use warnings;
 use strict;
 use Moose;
 use namespace::autoclean;
-
 use Carp qw/croak carp confess/;
 use HTTP::OAI::DataProvider::Common qw/Debug Warning/;
 use XML::LibXSLT;
