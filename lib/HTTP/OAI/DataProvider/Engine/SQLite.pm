@@ -4,7 +4,9 @@ package HTTP::OAI::DataProvider::Engine::SQLite;
 
 use warnings;
 use strict;
+
 use Moose::Role;
+
 #use namespace::autoclean;
 use Carp qw(carp croak confess);
 use DBI qw(:sql_types);    #new

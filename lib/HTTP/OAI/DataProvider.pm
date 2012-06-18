@@ -235,7 +235,8 @@ granularity).
 
 sub Identify {
 	my $self   = shift;
-	my %params = @_;    #dont croak here, prefer propper OAI error
+	my %params = @_
+	  or ();    #dont croak here, prefer propper OAI error
 	my $identify = $self->identify;
 	$params{verb} = 'Identify';
 	$self->_validateRequest(%params) or return $self->OAIerror;
