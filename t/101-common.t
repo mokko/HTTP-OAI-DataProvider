@@ -14,11 +14,11 @@ use Test::More tests => 14;
 	ok( !$@, 'isScalar should NOT die (scalar)' );
 
 	eval { isScalar( 'band' => 'on the run' ); };
-	ok( !$@, 'isScalar should die (hash)' );
+	ok( $@, 'isScalar should die (hash)' );
 
 	my $test = \$bla;
 	eval { isScalar($test); };
-	ok( !$@, 'isScalar should die (scalarref)' );
+	ok( $@, 'isScalar should die (scalarref)' );
 }
 
 {

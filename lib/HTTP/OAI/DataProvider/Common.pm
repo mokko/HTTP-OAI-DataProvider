@@ -30,6 +30,8 @@ sub argumentsLeft;
 
 =func carp argumentsLeft if @_;
 
+OBSOLETE
+
 argumentsLeft (in @_) stores just an error message in an attempt to unify the message
 printed if the same error occurs.
 
@@ -71,13 +73,13 @@ Dies if $variable is not scalar
 sub isScalar {
 	my $value = shift
 	  or croak "Need value!";
-	carp argumentsLeft if @_;
 
+	croak "Carp: More arguments than expected" if (@_);
 	croak "Value is not a scalar"
-	  if ( !Scalar::Util::reftype \$value eq 'SCALAR' );
+	  if ( Scalar::Util::reftype \$value ne 'SCALAR' );
 
 	#there must be a better way, but this works...
-	#new perldoc suggests not to use UNIVERSAL::isa as a function, so I don't
+	#new perldoc suggests not to use UNIVERSAL::isa as a function
 }
 
 =func valPackageName ($obj,'Package::Name');
@@ -173,15 +175,15 @@ If $signal is 'config' and $attach is added, $attach is ignored.
 sub testEnvironment {
 	my $arg    = shift;
 	my $dir    = File::Spec->catfile( $FindBin::Bin, '..', 't', 'environment' );
-	my $return=$dir;
-	
+	my $return = $dir;
+
 	if ( $arg eq 'config' ) {
-		return File::Spec->catfile($dir, 'config.pl');
+		return File::Spec->catfile( $dir, 'config.pl' );
 	}
 
 	if (@_) {
 		foreach my $item (@_) {
-			$return=File::Spec->catfile($return, $item);
+			$return = File::Spec->catfile( $return, $item );
 		}
 	}
 	return $return;

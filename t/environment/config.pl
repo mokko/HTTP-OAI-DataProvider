@@ -32,7 +32,7 @@
 		mpx => {
 			ns_uri => "http://www.mpx.org/mpx",
 			ns_schema =>
-			  "http://github.com/mokko/MPX/raw/master/latest/mpx.xsd",
+			  "http://github.com/mokko/MPX/raw/master/xsd/mpx.xsd",
 		},
 		oai_dc => {
 			ns_uri    => "http://www.openarchives.org/OAI/2.0/oai_dc/",

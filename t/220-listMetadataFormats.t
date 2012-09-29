@@ -33,7 +33,7 @@ my $baseURL = 'http://localhost:3000/oai';
 
 	#diag "ListMetadataFormats __with__ identifier";
 	my $response = $provider->ListMetadataFormats(
-		identifier => 'spk-berlin.de:EM-objId-153740' ) or die "Cant get metadata format";
+		identifier => 'spk-berlin.de:EM-objId-543' ) or die "Cant get metadata format";
 	okListMetadataFormats($response);
 
 }

@@ -25,6 +25,9 @@ my %nativeFormat = loadWorkingTestConfig('nativeFormat');
 my $nativePrefix = ( keys %nativeFormat )[0];
 die "No config! " if ( !%engine );
 
+print "engine: $engine{dbfile}\n";
+
+
 if ( -f $engine{dbfile} ) {
 	pass "db exists, ingester seems to have run already";
 }

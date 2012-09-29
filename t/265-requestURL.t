@@ -20,7 +20,7 @@ my @sequence = (
 	{ verb => 'ListMetadataFormats' },
 	{
 		verb           => 'GetRecord',
-		identifier     => 'spk-berlin.de:EM-objId-40008',
+		identifier     => 'spk-berlin.de:EM-objId-543',
 		metadataPrefix => 'oai_dc'
 	},
 	{

@@ -6,6 +6,7 @@ use warnings;
 use Moose;
 use Moose::Util::TypeConstraints;
 use namespace::autoclean;
+use Scalar::Util qw(looks_like_number);
 use Time::HiRes qw(gettimeofday);    #to generate unique tokens
 use Carp qw(carp croak);
 use URI;
@@ -25,7 +26,8 @@ subtype 'nativeFormatType', as 'HashRef', where {
 subtype 'chunkCacheType', as 'HashRef', where {
 	my @list = qw (maxChunks recordsPerChunk);
 	foreach my $item (@list) {
-		return unless ( $_->{$item} && $_->{$item} > 0 );
+		my $it=$_->{$item};
+		return unless ( $it && looks_like_number($it) && $it > 0 );
 	}
 	return 1;                                    #success
 };

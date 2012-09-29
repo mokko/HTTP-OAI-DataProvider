@@ -6,7 +6,7 @@ use HTTP::OAI::DataProvider::Test;
 use XML::LibXML;
 use FindBin;
 
-#use Data::Dumper qw(Dumper);
+use Data::Dumper qw(Dumper);
 
 #
 # init (taken for granted)
@@ -23,7 +23,7 @@ my $baseURL = 'http://localhost:3000/oai';
 {
 	my %params = (
 		metadataPrefix => 'mpx',
-		identifier     => 'spk-berlin.de:EM-objId-40008',
+		identifier     => 'spk-berlin.de:EM-objId-524',
 	);
 	my $response = $provider->GetRecord(%params);
 	okGetRecord($response);
@@ -76,12 +76,15 @@ my $baseURL = 'http://localhost:3000/oai';
 }
 
 {
+	#make sure that this id exists!
 	my %params = (
 		metadataPrefix => 'meschugge',
-		identifier     => 'spk-berlin.de:EM-objId-40008',
+		identifier     => 'spk-berlin.de:EM-objId-524',
 	);
 	my $response = $provider->GetRecord(%params);
+	#print Dumper ($response);
 	isOAIerror( $response, 'cannotDisseminateFormat' );
+	#check if OAIerror message is persistent
 	$response = $provider->OAIerror;
 	isOAIerror( $response, 'cannotDisseminateFormat' );
 }
