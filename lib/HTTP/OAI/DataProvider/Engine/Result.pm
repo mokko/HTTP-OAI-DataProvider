@@ -1,56 +1,84 @@
 package HTTP::OAI::DataProvider::Engine::Result;
-BEGIN {
-  $HTTP::OAI::DataProvider::Engine::Result::VERSION = '0.006';
+{
+  $HTTP::OAI::DataProvider::Engine::Result::VERSION = '0.007';
 }
-# ABSTRACT: Result object for engine
 
-use Carp qw/croak/;
+#ABSTRACT: Result object for engine
+
+use Moose;
+use namespace::autoclean;
+use Carp qw(croak carp);
 use HTTP::OAI;
 use Encode qw/decode/;    #encoding problem when dealing with data from sqlite
-use parent qw(HTTP::OAI::DataProvider::Engine);
 
-use Dancer ':syntax';     #only for debug in development, warnings?
+#
+# DOUBTFUL!
+#not sure if I should inherit from Engine!
+#use parent qw(HTTP::OAI::DataProvider::Engine);
+use HTTP::OAI::DataProvider::Common qw(Warning Debug);
+
+has 'transformer' => ( isa => 'Object', is => 'ro', required => 1 );
+has 'verb'        => ( isa => 'Str',    is => 'ro', required => 1 );
+
+has 'chunkSize'  => ( isa => 'Str',    is => 'ro', required => 1 );
+has 'chunkNo'  => ( isa => 'Str',    is => 'ro', required => 1 );
+has 'token'  => ( isa => 'Str',    is => 'ro', required => 1 );
+has 'targetPrefix'  => ( isa => 'Str',    is => 'ro', required => 1 );
+has 'total'  => ( isa => 'Str',    is => 'ro', required => 1 );
+
+has 'next'  => ( isa => 'Str',    is => 'rw', required => 0 );
+has 'requestURL'  => ( isa => 'Str',    is => 'rw', required => 0 );
 
 
-
-sub new {
-	my $class  = shift;
-	my %args   = @_;
-	my $result = \%args;
-	bless $result, $class;
-
-	$result->requiredFeatures( 'transformer', 'verb' );
+sub BUILD {
+	my $self = shift or carp "Need myself!";
 
 	#init values
-	$result->{records}   = [];    #use $result->countRecords
-	$result->{headCount} = 0;     #use $result->countHeaders
-	$result->{headers} = new HTTP::OAI::ListIdentifiers;
-	$result->{errors}  = [];
+	$self->{records}   = [];    #use $result->countRecords
+	$self->{headCount} = 0;     #use $result->countHeaders
+	$self->{headers} = new HTTP::OAI::ListIdentifiers;
+	$self->{errors}  = [];
 
-	return $result;
 }
 
 
 #don't think this is necessary anymore, should be done by DataProvider::_output
-sub requestURL {
-	my $result  = shift;
-	my $request = shift;
-
-	if ($request) {    #setter
-		$result->{requestURL} = $request;
-	} else {           #getter
-		return $result->{requestURL};
-	}
-}
+#sub requestURL {
+#	my $result = shift or carp "Need myself!";
+#	my $request = shift;
+#
+#	if ($request) {    #setter
+#		$result->{requestURL} = $request;
+#	}
+#	else {             #getter
+#		return $result->{requestURL};
+#	}
+#}
 
 
 sub addError {
-	my $self = shift;
-	my $code = shift;    #required
-	my $msg  = shift;    #optional
+	my $self           = shift;
+	my $code           = shift;    #required
+	my $msg            = shift;    #optional
+	my @possibleErrors = qw(
+	  badArgument
+	  badGranularity
+	  badResumptionToken
+	  badVerb
+	  cannotDisseminateFormat
+	  idDoesNotExist
+	  noRecordsMatch
+	  noMetadataFormats
+	  noSetHierarchy
+	);
 
 	if ( !$code ) {
-		die "addError needs a code";
+		carp "addError needs a code";
+	}
+
+	if ( grep ( $_ eq $code, @possibleErrors ) == 0 ) {
+		croak "Error code not recognized";    #carp or return?
+		return 0;                             #error
 	}
 
 	my %arg;
@@ -60,9 +88,7 @@ sub addError {
 		$arg{message} = $msg;
 	}
 
-	if ($code) {
-		push( @{ $self->{errors} }, new HTTP::OAI::Error(%arg) );
-	}
+	push( @{ $self->{errors} }, new HTTP::OAI::Error(%arg) );
 }
 
 
@@ -70,7 +96,7 @@ sub _addHeader {
 	my $result = shift;
 	my $header = shift;
 
-	#debug "Enter _addHeader";
+	#Debug "Enter _addHeader";
 
 	$result->{headCount}++;
 	if ( !$header ) {
@@ -81,7 +107,7 @@ sub _addHeader {
 		croak 'Internal Error: object is not HTTP::OAI::Header';
 	}
 
-	#debug "now " . $result->countHeaders . " headers";
+	#Debug "now " . $result->countHeaders . " headers";
 
 	$result->{headers}->identifier($header);
 }
@@ -101,7 +127,7 @@ sub _addRecord {
 		croak 'Internal Error: record is not HTTP::OAI::Record';
 	}
 
-	#debug "now" . $result->countRecords . "records";
+	#Debug "now" . $result->countRecords . "records";
 
 	push @{ $result->{records} }, $record;
 }
@@ -113,7 +139,7 @@ sub countHeaders {
 }
 
 
-sub responseCount {
+sub _responseCount {
 	my $result   = shift;
 	my $response = shift;
 
@@ -121,42 +147,42 @@ sub responseCount {
 		$response = $result->getResponse;
 	}
 	if ( ref $response eq 'HTTP::OAI::ListIdentifiers' ) {
-		debug "HeadCount" . $result->countHeaders;
-	} else {
-		debug "RecCount" . $result->countRecords;
+		Debug "HeadCount" . $result->countHeaders;
+	}
+	else {
+		Debug "RecCount" . $result->countRecords;
 	}
 }
 
 
-sub chunkSize {
-	my $result = shift;
-	if ( $result->{chunkSize} ) {
-		return $result->{chunkSize};
-	}
-	return ();    #fail
-}
+#sub chunkSize {
+#	my $result = shift;
+#	if ( $result->{chunkSize} ) {
+#		return $result->{chunkSize};
+#	}
+#	return ();    #fail
+#}
 
 
-sub getType {
-	my $result       = shift;
-	my $chunkRequest = $result->chunkRequest;
-
-	if ( !$chunkRequest->{type} ) {
-
-		#TODO: should be numerical operator '>'
-		if ( $result->countRecords > 0 ) {
-			$chunkRequest->{type} = 'records';
-		} else {
-			$chunkRequest->{type} = 'headers';
-		}
-	}
-}
+#sub getType {
+#	my $result       = shift or die "Wrong!";
+#
+#	if ( !$result->{type} ) {
+#		if ( $result->countRecords > 0 ) {
+#			$chunkRequest->{type} = 'records';
+#		}
+#		else {
+#			$chunkRequest->{type} = 'headers';
+#		}
+#	}
+#	#return $result->{type};
+#}
 
 
 sub getResponse {
 	my $result = shift;
 
-	#debug "Enter getResponse ".$result->{verb};
+	#Debug "Enter getResponse ".$result->{verb};
 
 	if ( $result->{verb} eq 'ListIdentifiers' ) {
 		return $result->toListIdentifiers;
@@ -167,7 +193,7 @@ sub getResponse {
 	if ( $result->{verb} eq 'ListRecords' ) {
 		return $result->toListRecords;
 	}
-	warning "Strange Error!";
+	Warning "Strange Error!";
 }
 
 
@@ -187,62 +213,44 @@ sub returnRecords {
 
 
 sub save {
-	my $result = shift;
-	my %args   = @_;      #contains params, header, optional: $md
+	my $result = shift or carp "Need myself!";
+	my %args = @_;    #contains params, header, optional: $md
 
-	#debug "Enter save";
-
-	$result->requiredType('HTTP::OAI::DataProvider::Engine::Result');
-	$result->requiredFeatures( \%args, 'header' );
-	$result->requiredFeatures('params');
+	croak "no header" if ( !$args{header} );
+	croak "no params" if ( !$args{params} );
 
 	#md is optional, a deleted record wd have none
 	if ( $result->{verb} eq 'ListIdentifiers' ) {
 		$result->_addHeader( $args{header} );
-		return 0;         #success;
+		return 1;     #success;
 	}
 
 	#assume it is either GetRecord or ListRecords
 
 	if ( $args{md} ) {
 
-		#currently md is a string, possibly in a wrong encoding
+		#i believe encoding issue is fixed now
 		$args{md} = decode( "utf8", $args{md} );
-
-		#this line fails on encoding problem
 		my $dom = XML::LibXML->load_xml( string => $args{md} );
 
-		#Debug "----- dom's actual encoding: ".$dom->actualEncoding;
-		#load $dom from source file works perfectly
-		#my $dom = XML::LibXML->load_xml( location =>
-		#'/home/Mengel/projects/Salsa_OAI2/data/fs/objId-1305695.mpx' )
-		# or return "Salsa Error: Loading xml file failed for strange reason";
-		#now md should become appropriate metadata
-
-		my $prefix;
-		$result->{params}->{metadataPrefix}
-		  ? $prefix = $result->{params}->{metadataPrefix}
-		  : $prefix = $result->{targetPrefix};
-
-		if ( !$prefix ) {
-			die "still no prefix?";
-		}
-
-		#debug "prefix:$prefix-----------------------";
+		my $prefix = $result->targetPrefix or croak "still no prefix?";
+		#Debug "prefix:$prefix-----------------------";
 
 		my $transformer = $result->{transformer};
 		if ($transformer) {
 			$dom = $transformer->toTargetPrefix( $prefix, $dom );
 
-			#debug "transformed dom" . $dom;
-		} else {
-			warning "Transformer not available";
+			#Debug "transformed dom" . $dom;
+		}
+		else {
+			Warning "Transformer not available";
 		}
 
-		#debug $dom->toString;
+		#Debug $dom->toString;
 		$args{metadata} = new HTTP::OAI::Metadata( dom => $dom );
-	} else {
-		warning "metadata not available, but that might well be the case";
+	}
+	else {
+		Warning "metadata not available, but that might well be the case";
 	}
 
 	my $record = new HTTP::OAI::Record(%args);
@@ -273,7 +281,7 @@ sub toListRecords {
 	my $result      = shift;
 	my $listRecords = new HTTP::OAI::ListRecords;
 
-	#debug "Enter toListRecords";
+	#Debug "Enter toListRecords";
 
 	if ( $result->countRecords == 0 ) {
 		croak "records2ListRecords: count doesn't fit";
@@ -295,7 +303,10 @@ sub toListRecords {
 sub _resumptionToken {
 	my $result = shift;
 
-	#debug 'Enter _resumptionToken'.ref $result;
+	#Debug 'Enter _resumptionToken'.ref $result;
+
+	#print ":::::chunkNo:$result->{chunkNo}\n";
+	#print ":::::chunkSize:$result->{chunkSize}\n";
 
 	my $rt = new HTTP::OAI::ResumptionToken(
 		completeListSize => $result->{total},
@@ -311,7 +322,7 @@ sub _resumptionToken {
 sub toListIdentifiers {
 	my $result = shift;
 
-	#debug "Enter toListIdentifiers";
+	#Debug "Enter toListIdentifiers";
 
 	#not sure if we tested this before
 	if ( $result->countHeaders == 0 ) {
@@ -322,7 +333,7 @@ sub toListIdentifiers {
 
 	if ( $result->{requestURL} ) {
 
-		#debug "requestURL:".$result->{requestURL};
+		#Debug "requestURL:".$result->{requestURL};
 		$listIdentifiers->requestURL( $result->requestURL );
 	}
 
@@ -336,7 +347,7 @@ sub toListIdentifiers {
 sub isError {
 	my $result = shift;
 
-	#debug "HTTP::OAI::DataProvider::Result::isError";
+	#Debug "HTTP::OAI::DataProvider::Result::isError";
 
 	if ( ref $result ne 'HTTP::OAI::DataProvider::Engine::Result' ) {
 		die "isError: Wrong class ";
@@ -344,22 +355,23 @@ sub isError {
 
 	if ( $result->{errors} ) {
 		return @{ $result->{errors} };
-	} else {
+	}
+	else {
 		return ();    #fail
 	}
 }
 
 
-
 sub lastChunk {
-	my $result=shift;
-	if ($result->{last}) {
+	my $result = shift;
+	if ( $result->{last} ) {
 		return 1;
 	}
 	return ();
 }
+__PACKAGE__->meta->make_immutable;
+1;
 
-1;                    #HTTP::OAI::DataProvider::Engine::Result
 __END__
 =pod
 
@@ -369,28 +381,28 @@ HTTP::OAI::DataProvider::Engine::Result - Result object for engine
 
 =head1 VERSION
 
-version 0.006
+version 0.007
 
 =head1 METHODS
 
 =head2 my $result=HTTP::OAI::DataProvider::Engine->new (%opts);
 
 	my %opts = (
-		requestURL  => $self->{requestURL},
-		transformer => $self->{transformer},
-		verb        => $params->{verb},
-		params      => $params,
+		requestURL  => $requestURL, #optional
+		transformer => $transformer, #required
+		verb        => $verb, #required
+		params      => $params,		#this params should not have a verb
 
 		#for resumptionToken
-		chunkSize    => $self->{chunkSize},
-		chunkNo      => $chunkDesc->{chunkNo},
-		targetPrefix => $chunkDesc->{targetPrefix},
-		token        => $chunkDesc->{token},
-		total        => $chunkDesc->{total},
+		chunkSize    => $chunkSize,
+		chunkNo      => $chunkNo,
+		targetPrefix => $targetPrefix,
+		token        => $token,
+		total        => $total,
 	);
 
-$opts{last}
-$opts{next}
+#$opts{last}
+#$opts{next}
 
 =head2 my $request=$result->requestURL ([$request]);
 
@@ -407,10 +419,14 @@ is convenient.
 =head2 $result->addError($code[, $message]);
 
 Adds an HTTP::OAI::Error error to a result object. Test with
-	#untested
 	if ($result->isError) {
 		$provider->err2XML ($result->isError);
 	}
+
+isError returns 
+-in scalar context: true if error is defined and nothing (false) if error is 
+ not defined. 
+-in list context a list of HTTP::OAI errors, if any
 
 =head2 $result->_addHeader ($header);
 
@@ -424,9 +440,9 @@ Adds a record to the result object. Gets called by saveRecord.
 
 Return number (scalar) of Headers so far.
 
-=head2 my $result->responseCount
+=head2 my $result->_responseCount
 
-Triggers debug output!
+Similar to countHeaders, but triggers Debug output!
 
 =head2 my $chunkSize=$result->chunkSize;
 
@@ -437,6 +453,10 @@ determines how big (number of records per chunk) the chunks are.
 
 getType sets internal type in $result to either headers or records, depending
 on content of $result.
+
+TODO:
+-This is weird. It looks like it should also return the value;
+-There should also be an undef state
 
 =head2 my $response=$result->getResponse;
 
@@ -463,13 +483,13 @@ Expects parts for the result, constructs a result and saves it into the result
 object.
 
 This is an abstracted version of saveRecord that automatically does the right
-thing whether being passed header or record information. It makes addHeader
-and addRecord private methods and saveRecord obsolete.
+thing whether being passed header or record information. It makes _addHeader
+and _addRecord private methods.
 
 Gets called in engine's queryChunk.
 
-How do I decide whether something is header or record? At first I thought I
-just check whether metadata info is there or not, but this would fail with
+How do I decide whether something is a header or record? At first I thought I
+just check whether metadata info is there or not, but this fails in case of
 deleted records, so now I check for the verb. That means I have to pass the
 verb to result->{verb} when result is born.
 
@@ -507,10 +527,14 @@ Is _actually_ called in DataProvider.
 
 	if ($result->lastChunk)
 
-=head1 USAGE
+=head1 DESCRIPTIOPN
 
-A result is an object that carries the db response before it is transformed to
-a HTTP::OAI::Response object.
+A result is an object that can carry 
+[a) info to carry out a DB query and (should ChunkCache, right?)]
+b) the db response before it is transformed to a HTTP::OAI::Response object.
+c) it can also carry OAI errors
+
+=head1 OLD SYNOPSIS 
 
 	#INIT
 	my $result=new HTTP::OAI::DataProvider::Engine (%opts);
@@ -534,17 +558,16 @@ a HTTP::OAI::Response object.
 	#HEADERS
 	print $result->countHeaders. 'headers';
 
+	#depending on $result will return listIdentifiers or listRecords
+	my $response=$result->getResponse
+
 	#WRAPPERS
 	#return records/headers as a HTTP::OAI::Response
 	my $getRecord=$result->toGetRecord;
 	my $listIdentifiers=$result->toListIdentifiers;
 	my $listRecords=$result->toListRecords;
 
-	#depending on $result will return listIdentifiers or listRecords
-	my $response=$result->getResponse
-
 	#CHUNKING
-	$bool=$result->chunking; #test if chunking is turned on or off
 	$result->chunk; #figures out maxChunkNo and sets
 	$result->chunkRequest([bla=>$bla]); #getter & setter for chunkRequest data
 	$result->EOFChunk ($rt); #tester, getter & setter for EOFChunk signal
@@ -568,7 +591,7 @@ Maurice Mengel <mauricemengel@gmail.com>
 
 =head1 COPYRIGHT AND LICENSE
 
-This software is copyright (c) 2011 by Maurice Mengel.
+This software is copyright (c) 2012 by Maurice Mengel.
 
 This is free software; you can redistribute it and/or modify it under
 the same terms as the Perl 5 programming language system itself.

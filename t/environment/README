@@ -1,0 +1,6 @@
+This directory collects files needed for a  test environment. These files 
+contain a working configuration of the data provider (using the data I have 
+in the format i have). 
+
+The data format is called MPX. It's not an integral part of the data provider, 
+it is merely an example format. 

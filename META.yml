@@ -3,14 +3,11 @@ abstract: 'A simple OAI data provider'
 author:
   - 'Maurice Mengel <mauricemengel@gmail.com>'
 build_requires:
-  English: 0
-  FindBin: 0
-  Test::More: 0
-  perl: 5.006
+  Data::Dumper: 0
 configure_requires:
   ExtUtils::MakeMaker: 6.30
 dynamic_config: 0
-generated_by: 'Dist::Zilla version 4.200007, CPAN::Meta::Converter version 2.110930'
+generated_by: 'Dist::Zilla version 4.300017, CPAN::Meta::Converter version 2.120921'
 license: perl
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.4.html
@@ -18,23 +15,38 @@ meta-spec:
 name: HTTP-OAI-DataProvider
 requires:
   Carp: 0
+  Cwd: 0
   DBI: 0
   DBIx::Connector: 0
   Dancer: 0
-  Dancer::CommandLine: 0
   Encode: 0
   Exporter: 0
+  File::Spec: 0
+  FindBin: 0
+  Getopt::Long: 0
   HTTP::OAI: 0
   HTTP::OAI::Repository: 0
+  Moose: 0
+  Moose::Role: 0
+  Moose::Util::TypeConstraints: 0
+  Pod::Usage: 0
+  Scalar::Util: 0
+  Test::More: 0
+  Test::Xpath: 0
   Time::HiRes: 0
+  URI: 0
   XML::LibXML: 0
   XML::LibXML::XPathContext: 0
   XML::LibXSLT: 0
   XML::SAX::Writer: 0
-  YAML::Syck: 0
-  parent: 0
+  base: 0
+  namespace::autoclean: 0
+  perl: 5.008
+  strict: 0
+  utf8: 0
+  warnings: 0
 resources:
   bugtracker: https://rt.cpan.org/Public/Dist/Display.html?Name=HTTP-OAI-DataProvider
   homepage: https://github.com/mokko/HTTP-OAI-DataProvider/wiki
   repository: git://github.com/mokko/HTTP-OAI-DataProvider.git
-version: 0.006
+version: 0.007

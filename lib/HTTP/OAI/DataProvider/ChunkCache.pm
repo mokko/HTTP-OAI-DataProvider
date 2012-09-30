@@ -1,57 +1,41 @@
 package HTTP::OAI::DataProvider::ChunkCache;
-BEGIN {
-  $HTTP::OAI::DataProvider::ChunkCache::VERSION = '0.006';
+{
+  $HTTP::OAI::DataProvider::ChunkCache::VERSION = '0.007';
 }
-# ABSTRACT: Store request info per resumptionToken
-
 use strict;
 use warnings;
+
+# ABSTRACT: Store request info per resumptionToken
+
+use Moose;
+use namespace::autoclean;
 use Carp qw/carp croak/;
+use HTTP::OAI::DataProvider::ChunkCache::Description;
 
 our $chunkCache = {};
-
-
-
-sub new {
-	my $class = shift;
-	my $self  = {};
-	my %args  = @_;
-
-	if ( $args{maxSize} ) {
-		$self->{maxSize} = $args{maxSize};
-	} else {
-		croak "Need maxSize for cache";
-	}
-
-	bless $self, $class;
-	return $self;
-}
+has 'maxSize' => ( is => 'ro', isa => 'Int', required => '1' );
 
 
 sub add {
-	my $self  = shift;
-	my $chunkDesc = shift;
+	my $self = shift;
+	my $chunkDesc = shift or croak "Need chunkDescription!";    #should be return
 
-	#ensure that necessary info is there
-	#next is option since last chunk has no next
-	foreach (qw /chunkNo maxChunkNo sql targetPrefix total token/) {
-		if ( !$chunkDesc->{$_} ) {
-			croak "$_ missing";
-			$self->error++;
-		}
+	if ( !ref $chunkDesc ) {
+		croak "chunk Description is wrong format!";
 	}
 
-
-	if ($chunkDesc->{maxChunkNo} > $self->{maxSize}) {
+	if ( $chunkDesc->maxChunkNo > $self->maxSize ) {
 		croak "maxChunkNo greater than chunkCache maxSize";
 	}
 
-	if ($self->error) {
-		return 1;
+	#if necessary remove a description from cache
+	my $count   = $self->count();
+	my $overPar = $count + 1 - $self->{maxSize};
+	if ( $overPar > 0 ) {
+		$self->_rmFromCache($overPar);
 	}
 
 	#write into cache
-	$self->_cacheSize();
 	$chunkCache->{ $chunkDesc->{token} } = $chunkDesc;
 }
 
@@ -70,61 +54,27 @@ sub error {
 
 
 sub get {
-	my $self  = shift;
-	my $token = shift;
-
-	if ( !$token ) {
-		$self->{error} = "No token specified when \$cache->get() was called";
-		return ();
-	}
+	my $self = shift;
+	my $token = shift or return;
 
 	if ( !$chunkCache->{$token} ) {
 		$self->{error} = "This token does not exist in cache";
-		return();
+		return;
 	}
 
 	return $chunkCache->{$token};
-
 }
 
 
 sub list {
-	my $self = shift;
 	return ( keys %{$chunkCache} );
-}
-
-
-sub size {
-	my $self = shift;
-	my $size=shift;
-
-	#i am not sure what scalar does
-	if ($size) {
-		$self->{maxSize} = scalar $size;
-	} else {
-		return $self->{maxSize};
-	}
 }
 
 #
 # PRIVATE
 #
 
-#gets called in add
-sub _cacheSize {
-	my $self  = shift;
-	my $count = $self->count();
-
-	#called before we add an item to cache, so we have to add one to the count
-	#overPar: no of items which cache exceeds maxSize, should max be 1
-	my $overPar = $count + 1 - $self->{maxSize};
-	if ( $overPar > 0 ) {
-		$self->_rmFromCache($overPar);
-	}
-}
-
-#gets called in _cacheSize
-sub _rmFromCache {
+sub _rmFromCache {    #gets called in add
 	my $self    = shift;
 	my $overPar = shift;
 
@@ -139,6 +89,7 @@ sub _rmFromCache {
 	}
 }
 
+__PACKAGE__->meta->make_immutable;
 1;
 
 __END__
@@ -150,7 +101,7 @@ HTTP::OAI::DataProvider::ChunkCache - Store request info per resumptionToken
 
 =head1 VERSION
 
-version 0.006
+version 0.007
 
 =head1 SYNOPSIS
 
@@ -159,14 +110,14 @@ version 0.006
 
 	#chunkDesc is description of a chunk as hashref
 	#next is optional. Last token doesn't have a next
-	my $chunkDesc={
+	my $chunkDesc= new HTTP::OAI::DataProvider::ChunkCache::Description(
 		chunkNo=>$chunkNo,
 		maxChunkNo=>$maxChunkNo,
 		[next=>$token,]
 		sql=>$sql,
 		token=>$token,
 		total=>$total,
-	};
+	);
 
 	#add a chunkDesc to cache
 	$cache->add ($chunkDesc) or die $cache->error;
@@ -200,20 +151,10 @@ Returns last error message. Usage example:
 
 =head2 my $chunk=$chunkCache->get($token);
 
-Returns a chunk description as hashref or nothing on error.
+Returns a HTTP::OAI::DataProvider::ChunkCache::Description object or nothing. 
 
-Structure of hashref:
-	$chunk={
-			chunkNo=>$chunkNo,
-			maxChunkNo=>$maxChunkNo,
-			next=>$token,
-			sql=>$sql,
-			targetPrefix=>$prefix,
-			token=>$token,
-			total=>$total
-	};
-
-Of course, it is not a chunk (i.e. results), but the description of a chunk.
+Nothing is return if no token is supplied or when no matching description was
+found.
 
 =head2 my @tokens=$cache->list;
 
@@ -221,17 +162,13 @@ Returns an array of tokens in the cache (in no particular order).
 
 Todo: What do on error?
 
-=head2 my $maxSize=$cache->size;
-
-Gets or sets maximum size of cache.
-
 =head1 AUTHOR
 
 Maurice Mengel <mauricemengel@gmail.com>
 
 =head1 COPYRIGHT AND LICENSE
 
-This software is copyright (c) 2011 by Maurice Mengel.
+This software is copyright (c) 2012 by Maurice Mengel.
 
 This is free software; you can redistribute it and/or modify it under
 the same terms as the Perl 5 programming language system itself.

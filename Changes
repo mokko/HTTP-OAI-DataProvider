@@ -1,3 +1,22 @@
 RELEASE HISTORY
-0.06 with dist::zilla
+$next (0.07) Major Refactoring
+ -all OO packages now have antlers (Moose).
+ Major Interface changes
+ -HTTP::OAI::DataProvider now wants arguments as HASH (instead of HashRef).
+ -requestURL is not a method of DataProvider and not any longer an argument of some verbs!
+ -new interface for error checking: $provider->errorOAI 
+ 		Todo: not properly tested yet...
+ New Tools (command line tools)
+ -dp.pl: a command line interface to HTTP::OAI::DataProvider
+ -webapp.pl: a simple web frontend for manual testing and as demo (using Dancer)
+ -ingest.pl: read an XML file and parse it into the database
+ Tests
+ -some basic tests for almost everything, but still not very thorough.
+ API Changes
+ -new packages DP::Test, DP::Common, DP::Valid; DP::Ingester; 
+  ChunkCache::Description; DP::Interface
+ -config value setLibraryCB is not necessary anymore
+
+0.06 with dist::zilla (version used in production at SALSA_OAI)
+-works, but is a bit buggy and difficult to install
 0.05 with query cache and chunking
