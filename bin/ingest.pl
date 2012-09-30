@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #PODNAME: ingest.pl
-#ABSTRACT: demo the data provider's ingest feature
+# ABSTRACT: demo the data provider's ingest feature
 
 use strict;
 use warnings;

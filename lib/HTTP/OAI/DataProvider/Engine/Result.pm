@@ -1,6 +1,6 @@
 package HTTP::OAI::DataProvider::Engine::Result;
 
-# ABSTRACT: Result object for engine
+#ABSTRACT: Result object for engine
 
 use Moose;
 use namespace::autoclean;

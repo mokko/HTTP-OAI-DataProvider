@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #PODNAME: webapp.pl
-#ABSTRACT: demo of web frontend to HTTP::OAI::DataProvider
+# ABSTRACT: demo of web frontend to HTTP::OAI::DataProvider
 use strict;
 use warnings;
 use FindBin;

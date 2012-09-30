@@ -649,7 +649,7 @@ sub _initDB {
 
 }
 
-=sub method $engine->storeRecord($record);
+=method $engine->storeRecord($record);
 
 store record in db
 

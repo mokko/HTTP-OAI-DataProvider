@@ -1,5 +1,5 @@
 #!/usr/bin/perl
-#APPNAME: dp.pl
+#PODNAME: dp.pl
 #ABSTRACT: command line interface to HTTP::OAI::DataProvider
 
 use strict;

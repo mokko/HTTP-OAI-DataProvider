@@ -108,7 +108,7 @@ sub valPackageName {
 	}
 }
 
-=sub Debug "debug message";
+=func Debug "debug message";
 
 First initialize Debug with codeRef:
 	Debug (sub { my $msg=shift; print "$msg\n" if $msg});
@@ -137,7 +137,7 @@ sub Debug {
 	}
 }
 
-=sub Warning "message";
+=func Warning "message";
 
 Usage analogous to C<Debug>. For details see there.
 

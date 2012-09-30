@@ -31,12 +31,19 @@ has 'requestURL' => ( is => 'rw', isa => 'Str', required => '0' );
 		total=>$total,
 	);
 
-=list
-* chunkNo: unique index of this chunk
-* maxChunkNo: the highest chunk from this request
-* token: token of this chunk
-* next: the token of the next chunk, if any (optional).
-* total: don't remember what this is
+=over 
+
+=item * chunkNo: unique index of this chunk
+
+=item * maxChunkNo: the highest chunk from this request
+
+=item * token: token of this chunk
+
+=item * next: the token of the next chunk, if any (optional).
+
+=item * total: don't remember what this is
+
+=back
 
 =cut
 

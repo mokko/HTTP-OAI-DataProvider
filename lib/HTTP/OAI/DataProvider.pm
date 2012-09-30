@@ -141,7 +141,6 @@ engine you use. All engine parameters are handed down to the engine you use.
 	setLibrary => {
 		'78' => {
 			    'setName' => 'Schellackplatten aus dem Phonogramm-Archiv'
-			  . ' (ursprünglich für DISMARC exportiert)'
 		},
 		'MIMO' =>
 		  { 'setName' => 'Musical Instruments selected for MIMO project' },
