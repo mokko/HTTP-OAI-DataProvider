@@ -1,8 +1,10 @@
 logs/*
 .project
 .#*
+.build
 *~
 blib
+build
 Makefile.PL
 Makefile
 Makefile.old

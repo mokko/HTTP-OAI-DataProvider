@@ -2,8 +2,8 @@ package HTTP::OAI::DataProvider;
 
 # ABSTRACT: A simple OAI data provider
 
-use warnings;
 use strict;
+use warnings;
 use Carp qw/croak carp/;
 use Encode qw(encode_utf8);
 use XML::SAX::Writer;

@@ -1,8 +1,8 @@
 package HTTP::OAI::DataProvider::Engine;
-
-# ABSTRACT: interface between database and data provider
 use strict;
 use warnings;
+
+# ABSTRACT: interface between database and data provider
 use Moose;
 use Moose::Util::TypeConstraints;
 use namespace::autoclean;

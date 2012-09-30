@@ -13,13 +13,13 @@ use XML::LibXML;
 use Pod::Usage;
 use lib File::Spec->catfile( $FindBin::Bin, '..', 'lib' );
 use HTTP::OAI::DataProvider::Ingester;
+use HTTP::OAI::DataProvider::Mapping::MPX;
 use HTTP::OAI::DataProvider::Common qw(
   Debug
   say
   testEnvironment
   Warning
 );
-use HTTP::OAI::DataProvider::Mapping::MPX;
 
 sub verbose;
 sub error;

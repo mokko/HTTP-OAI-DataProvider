@@ -1,9 +1,9 @@
 package HTTP::OAI::DataProvider::ChunkCache;
+use strict;
+use warnings;
 
 # ABSTRACT: Store request info per resumptionToken
 
-use strict;
-use warnings;
 use Moose;
 use namespace::autoclean;
 use Carp qw/carp croak/;

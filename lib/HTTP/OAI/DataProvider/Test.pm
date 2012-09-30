@@ -1,5 +1,5 @@
 package HTTP::OAI::DataProvider::Test;
-
+# ABSTRACT: Testing the data provider
 use strict;
 use warnings;
 use Test::More;
