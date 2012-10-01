@@ -1,0 +1,9 @@
+.build/
+*~
+.project
+HTTP-OAI-DataProvider-*
+bak/
+blib/
+pm_to_blib
+t/environment/db
+logs/
