@@ -7,3 +7,4 @@ blib/
 pm_to_blib
 t/environment/db
 logs/
+weaver.ini
