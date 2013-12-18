@@ -6,7 +6,7 @@ use Test::More tests => 9;
 use HTTP::OAI::DataProvider;
 use HTTP::OAI::DataProvider::Test;
 use XML::LibXML;
-use Test::Xpath;
+use Test::XPath;
 
 #use Data::Dumper qw(Dumper);
 

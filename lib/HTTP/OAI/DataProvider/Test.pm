@@ -3,7 +3,7 @@ package HTTP::OAI::DataProvider::Test;
 use strict;
 use warnings;
 use Test::More;
-use Test::Xpath;
+use Test::XPath;
 use FindBin;
 use XML::LibXML;
 use Carp qw(carp croak);
