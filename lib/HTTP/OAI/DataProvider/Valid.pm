@@ -5,7 +5,8 @@ use strict;
 use warnings;
 use HTTP::OAI::DataProvider::Common qw(isScalar modDir valPackageName);
 use XML::LibXML;
-use File::Spec;
+use Path::Class;
+#use File::Spec;
 use Moose;
 
 =head2 Intro
@@ -24,8 +25,8 @@ sub BUILD {
 	#store xsd in module directory because it extends functionality of package
 
 	my %load = (
-		oaiXsd    => File::Spec->catfile( modDir(), 'OAI-PMH.xsd' ),
-		laxOaiXsd => File::Spec->catfile( modDir(), 'OAI-PMH-lax.xsd' ),
+		oaiXsd    => file ( modDir(), 'OAI-PMH.xsd' ),
+		laxOaiXsd => file ( modDir(), 'OAI-PMH-lax.xsd' ),
 	);
 
 	foreach my $key ( keys %load ) {

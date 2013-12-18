@@ -5,7 +5,7 @@
 use strict;
 use warnings;
 use Test::More tests => 1;
-use File::Spec;
+#use File::Spec;
 use HTTP::OAI::DataProvider::Test;
 use HTTP::OAI::DataProvider::Ingester;
 use HTTP::OAI::DataProvider::Mapping::MPX;
@@ -49,6 +49,6 @@ else {
 		source  => $target,
 		mapping => \&HTTP::OAI::DataProvider::Mapping::MPX::extractRecords
 	) or die "Can't digest!";
-	ok( $ret, " import of $target seems to have worked( returned true ) " );
+	ok( $ret, "import of $target seems to have worked(returned true)");
 
 }

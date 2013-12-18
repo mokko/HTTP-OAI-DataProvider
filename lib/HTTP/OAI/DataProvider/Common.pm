@@ -7,8 +7,9 @@ use warnings;
 use Scalar::Util;
 use Carp qw(carp croak);
 use Cwd qw(realpath);
-use File::Spec;
+
 use FindBin;
+use Path::Class;
 
 use base 'Exporter';
 our @EXPORT_OK;
@@ -53,15 +54,27 @@ sub modDir {
 }
 
 #load this once when the module is loaded
-sub _modDir {
-	my $_modDir = __FILE__;
-	$_modDir =~ s,\.pm$,,;
-	$_modDir = realpath( File::Spec->catfile( $_modDir, '..' ) );
+##sub _modDir {
+#	my $_modDir = __FILE__;
+#	$_modDir =~ s,\.pm$,,;
+#	$_modDir = realpath( File::Spec->catfile( $_modDir, '..' ) );
+#
+#	if ( !-d $_modDir ) {
+#		carp "modDir does not exist! ($_modDir)";
+#	}
+#	$modDir = $_modDir;
+#}
 
-	if ( !-d $_modDir ) {
-		carp "modDir does not exist! ($_modDir)";
-	}
-	$modDir = $_modDir;
+=method my $modDir=$self->_modDir || die self->error;  
+
+returns absolute path of module's directory or error. 
+	
+Carps on failure.
+
+=cut
+
+sub _modDir {
+	return file(__FILE__)->parent;
 }
 
 =func isScalar ($variable);
@@ -173,20 +186,18 @@ If $signal is 'config' and $attach is added, $attach is ignored.
 =cut
 
 sub testEnvironment {
-	my $arg    = shift;
-	my $dir    = File::Spec->catfile( $FindBin::Bin, '..', 't', 'environment' );
-	my $return = $dir;
+	my $arg = shift;
+	my $dir = file($FindBin::Bin);
+	$dir = dir( $dir->parent, 't', 'environment' );
 
 	if ( $arg eq 'config' ) {
-		return File::Spec->catfile( $dir, 'config.pl' );
+		return file( $dir, 'config.pl' );
 	}
 
 	if (@_) {
-		foreach my $item (@_) {
-			$return = File::Spec->catfile( $return, $item );
-		}
+		$dir = file( $dir, @_ );
 	}
-	return $return;
+	return $dir;
 }
 
 1;
