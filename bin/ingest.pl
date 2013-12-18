@@ -8,10 +8,10 @@ use Getopt::Long;
 use Carp 'confess';
 
 use FindBin;
-use File::Spec;
+#use File::Spec;
 use XML::LibXML;
 use Pod::Usage;
-use lib File::Spec->catfile( $FindBin::Bin, '..', 'lib' );
+#use lib File::Spec->catfile( $FindBin::Bin, '..', 'lib' );
 use HTTP::OAI::DataProvider::Ingester;
 use HTTP::OAI::DataProvider::Mapping::MPX;
 use HTTP::OAI::DataProvider::Common qw(
