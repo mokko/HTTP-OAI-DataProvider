@@ -1,13 +1,13 @@
 #!/usr/bin/perl
 #PODNAME: ingest.pl
-# ABSTRACT: demo the data provider's ingest feature
+#ABSTRACT: demo the data provider's ingest feature
 
 use strict;
 use warnings;
 use Getopt::Long;
 use Carp 'confess';
 
-use FindBin;
+#use FindBin;
 #use File::Spec;
 use XML::LibXML;
 use Pod::Usage;
