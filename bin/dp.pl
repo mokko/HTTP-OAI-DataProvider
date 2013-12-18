@@ -6,12 +6,12 @@ use strict;
 use warnings;
 
 use Getopt::Long;
-use FindBin;
-use File::Spec;
+#use FindBin;
+#use Path::Class;
 
 #should make allow this script to the find the packages before install, like
 #perl -Ilib bin/dp.pl
-use lib File::Spec->catfile( $FindBin::Bin, '..', 'lib' );
+#use lib File::Spec->catfile( $FindBin::Bin, '..', 'lib' );
 use HTTP::OAI;
 use HTTP::OAI::DataProvider;
 use HTTP::OAI::DataProvider::Common;
