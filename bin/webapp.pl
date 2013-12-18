@@ -5,30 +5,33 @@ use strict;
 use warnings;
 use FindBin;
 use Dancer;
-use File::Spec;
+use Path::Class;
+
 #so you don't have to type 'perl -Ilib bin/webapp.pl'
-use lib File::Spec->catfile($FindBin::Bin,'..','lib');
+#use lib dir(())->parent),'lib');
+#use lib dir(dir($FindBin::Bin)->parent,'lib');
 use HTTP::OAI::DataProvider;
 use HTTP::OAI::DataProvider::Test;
 
-my $rootdir=File::Spec->catfile($FindBin::Bin,'..','t','environment');
-my %config   = loadWorkingTestConfig();
+my $rootdir = dir( dir($FindBin::Bin)->parent, 't', 'environment' );
+my %config  = loadWorkingTestConfig();
 
 #use Dancer's debug and warning irrespective of the test configuration
-$config{debug}=\&Dancer::debug;
-$config{warning}=\&Dancer::warning;
+$config{debug}   = \&Dancer::debug;
+$config{warning} = \&Dancer::warning;
 
-set logger => 'console';
-setting public => File::Spec->catfile($rootdir,'public'); #for oai2.xsl
+set logger     => 'console';
+setting public => dir( $rootdir, 'public' );    #for oai2.xsl
 
-my $provider = new HTTP::OAI::DataProvider(%config) or die "Cant create provider!";
+my $provider = new HTTP::OAI::DataProvider(%config)
+  or die "Cant create provider!";
 
 any [ 'get', 'post' ] => '/' => sub {
-	content_type 'text/xml'; #to make browser use oai2.xsl
-	my $params=params();
-	my $verb =delete $params->{verb};
-	return $provider->$verb(%{$params});
-};
+	  content_type 'text/xml';                  #to make browser use oai2.xsl
+	  my $params = params();
+	  my $verb   = delete $params->{verb};
+	  return $provider->$verb( %{$params} );
+  };
 
 dance;
 
