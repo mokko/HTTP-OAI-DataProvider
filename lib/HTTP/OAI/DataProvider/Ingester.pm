@@ -16,8 +16,10 @@ has 'dbfile'       => ( isa => 'Str', is => 'ro', required => 1 );
 
 	use HTTP::OAI::DataProvider::Ingester;
 	my $mouth=new HTTP::OAI::DataProvider::Ingester (
-		engine=>'OAI::DP::SQLite', 
-		engineOpts=$hashRef,
+		engine     => 'OAI::DP::SQLite', 
+		nativePrefix => $natPrefix,
+		nativeURI=>$natURI,
+		dbfile=>$dbfile,
 	);
 	#ingester internally calls new OAI::DP::SQlite (%dbOpts);
 	$ingester->digest($file,$mapping);
