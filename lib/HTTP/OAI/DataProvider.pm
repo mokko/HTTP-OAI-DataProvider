@@ -649,7 +649,7 @@ sub err2XML {
 	}
 
 	#$response=$self->overwriteRequestURL($response);
-	$self->overwriteRequestURL($response);
+	$self->_overwriteRequestURL($response);
 	$self->_init_xslt($response);
 	return $response->toDOM->toString;
 
@@ -702,7 +702,7 @@ sub _output {
 	  or croak "No response";    #a HTTP::OAI::Response object
 
 	$self->_init_xslt($response);    #response is a HTTP::OAI::$verb object
-	$response = $self->overwriteRequestURL($response);
+	$response = $self->_overwriteRequestURL($response);
 
 	#alternative output
 	#return encode_utf8($response->toDOM->toString);
@@ -715,56 +715,35 @@ sub _output {
 #as per https://groups.google.com/forum/?fromgroups#!topic/psgi-plack/J0IiUanfgeU
 }
 
-=method $obj= $self->overwriteRequestURL($obj)
+=method $obj= $self->_overwriteRequestURL($obj)
 
-If $provider->{requestURL} exists take that value and overwrite the requestURL
-in the responseURL. requestURL specified in this module consists only of
-	http://blablabla.com:8080
+If $provider->{requestURL} exists take that value and overwrite the 
+$response->requestURL with it. All params following the question mark are 
+preserved.
 
-All params following the question mark are preserved.
-
-I use this to correct the url of data provider which is hosted on two different 
-server. One hosts the perl webapp and the other one caches the app for the 
-public.
+In case you do not want the real url of the data provider, but that of cache 
+etc.
 
 =cut
 
-sub overwriteRequestURL {
+sub _overwriteRequestURL {
 	my $self = shift or croak "Need myself";
 	my $response = shift
 	  or croak "Need response";    #e.g. HTTP::OAI::ListRecord
 
+	#if no requestURL specified don't change anything
 	return $response if ( !$self->requestURL );
 
-	#replace part before question mark
-	if ( $response->requestURL =~ /\?/ ) {
-
-		my @f = split( /\?/, $response->requestURL, 2 );
-		if ( $f[1] ) {
-			my $new = $self->requestURL . '?' . $f[1];
-
-			#very dirty
-			if ( $new =~ /verb=/ ) {
-
-				#why? untested
-				$self->{engine}->{chunkRequest}->{_requestURI} = $new;
-			}
-			else {
-
-				#why? untested
-				$new = $self->{engine}->{chunkRequest}->{_requestURI};
-			}
-
-			$response->requestURL($new);
-			return $response;
-
-			#Debug "overwriteRequestURL: "
-			#  . $response->requestURL . '->'
-			#  . $new;
-		}
-	}
-	else {    #requestURL has no ? in case of an badVerb
+	#return with new URL if no params
+	if ( !$response->requestURL =~ /\?/ ) {
 		$response->requestURL( $self->requestURL );
+		return $response;
+	}
+
+	my @f = split( /\?/, $response->requestURL, 2 );
+	if ( $f[1] ) {
+		my $new = $self->requestURL . '?' . $f[1];
+		$response->requestURL($new);
 	}
 	return $response;
 }

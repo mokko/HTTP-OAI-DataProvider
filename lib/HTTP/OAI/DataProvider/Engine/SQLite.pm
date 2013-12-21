@@ -4,7 +4,6 @@ package HTTP::OAI::DataProvider::Engine::SQLite;
 
 use warnings;
 use strict;
-
 use Moose::Role;
 
 #use namespace::autoclean;
@@ -264,7 +263,7 @@ sub granularity {
 =head2	$header=$engine->findByIdentifier($identifier)
 	Finds and return a specific header (HTTP::OAI::Header) by identifier.
 
-	If no header with this identifier found, this method returns nothing. 
+	If no header with this identifier found, nothing is returned. 
 
 =cut
 
@@ -297,7 +296,7 @@ sub findByIdentifier {
 	if ( $aref->[0] ) {
 		my $h = new HTTP::OAI::Header(
 			identifier => $identifier,
-			datestamp  => $aref->[0]
+			datestamp  => $aref->[0],
 		);
 
 		#TODO $h->status=$aref->[1];
@@ -625,7 +624,8 @@ sub _initDB {
 		return;
 	}
 
-	$dbh->do("PRAGMA foreign_keys");
+	#not sure about foreign keys
+	$dbh->do("PRAGMA foreign_keys = OFF");
 
 	#doesn't seem to make a big difference; default is 2000
 	$dbh->do("PRAGMA cache_size = 8000");
