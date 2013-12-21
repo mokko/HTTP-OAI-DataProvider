@@ -18,7 +18,6 @@ use HTTP::OAI::DataProvider::Engine;
 use HTTP::OAI::DataProvider::SetLibrary;
 use HTTP::OAI::DataProvider::Common qw/Debug Warning say/;
 
-#use Data::Dumper qw/Dumper/; #for debugging
 
 subtype 'identifyType', as 'HashRef', where {
 	     defined $_->{adminEmail}
@@ -217,6 +216,8 @@ sub GetRecord {
 
 	# Metadata handling
 	my $response = $engine->query( \%params );    #todo
+	#print "response's requestURL".$response->requestURL."\n";
+	#print "self's requestURL".$self->requestURL."\n";
 	return $self->_output($response);
 }
 
@@ -700,7 +701,6 @@ sub _output {
 	my $self     = shift;
 	my $response = shift
 	  or croak "No response";    #a HTTP::OAI::Response object
-
 	$self->_init_xslt($response);    #response is a HTTP::OAI::$verb object
 	$response = $self->_overwriteRequestURL($response);
 

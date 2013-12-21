@@ -54,7 +54,7 @@ HTTP::OAI::DataProvider::Engine consumes
  HTTP::OAI::DataProvider::Engine::SQLite consumes
   HTTP::OAI::DataProvider::Engine::Interface
 
-=method my $cache=HTTP::OAI::DataRepository::SQLite::new (@args);
+=method my $cache=HTTP::OAI::DataProvider::Engine::SQLite->new (@args);
 
 TODO: params
 
@@ -79,7 +79,7 @@ sub queryChunk {
 
 	#print "chunkDesc->chunkNo".$chunkDesc->chunkNo."\n";
 	#print "recordsPerChunk".$self->{chunkCache}{recordsPerChunk}."\n";
-	#Debug "Enter queryChunk";
+	Debug "Enter queryChunk";
 
 	my %opts = (
 		transformer => $self->{transformer},
@@ -104,9 +104,15 @@ sub queryChunk {
 	}
 
 	my $result = new HTTP::OAI::DataProvider::Engine::Result(%opts);
-	if ( $self->requestURL ) {
-		$result->requestURL = $self->requestURL;
-	}
+
+	#should copy all of the requestURL
+	
+	#	use Data::Dumper qw/Dumper/; #for debugging
+	#print 'ddddddddddddddddddddddddddddddddd'.Dumper $params;
+	
+	#if ( $self->requestURL ) {
+	#	$result->requestURL = $self->requestURL;
+	#}
 
 	#SQL
 	my $dbh = $self->{connection}->dbh()       or croak $DBI::errstr;
