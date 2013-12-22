@@ -11,7 +11,7 @@ use Test::XPath;
 #use Data::Dumper qw(Dumper);
 
 # new is taken for granted
-my %config   = HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
+my %config = HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
 
 #use Data::Dumper qw(Dumper);
 #print Dumper (%config);
@@ -22,9 +22,7 @@ my $provider = new HTTP::OAI::DataProvider(%config);
 # execute verb: test if things work
 #
 my $response = $provider->Identify();    #response should be a xml string
-#print $response;
 okIdentify($response);
-
 
 #
 # 1- check config values from test_config
@@ -41,7 +39,11 @@ my $from_config_test = {
 my $xt = xpathTester($response);
 
 foreach my $key ( keys %{$from_config_test} ) {
-	$xt->is( $from_config_test->{$key}, $config{identify}{$key}, "$key correct" );
+	$xt->is(
+		$from_config_test->{$key},
+		$config{identify}{$key},
+		"$key correct"
+	);
 }
 
 #
@@ -74,7 +76,7 @@ foreach my $key ( keys %{$expected} ) {
 {
 	my $response;
 	$response = $provider->Identify( bla => 'meschugge' );
-	isOAIerror($response, 'badArgument');
+	ok( $response =~ /badArgument/, 'right error' );
 }
 
 #

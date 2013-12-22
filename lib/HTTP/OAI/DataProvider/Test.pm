@@ -182,6 +182,7 @@ sub isOAIerror {
 	isScalar($code);
 	
 	my @errors = qw (
+	  badVerb
 	  badArgument
 	  badResumptionToken
 	  cannotDisseminateFormat
@@ -194,7 +195,7 @@ sub isOAIerror {
 		print "Unrecognized OAI error code ($code)\n";
 	}
 
-	my $dom = _response2dom($response);
+	my $dom = _response2dom($response) or die "no dom!";
 	_failValidationError($dom);
 	my $oaiError = _failNoOAIerror($dom);
 

@@ -71,7 +71,10 @@ my $baseURL = 'http://localhost:3000/oai';
 	);
 	my $response = $provider->GetRecord(%params);
 	isOAIerror( $response, 'idDoesNotExist' );
-	$response = $provider->OAIerror;
+	if ($provider->OAIerrors->errors){
+		my $response=$provider->_output($response);
+	}
+	#print "........$response\n";
 	isOAIerror( $response, 'idDoesNotExist' );
 }
 
@@ -85,7 +88,7 @@ my $baseURL = 'http://localhost:3000/oai';
 	#print Dumper ($response);
 	isOAIerror( $response, 'cannotDisseminateFormat' );
 	#check if OAIerror message is persistent
-	$response = $provider->OAIerror;
+	#$response = $provider->_output($provider->OAIerrors);
 	isOAIerror( $response, 'cannotDisseminateFormat' );
 }
 

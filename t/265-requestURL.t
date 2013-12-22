@@ -45,11 +45,12 @@ my $codeRef = sub {
 		$provider->requestURL($url);
 		my $response = $provider->$verb( %{$params} );
 
-		if ( $provider->error ) {
-			die "provider error:" . $provider->error;
+		if ( $provider->OAIerrors->errors ) {
+			die "provider error:" . $provider->OAIerrors;
 		}
 		fail "oaiError where there should be none" if oaiErrorResponse($response);
 
+		print $response;
 		my $xt = xpathTester($response);
 		$xt->is( $xpath, $url, "expect $url" );
 	}

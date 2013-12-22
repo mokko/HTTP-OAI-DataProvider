@@ -1,6 +1,6 @@
 #!perl
 
-use Test::More tests => 14;
+use Test::More tests => 11;
 use HTTP::OAI::DataProvider;
 use HTTP::OAI::DataProvider::Test;
 use HTTP::OAI::Repository qw(validate_request);
@@ -59,7 +59,7 @@ my $provider = new HTTP::OAI::DataProvider(loadWorkingTestConfig);
 	validateRequest(%params);
 
 	my $response = $provider->ListIdentifiers(%params)
-	  or die $provider->error;
+	  or die $provider->OAIerror;
 	okListIdentifiers( $response, 'with from' );
 }
 {
@@ -73,7 +73,7 @@ my $provider = new HTTP::OAI::DataProvider(loadWorkingTestConfig);
 	validateRequest(%params);
 
 	my $response = $provider->ListIdentifiers(%params)
-	  or die $provider->error;
+	  or die $provider->OAIerror;
 	okListIdentifiers( $response, 'with until' );
 }
 {
@@ -109,8 +109,10 @@ my $provider = new HTTP::OAI::DataProvider(loadWorkingTestConfig);
 }
 
 {
-	my $response = $provider->OAIerror;
-	isOAIerror( $response, 'cannotDisseminateFormat' );
+	my $response = $provider->OAIerrors;
+	if ($provider->OAIerrors->errors){
+		isOAIerror( $response, 'cannotDisseminateFormat' );
+	}
 }
 
 {
@@ -133,8 +135,7 @@ my $provider = new HTTP::OAI::DataProvider(loadWorkingTestConfig);
 
 	#validateRequest(%params);
 	my $response = $provider->ListIdentifiers(%params);
-	die "that wasn't supposed to happen" if ($response);
-	$response = $provider->error;
+	#print "$response\n";
 	isOAIerror( $response, 'noRecordsMatch' );
 }
 
@@ -151,8 +152,10 @@ my $provider = new HTTP::OAI::DataProvider(loadWorkingTestConfig);
 	my $response = $provider->ListIdentifiers(%params);
 
 	isOAIerror( $response, 'badArgument' );
-	$response = $provider->OAIerror;
-	isOAIerror( $response, 'badArgument' );
+	if ($provider->OAIerrors->errors){
+		$response = $provider->OAIerrors;
+		isOAIerror( $response, 'badArgument' );
+	}
 }
 
 {
@@ -160,8 +163,10 @@ my $provider = new HTTP::OAI::DataProvider(loadWorkingTestConfig);
 
 	my $response = $provider->ListIdentifiers(%params);
 	isOAIerror( $response, 'badArgument' );
-	$response = $provider->OAIerror;
-	isOAIerror( $response, 'badArgument' );
+	if ($provider->OAIerrors->errors){
+		$response = $provider->OAIerrors;
+		isOAIerror( $response, 'badArgument' );
+	}
 }
 
 #TODO: noSetHierarchy

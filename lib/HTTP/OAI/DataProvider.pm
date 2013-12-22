@@ -13,7 +13,7 @@ use Moose::Util::TypeConstraints;
 use namespace::autoclean;
 
 use HTTP::OAI;
-use HTTP::OAI::Repository qw/validate_request/;
+use HTTP::OAI::Repository 'validate_request';
 use HTTP::OAI::DataProvider::Engine;
 use HTTP::OAI::DataProvider::SetLibrary;
 use HTTP::OAI::DataProvider::Common qw/Debug Warning say/;
@@ -31,7 +31,7 @@ use HTTP::OAI::DataProvider::Common qw/Debug Warning say/;
 	#verbs or an error. 
 
 	#New Error Checking 
-	if ($provider->OAIerrors->is_error) {
+	if ($provider->OAIerrors->errors) {
 		debug $self->_output($provider->OAIerror);
 	}
 
@@ -165,7 +165,9 @@ has 'OAIerrors'  => (
 	is       => 'rw',
 	required => 0,
 	init_arg => undef,
-	default  => sub { HTTP::OAI::Response->new() }
+
+	#no requestURL no responseDate
+	default => sub { HTTP::OAI::Response->new() }
 );
 
 sub BUILD {
@@ -175,6 +177,13 @@ sub BUILD {
 	Warning( $self->warning ) if ( $self->warning );
 
 	$self->{Engine} = new HTTP::OAI::DataProvider::Engine( %{ $self->engine } );
+
+	if ( $self->requestURL ) {
+
+		#what about responseDate? TODO
+		$self->OAIerrors->requestURL( $self->requestURL );
+	}
+
 }
 
 =method my $result=$provider->GetRecord(%params);
@@ -213,7 +222,7 @@ sub GetRecord {
 
 	$self->checkFormatSupported( $params{metadataPrefix} );
 
-	if ( $self->OAIerrors->is_error ) {
+	if ( $self->OAIerrors->errors ) {
 		return $self->_output( $self->OAIerrors );
 	}
 
@@ -234,11 +243,22 @@ granularity).
 =cut
 
 sub Identify {
-	my $self   = shift;
-	my %params = @_
-	  or ();    #dont croak here, prefer propper OAI error
+	my $self     = shift;
+	my %params   = @_ or ();          #dont croak here, prefer propper OAI error
 	my $identify = $self->identify;
 	$params{verb} = 'Identify';
+
+#	if ( $self->_validateRequest(%params) ) {
+#		print "validate says all good!\n";
+#	}
+#	else {
+#		print "validate says request is not ok\n";
+#		print 'response'.$self->OAIerrors."\n";
+#		print "string".$self->_output( $self->OAIerrors )."\n";
+#		
+#		return $self->_output( $self->OAIerrors );
+#	}
+
 	$self->_validateRequest(%params)
 	  or return $self->_output( $self->OAIerrors );
 
@@ -297,7 +317,7 @@ sub ListMetadataFormats {
 	#
 	$self->_validateRequest(%params)
 	  or return $self->_output( $self->OAIerrors );
-
+	
 	#only if there is actually an identifier
 	if ( $params{identifier} ) {
 		my $header = $engine->findByIdentifier( $params{identifier} );
@@ -306,9 +326,8 @@ sub ListMetadataFormats {
 				new HTTP::OAI::Error( code => 'idDoesNotExist' ) );
 		}
 	}
-
 	#Metadata Handling
-	my $list = new HTTP::OAI::ListMetadataFormats;
+	my $list = HTTP::OAI::ListMetadataFormats->new();
 	foreach my $prefix ( keys %{ $self->{globalFormats} } ) {
 
 		#print "prefix:$prefix\n";
@@ -331,7 +350,7 @@ sub ListMetadataFormats {
 			new HTTP::OAI::Error( code => 'noMetadataFormats' ) );
 	}
 
-	if ( $self->OAIerrors->is_error ) {
+	if ( $self->OAIerrors->errors ) {
 		return $self->_output( $self->OAIerrors );
 	}
 	return $self->_output($list);    #success
@@ -421,7 +440,7 @@ sub ListIdentifiers {
 			new HTTP::OAI::Error( code => 'noRecordsMatch' ) );
 	}
 
-	if ( $self->OAIerrors->is_error ) {
+	if ( $self->OAIerrors->errors ) {
 		return $self->_output( $self->OAIerrors );
 	}
 
@@ -490,7 +509,7 @@ sub ListRecords {
 
 	$self->checkFormatSupported( $params{metadataPrefix} );
 
-	if ( $self->OAIerrors->is_error ) {
+	if ( $self->OAIerrors->errors ) {
 		return $self->_output( $self->OAIerrors );
 	}
 
@@ -597,7 +616,7 @@ Expects a prefix for a metadataPrefix (as scalar). If it can't be disseminated
 an error is raised in $self->OAIerrors
 
 	$self->checkFormatSupported( $params->{metadataPrefix} )
-	if ($self->OAIerror->is_error) {
+	if ($self->OAIerror->errors) { 		#errors is kind a like is_error
 		#do something
 	}
 
@@ -626,15 +645,25 @@ sub _output {
 	$self->_init_xslt($response);    #response is a HTTP::OAI::$verb object
 	$response = $self->_overwriteRequestURL($response);
 
-	#alternative output
-	#return encode_utf8($response->toDOM->toString);
-	#there is some error here
 	my $xml;
 	$response->set_handler( XML::SAX::Writer->new( Output => \$xml ) );
 	$response->generate;
+
+	#reset the OAIerror for next time
+	$self->OAIerrors(HTTP::OAI::Response->new());
+
 	return encode_utf8($xml);
 
 #as per https://groups.google.com/forum/?fromgroups#!topic/psgi-plack/J0IiUanfgeU
+}
+
+sub _outputAlt {
+	my $self     = shift;
+	my $response = shift
+	  or croak "No response";        #a HTTP::OAI::Response object
+	$self->_init_xslt($response);    #response is a HTTP::OAI::$verb object
+	$response = $self->_overwriteRequestURL($response);
+	return encode_utf8( $response->toDOM->toString );
 }
 
 =method $obj= $self->_overwriteRequestURL($obj)
@@ -719,14 +748,19 @@ params does not include a verb.
 
 sub _validateRequest {
 	my $self = shift or croak "Need myself!";
-	my %params = @_
-	  or ();    #dont croak here, prefer propper OAI error
-
+	my %params = @_ or ();    #dont croak here, prefer propper OAI error
+	my $e = 0;
 	foreach my $err ( validate_request(%params) ) {
-		$self->OAIerrors->errors($err);
+		$self->OAIerrors->errors($err);    #adds to OAI error lost
+		$e++; 
+		die "Problem with err: $err" if ( ref $err ne 'HTTP::OAI::Error' );
 	}
-	return if $self->OAIerrors->is_error;
-	return 1;    #no validation error (success)
+
+	#avoid HTTP::OAI::Response::is_error makes trouble
+	if ( $e > 0 ) {
+		return;                            # return empty on error
+	}
+	return 1;    #my validateRequest returns 1 on success (no validation error)
 }
 
 sub _processSetLibrary {
