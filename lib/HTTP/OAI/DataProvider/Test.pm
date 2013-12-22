@@ -275,7 +275,7 @@ sub oaiErrorResponse {
 Most of the time you want oaiErrorResponse instead of this one. Still trying to
 figure out if this function should be internal.
 
-Returns nothing if no response is not an error. If the response is erroneous, 
+Returns nothing if response is not an error. If the response is erroneous, 
 returns a hashref with one or more errors.
 
 	$hashref->{code}->{description};

@@ -4,27 +4,31 @@ use Test::More tests => 2;
 use HTTP::OAI::DataProvider;
 use HTTP::OAI::DataProvider::Test;
 use HTTP::OAI;
+
 #use XML::LibXML;
 
 my %config   = HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
 my $provider = new HTTP::OAI::DataProvider(%config);
+
 #TODO: could be XPATH test...
+#I could also test the HTTP::OAI::Response or the HTTP::OAI::Error object  
 {
-	my $response =
-	  $provider->err2XML( new HTTP::OAI::Error( code => 'badArgument' ) );
-	ok( $response =~ /badArgument/, 'response has one error' );
+	$provider->OAIerrors->errors(
+		new HTTP::OAI::Error( code => 'badArgument' ) );
+	my $str = $provider->_output( $provider->OAIerrors );
+	ok( $str =~ /badArgument/, 'response has one error' );
 }
 
 {
-	my $response = $provider->err2XML(
-		new HTTP::OAI::Error( code => 'badArgument' ),
-		new HTTP::OAI::Error( code => 'cannotDisseminate' )
-	);
-	ok(
-		$response =~ /cannotDisseminate/
-		  && $response =~ /badArgument/,
-		'response has two errors'
-	);
+	$provider->OAIerrors->errors(
+		new HTTP::OAI::Error( code => 'badArgument' ) );
+	$provider->OAIerrors->errors(
+		new HTTP::OAI::Error( code => 'cannotDisseminate' ) );
+	my $response = $provider->OAIerrors;
+	my $str      = $provider->_output($response);
+
+	ok( ( $str =~ /cannotDisseminate/ && $str =~ /badArgument/ ),
+		'response has two errors' );
 }
 
 =head2 OAI Errors

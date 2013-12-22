@@ -171,7 +171,7 @@ ok( $engine->granularity eq 'YYYY-MM-DDThh:mm:ssZ', 'granularity looks good' );
 #print $engine->earliestDate()."\n";
 
 #if you import new data in the test database you may have to adjust that date...
-ok( $engine->earliestDate() eq '2011-09-29T19:18:52Z',
+ok( $engine->earliestDate() eq '2011-02-15T10:03:46Z',
 	'earliestDate looks good' );
 
 ###
