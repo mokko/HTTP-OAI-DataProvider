@@ -4,7 +4,7 @@ use Test::More;
 use HTTP::OAI::DataProvider;
 use HTTP::OAI::DataProvider::Test
   qw/isLMFprefix okListMetadataFormats xpathTester isOAIerror/;
-use Test::Xpath;
+use Test::XPath;
 use XML::LibXML;
 
 # new is taken for granted
