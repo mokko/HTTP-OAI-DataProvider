@@ -38,21 +38,26 @@ plan tests => @sequence * 2 + 3; #put number of tests as early as possible
 my $newURL = 'http://somethingelse.com';
 my $oldURL = 'http://localhost';
 
+
+#testing if requestURL can be changed
+
 my $codeRef = sub {
 	my ( $provider, $verb, $params ) = @_;
 
 	foreach my $url ( $oldURL, $newURL ) {
 		$provider->requestURL($url);
+		#$provider->_overwriteRequestURL($url);
+		
 		my $response = $provider->$verb( %{$params} );
 
 		if ( $provider->OAIerrors->errors ) {
 			die "provider error:" . $provider->OAIerrors;
+			#fail "oaiError where there should be none";
 		}
-		fail "oaiError where there should be none" if oaiErrorResponse($response);
 
-		print $response;
 		my $xt = xpathTester($response);
-		$xt->is( $xpath, $url, "expect $url" );
+		#print "$response\n";
+		$xt->is( $xpath, $url, "$verb" );
 	}
 
 };

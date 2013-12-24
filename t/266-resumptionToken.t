@@ -41,7 +41,7 @@ my $codeRef = sub {
 	my ( $provider, $verb, $params ) = @_;
 	my $result=$provider->$verb(%{$params});
 	
-	if ($provider->OAIerror) {
+	if ($provider->OAIerrors->errors) {
 		die "error";
 	}
 	

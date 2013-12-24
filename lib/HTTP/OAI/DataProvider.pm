@@ -248,17 +248,6 @@ sub Identify {
 	my $identify = $self->identify;
 	$params{verb} = 'Identify';
 
-#	if ( $self->_validateRequest(%params) ) {
-#		print "validate says all good!\n";
-#	}
-#	else {
-#		print "validate says request is not ok\n";
-#		print 'response'.$self->OAIerrors."\n";
-#		print "string".$self->_output( $self->OAIerrors )."\n";
-#		
-#		return $self->_output( $self->OAIerrors );
-#	}
-
 	$self->_validateRequest(%params)
 	  or return $self->_output( $self->OAIerrors );
 
@@ -643,7 +632,7 @@ sub _output {
 	my $response = shift
 	  or croak "No response";        #a HTTP::OAI::Response object
 	$self->_init_xslt($response);    #response is a HTTP::OAI::$verb object
-	$response = $self->_overwriteRequestURL($response);
+	$response = $self->_transferRURL($response);
 
 	my $xml;
 	$response->set_handler( XML::SAX::Writer->new( Output => \$xml ) );
@@ -662,40 +651,44 @@ sub _outputAlt {
 	my $response = shift
 	  or croak "No response";        #a HTTP::OAI::Response object
 	$self->_init_xslt($response);    #response is a HTTP::OAI::$verb object
-	$response = $self->_overwriteRequestURL($response);
+	$response = $self->_transferRURL($response);
 	return encode_utf8( $response->toDOM->toString );
 }
 
-=method $obj= $self->_overwriteRequestURL($obj)
+=method $obj= $self->_transferRURL($response)
 
-If $provider->{requestURL} exists take that value and overwrite the 
-$response->requestURL with it. All params following the question mark are 
-preserved.
+Transfers the requestURL from the provider (where it might have changed in the
+meantime) to the response.
 
-This allows you to replace the real url of your data provider with another URL, 
-e.g. your cache.
+N.B. Currently it preserves the params of the response's RURL. I am not sure 
+that there ever are some.
 
 =cut
 
-sub _overwriteRequestURL {
+sub _transferRURL {
 	my $self = shift or croak "Need myself";
 	my $response = shift
 	  or croak "Need response";    #e.g. HTTP::OAI::ListRecord
 
-	#if no requestURL specified don't change anything
-	return $response if ( !$self->requestURL );
+	#print "tRANSfer: current RURL of response:".$response->requestURL."\n";
+	#print "tRANSfer: current RURL of provider:".$self->requestURL."\n";
 
-	#return with new URL if no params
-	if ( !$response->requestURL =~ /\?/ ) {
+	#if provider has no requestURL, don't change anything
+	return $response if ( !$self->requestURL );
+	
+	#if response has no parameters, replace with provider's RURL
+	if ( !($response->requestURL =~ /\?/) ) {
 		$response->requestURL( $self->requestURL );
 		return $response;
 	}
 
+	#2 is the right limit for 2 parts
 	my @f = split( /\?/, $response->requestURL, 2 );
 	if ( $f[1] ) {
 		my $new = $self->requestURL . '?' . $f[1];
 		$response->requestURL($new);
 	}
+	#print "NEW-fer: current RURL of response:".$response->requestURL."\n";
 	return $response;
 }
 
