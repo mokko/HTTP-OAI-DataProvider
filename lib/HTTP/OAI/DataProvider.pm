@@ -166,7 +166,7 @@ has 'OAIerrors'  => (
 	required => 0,
 	init_arg => undef,
 
-	#no requestURL no responseDate
+	#OAIerrors has no requestURL & no responseDate
 	default => sub { HTTP::OAI::Response->new() }
 );
 
@@ -177,13 +177,6 @@ sub BUILD {
 	Warning( $self->warning ) if ( $self->warning );
 
 	$self->{Engine} = new HTTP::OAI::DataProvider::Engine( %{ $self->engine } );
-
-	if ( $self->requestURL ) {
-
-		#what about responseDate? TODO
-		$self->OAIerrors->requestURL( $self->requestURL );
-	}
-
 }
 
 =method my $result=$provider->GetRecord(%params);
@@ -306,7 +299,7 @@ sub ListMetadataFormats {
 	#
 	$self->_validateRequest(%params)
 	  or return $self->_output( $self->OAIerrors );
-	
+
 	#only if there is actually an identifier
 	if ( $params{identifier} ) {
 		my $header = $engine->findByIdentifier( $params{identifier} );
@@ -315,6 +308,7 @@ sub ListMetadataFormats {
 				new HTTP::OAI::Error( code => 'idDoesNotExist' ) );
 		}
 	}
+
 	#Metadata Handling
 	my $list = HTTP::OAI::ListMetadataFormats->new();
 	foreach my $prefix ( keys %{ $self->{globalFormats} } ) {
@@ -326,12 +320,6 @@ sub ListMetadataFormats {
 		$format->metadataNamespace( $self->{globalFormats}{$prefix}{ns_uri} );
 		$list->metadataFormat($format);
 	}
-
-	#ListMetadataFormat has requestURL info, so recreate it
-	#mk sure we don' t lose requestURL in Starman
-	#if ( $self->requestURL ) {
-	#	$list->requestURL( $self->requestURL );
-	#}
 
 	#check if noMetadataFormats
 	if ( $list->metadataFormat() == 0 ) {
@@ -504,7 +492,7 @@ sub ListRecords {
 
 	# Metadata handling
 
-	my $response = $engine->query( \%params, $self->requestURL );    #todo!
+	my $response = $engine->query( \%params );    #todo!
 
 	if ( !$response ) {
 		$self->OAIerrors->errors(
@@ -591,11 +579,6 @@ sub ListSets {
 		$listSets = $library->expand(@used_sets);
 	}
 
-	#mk sure we don't lose requestURL in Starman ????
-	if ( $self->requestURL() ) {
-		$listSets->requestURL( $self->requestURL() );
-	}
-
 	return $self->_output($listSets);
 }
 
@@ -639,7 +622,7 @@ sub _output {
 	$response->generate;
 
 	#reset the OAIerror for next time
-	$self->OAIerrors(HTTP::OAI::Response->new());
+	$self->OAIerrors( HTTP::OAI::Response->new() );
 
 	return encode_utf8($xml);
 
@@ -675,9 +658,9 @@ sub _transferRURL {
 
 	#if provider has no requestURL, don't change anything
 	return $response if ( !$self->requestURL );
-	
+
 	#if response has no parameters, replace with provider's RURL
-	if ( !($response->requestURL =~ /\?/) ) {
+	if ( !( $response->requestURL =~ /\?/ ) ) {
 		$response->requestURL( $self->requestURL );
 		return $response;
 	}
@@ -688,6 +671,7 @@ sub _transferRURL {
 		my $new = $self->requestURL . '?' . $f[1];
 		$response->requestURL($new);
 	}
+
 	#print "NEW-fer: current RURL of response:".$response->requestURL."\n";
 	return $response;
 }
@@ -745,7 +729,7 @@ sub _validateRequest {
 	my $e = 0;
 	foreach my $err ( validate_request(%params) ) {
 		$self->OAIerrors->errors($err);    #adds to OAI error lost
-		$e++; 
+		$e++;
 		die "Problem with err: $err" if ( ref $err ne 'HTTP::OAI::Error' );
 	}
 
