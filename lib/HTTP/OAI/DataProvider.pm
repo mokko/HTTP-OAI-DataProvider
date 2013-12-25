@@ -623,7 +623,6 @@ sub _output {
 
 	#reset the OAIerror for next time
 	$self->OAIerrors( HTTP::OAI::Response->new() );
-
 	return encode_utf8($xml);
 
 #as per https://groups.google.com/forum/?fromgroups#!topic/psgi-plack/J0IiUanfgeU
@@ -653,27 +652,9 @@ sub _transferRURL {
 	my $response = shift
 	  or croak "Need response";    #e.g. HTTP::OAI::ListRecord
 
-	#print "tRANSfer: current RURL of response:".$response->requestURL."\n";
-	#print "tRANSfer: current RURL of provider:".$self->requestURL."\n";
-
-	#if provider has no requestURL, don't change anything
-	return $response if ( !$self->requestURL );
-
-	#if response has no parameters, replace with provider's RURL
-	if ( !( $response->requestURL =~ /\?/ ) ) {
-		$response->requestURL( $self->requestURL );
-		return $response;
-	}
-
-	#2 is the right limit for 2 parts
-	my @f = split( /\?/, $response->requestURL, 2 );
-	if ( $f[1] ) {
-		my $new = $self->requestURL . '?' . $f[1];
-		$response->requestURL($new);
-	}
-
-	#print "NEW-fer: current RURL of response:".$response->requestURL."\n";
+	$response->requestURL( $self->requestURL );
 	return $response;
+
 }
 
 =method $obj= $self->_init_xslt($obj)
