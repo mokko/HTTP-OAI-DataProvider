@@ -77,9 +77,9 @@ sub queryChunk {
 	my $chunkDesc = shift or croak "Need chunkDesc!";
 	my $params    = shift or croak "Need params!";
 
-	#print "chunkDesc->chunkNo".$chunkDesc->chunkNo."\n";
-	#print "recordsPerChunk".$self->{chunkCache}{recordsPerChunk}."\n";
-	Debug "Enter queryChunk";
+	#Debug "Enter queryChunk";
+	#Debug "chunkDesc->chunkNo".$chunkDesc->chunkNo."\n";
+	#Debug "recordsPerChunk".$self->{chunkCache}{recordsPerChunk}."\n";
 
 	my %opts = (
 		transformer => $self->{transformer},
@@ -94,7 +94,7 @@ sub queryChunk {
 		total        => $chunkDesc->total,
 	);
 
-	#next is optional because last chunk has no next
+	#last chunk has no next
 	if ( $chunkDesc->next ) {
 		$opts{'next'} = $chunkDesc->next;
 	}
@@ -107,13 +107,6 @@ sub queryChunk {
 
 	#should copy all of the requestURL
 	
-	#	use Data::Dumper qw/Dumper/; #for debugging
-	#print 'ddddddddddddddddddddddddddddddddd'.Dumper $params;
-	
-	#if ( $self->requestURL ) {
-	#	$result->requestURL = $self->requestURL;
-	#}
-
 	#SQL
 	my $dbh = $self->{connection}->dbh()       or croak $DBI::errstr;
 	my $sth = $dbh->prepare( $chunkDesc->sql ) or croak $dbh->errstr();

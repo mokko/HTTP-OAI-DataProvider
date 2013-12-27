@@ -8,24 +8,6 @@ use Carp qw(croak carp);
 use HTTP::OAI;
 use Encode qw/decode/;    #encoding problem when dealing with data from sqlite
 
-#
-# DOUBTFUL!
-#not sure if I should inherit from Engine!
-#use parent qw(HTTP::OAI::DataProvider::Engine);
-use HTTP::OAI::DataProvider::Common qw(Warning Debug);
-
-has 'transformer' => ( isa => 'Object', is => 'ro', required => 1 );
-has 'verb'        => ( isa => 'Str',    is => 'ro', required => 1 );
-
-has 'chunkSize'  => ( isa => 'Str',    is => 'ro', required => 1 );
-has 'chunkNo'  => ( isa => 'Str',    is => 'ro', required => 1 );
-has 'token'  => ( isa => 'Str',    is => 'ro', required => 1 );
-has 'targetPrefix'  => ( isa => 'Str',    is => 'ro', required => 1 );
-has 'total'  => ( isa => 'Str',    is => 'ro', required => 1 );
-
-has 'next'  => ( isa => 'Str',    is => 'rw', required => 0 );
-has 'requestURL'  => ( isa => 'Str',    is => 'rw', required => 0 );
-
 =head1 DESCRIPTIOPN
 
 A result is an object that can carry 
@@ -77,6 +59,24 @@ c) it can also carry OAI errors
 	#for resumptionToken
 	$result->expirationDate; #create an expiration date
 	$result->mkToken; #make a token using current micro second
+=cut
+
+#not sure if I should inherit from Engine!
+#use parent qw(HTTP::OAI::DataProvider::Engine);
+use HTTP::OAI::DataProvider::Common qw(Warning Debug);
+
+has 'transformer' => ( isa => 'Object', is => 'ro', required => 1 );
+has 'verb'        => ( isa => 'Str',    is => 'ro', required => 1 );
+
+has 'chunkSize'  => ( isa => 'Str',    is => 'ro', required => 1 );
+has 'chunkNo'  => ( isa => 'Str',    is => 'ro', required => 1 );
+has 'token'  => ( isa => 'Str',    is => 'ro', required => 1 );
+has 'targetPrefix'  => ( isa => 'Str',    is => 'ro', required => 1 );
+has 'total'  => ( isa => 'Str',    is => 'ro', required => 1 );
+
+has 'next'  => ( isa => 'Str',    is => 'rw', required => 0 );
+has 'requestURL'  => ( isa => 'Str',    is => 'rw', required => 0 );
+
 
 =method my $result=HTTP::OAI::DataProvider::Engine->new (%opts);
 
