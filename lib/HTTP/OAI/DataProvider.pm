@@ -288,25 +288,6 @@ ERRORS
 
 =cut
 
-=method 
-
-	my %params=$self->_verb(verb=>'ListMetadataFormats', %params);
-	return $self->OAIerrors if ( $self->error );     
-
-=cut
-
-sub _verb {
-	my $self = shift or die "Need myself";
-
-	#dont croak here, prefer propper OAI error
-	my %params = @_ or ();
-
-	$self->resetErrorStack;    #not sure if this should be here
-	$self->validateRequest(%params);
-	return %params;
-
-}
-
 sub ListMetadataFormats {
 	my $self = shift or die "Need myself";
 	my %params = $self->_verb( verb => 'ListMetadataFormats', @_ );
@@ -390,14 +371,9 @@ sub ListIdentifiers {
 	  or croak "Internal error: Data store missing!";
 
 	if ( $params{resumptionToken} ) {
-
-		#chunk is response object here!
+		#chunk has always been HTTP::OAI::Response object
 		my $chunk = $engine->chunkExists(%params);
-
-		if ($chunk) {
-			return $self->asString($chunk);    #success
-		}
-
+		return $chunk if $chunk;
 		return $self->addError( code => 'badResumptionToken' );
 	}
 
@@ -505,10 +481,11 @@ ERRORS
 =cut
 
 sub ListSets {
-	my $self   = shift           or croak "Provider missing!";
-	my $engine = $self->{Engine} or croak "Engine missing!";
+	my $self = shift or croak "Provider missing!";
 	my %params = $self->_verb( verb => 'ListSets', @_ );
 	return $self->OAIerrors if ( $self->error );
+
+	my $engine = $self->{Engine} or carp "Engine missing!";
 
 	#Debug "Enter ListSets $self\n";
 
@@ -583,9 +560,11 @@ sub asString {
 	my $self = shift or croak "Need myself";
 	my $response = shift
 	  or croak "No response";    #a HTTP::OAI::Response object
-	Debug "$response: " . $response;
-	$self->_init_xslt($response);
-	$response = $self->_transferRURL($response);
+	#Debug "$response: " . $response;
+	if ( $self->xslt ) {
+		$response->xslt( $self->xslt ) or carp "problems with xslt!";
+	}
+	$response->requestURL( $self->requestURL );
 
 	my $xml;
 	$response->set_handler( XML::SAX::Writer->new( Output => \$xml ) );
@@ -594,72 +573,6 @@ sub asString {
 	return encode_utf8($xml);
 
 #as per https://groups.google.com/forum/?fromgroups#!topic/psgi-plack/J0IiUanfgeU
-}
-
-#
-#
-#
-
-=method $obj= $self->_transferRURL($response)
-
-Transfers the requestURL from the provider (where it might have changed in the
-meantime) to the response.
-
-N.B. Currently it preserves the params of the response's RURL. I am not sure 
-that there ever are some.
-
-=cut
-
-sub _transferRURL {
-	my $self = shift or croak "Need myself";
-	my $response = shift
-	  or croak "Need response";    #e.g. HTTP::OAI::ListRecord
-
-	$response->requestURL( $self->requestURL );
-	return $response;
-
-}
-
-=method $obj= $self->_init_xslt($obj)
-
-For an HTTP::OAI::Response object ($obj), sets the stylesheet to the value
-specified during init. This assume that there is only one stylesheet.
-
-This may be a bad name, since not specific enough. This xslt is responsible
-for a nicer look and added on the top of reponse headers.
-
-=cut
-
-sub _init_xslt {
-	my $self = shift;
-	my $obj = shift or return;    #e.g. HTTP::OAI::ListRecord
-
-	#Debug "Enter _init_xslt obj:$obj"; #beautify
-	if ( $self->xslt ) {
-		$obj->xslt( $self->xslt ) or croak "problems with xslt!";
-	}
-}
-
-=method $self->addError(code=>$code, message=>$message);
-
-Expected is an error code and optionally an error message. If not specified, 
-message will use default message for that error code. Returns a 
-HTTP::OAI::Response object with the error stack. Croaks on failure.
-
-TODO: Theoretically, I need a way to add multiple errors at once:
-
-$self->addError([(code=>$code, message=>$message), (code=>$code, message=>$message)]);
-
-=cut
-
-sub addError {
-	my $self = shift or croak "Need myself";
-	my %args = @_;
-	die "Need error code!" if ( !$args{code} );
-
-	$self->OAIerrors->errors( HTTP::OAI::Error->new(%args) );
-	return $self->OAIerrors;
-
 }
 
 =method $self->error
@@ -700,17 +613,43 @@ sub validateRequest {
 	my $self = shift or croak "Need myself!";
 	my %params = @_ or ();    #dont croak here, prefer propper OAI error
 	foreach my $err ( validate_request(%params) ) {
+		Debug "validateRequest: found error".$err->code.':'.$err->message;
 		$self->OAIerrors->errors($err);    #adds to error stack manually
 		 #$self->addError(code=>$err->code, message=>$err->message);    #adds to error stack manually
 	}
 
 	#avoid HTTP::OAI::Response->is_error since it makes trouble
 	if ( $self->error ) {
-		Debug "validateRequest: found error";
 		return;    # error = request NOT valid
 	}
 	Debug "validateRequest: found NO error";
-	return 1;    #success = request is valid
+	return 1;      #success = request is valid
+}
+
+##
+## SUBS that are or should be private
+##
+
+=method $self->addError(code=>$code, message=>$message);
+
+Expected is an error code and optionally an error message. If not specified, 
+message will use default message for that error code. Returns a 
+HTTP::OAI::Response object with the error stack. Croaks on failure.
+
+TODO: Theoretically, I need a way to add multiple errors at once:
+
+$self->addError([(code=>$code, message=>$message), (code=>$code, message=>$message)]);
+
+=cut
+
+sub addError {
+	my $self = shift or croak "Need myself";
+	my %args = @_;
+	die "Need error code!" if ( !$args{code} );
+
+	$self->OAIerrors->errors( HTTP::OAI::Error->new(%args) );
+	return $self->OAIerrors;
+
 }
 
 sub _uriTest {
@@ -727,6 +666,27 @@ sub _uriTest {
 		}
 	}
 	return 1;    #exists and is uri
+}
+
+=method verb
+
+	Something for all verbs 
+
+	my %params=$self->_verb(verb=>'ListMetadataFormats', %params);
+	return $self->OAIerrors if ( $self->error );     
+
+=cut
+
+sub _verb {
+	my $self = shift or die "Need myself";
+
+	#dont croak here, prefer propper OAI error
+	my %params = @_ or ();
+
+	$self->resetErrorStack;    #not sure if this should be here
+	$self->validateRequest(%params);
+	return %params;
+
 }
 
 sub _processSetLibrary {
