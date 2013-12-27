@@ -20,8 +20,8 @@ plan tests => ( ( keys %{ $config{globalFormats} } ) + 4 );
 my $baseURL = 'http://localhost:3000/oai';
 
 {
-	my $response =
-	  $provider->ListMetadataFormats();    #response should be a xml string
+	#response is HTTP::OAI::Response now
+	my $response = $provider->verb( verb => 'ListMetadataFormats' );
 	my $xml = $provider->asString($response);
 	okListMetadataFormats($response);
 	foreach my $prefix ( keys %{ $config{globalFormats} } ) {
@@ -32,24 +32,32 @@ my $baseURL = 'http://localhost:3000/oai';
 {
 
 	#diag "ListMetadataFormats __with__ identifier";
-	my $response = $provider->ListMetadataFormats(
-		identifier => 'spk-berlin.de:EM-objId-543' )
-	  or die "Cant get metadata format";
+	my $response = $provider->verb(
+		verb       => 'ListMetadataFormats',
+		identifier => 'spk-berlin.de:EM-objId-543'
+	) or die "Cant get metadata format";
 	okListMetadataFormats($response);
 
 }
 {
 	#testing badArgument
-	my $response = $provider->ListMetadataFormats( iddentifiier => 'wrong' );
+	my $response = $provider->verb(
+		verb         => 'ListMetadataFormats',
+		iddentifiier => 'wrong'
+	);
 	isOAIerror2( $response, 'badArgument' );
 
-	$response = $provider->Identify( Identifier => 'meschugge' );
+	$response = $provider->verb( 
+		verb => 'Identify', 
+		Identifier => 'meschugge' );
 	isOAIerror2( $response, 'badArgument' );
 }
 
 {
-	my $response = $provider->ListMetadataFormats(
-		identifier => 'spk-berlin.de:EM-objId-01234567890A' );
+	my $response = $provider->verb(
+		verb       => 'ListMetadataFormats',
+		identifier => 'spk-berlin.de:EM-objId-01234567890A'
+	);
 	if ($response) {
 
 		#ok ($response=~/idDoesNotExist/, 'idDoesNotExist ok');

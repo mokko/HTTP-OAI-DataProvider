@@ -68,15 +68,14 @@ use HTTP::OAI::DataProvider::Common qw(Warning Debug);
 has 'transformer' => ( isa => 'Object', is => 'ro', required => 1 );
 has 'verb'        => ( isa => 'Str',    is => 'ro', required => 1 );
 
-has 'chunkSize'  => ( isa => 'Str',    is => 'ro', required => 1 );
-has 'chunkNo'  => ( isa => 'Str',    is => 'ro', required => 1 );
-has 'token'  => ( isa => 'Str',    is => 'ro', required => 1 );
-has 'targetPrefix'  => ( isa => 'Str',    is => 'ro', required => 1 );
-has 'total'  => ( isa => 'Str',    is => 'ro', required => 1 );
+has 'chunkSize'    => ( isa => 'Str', is => 'ro', required => 1 );
+has 'chunkNo'      => ( isa => 'Str', is => 'ro', required => 1 );
+has 'token'        => ( isa => 'Str', is => 'ro', required => 1 );
+has 'targetPrefix' => ( isa => 'Str', is => 'ro', required => 1 );
+has 'total'        => ( isa => 'Str', is => 'ro', required => 1 );
 
-has 'next'  => ( isa => 'Str',    is => 'rw', required => 0 );
-has 'requestURL'  => ( isa => 'Str',    is => 'rw', required => 0 );
-
+has 'next'       => ( isa => 'Str', is => 'rw', required => 0 );
+has 'requestURL' => ( isa => 'Str', is => 'rw', required => 0 );
 
 =method my $result=HTTP::OAI::DataProvider::Engine->new (%opts);
 
@@ -141,7 +140,7 @@ is convenient.
 
 Adds an HTTP::OAI::Error error to a result object. Test with
 	if ($result->isError) {
-		$provider->err2XML ($result->isError);
+		#something
 	}
 
 isError returns 
@@ -404,6 +403,7 @@ sub save {
 		my $dom = XML::LibXML->load_xml( string => $args{md} );
 
 		my $prefix = $result->targetPrefix or croak "still no prefix?";
+
 		#Debug "prefix:$prefix-----------------------";
 
 		my $transformer = $result->{transformer};
@@ -546,7 +546,7 @@ sub toListIdentifiers {
 Returns a list of HTTP::OAI::Error objects if any.
 
 	if ( $result->isError ) {
-		return $self->err2XML($result->isError);
+		return $result->isError;
 	}
 
 Is _actually_ called in DataProvider.
@@ -559,31 +559,27 @@ sub isError {
 	#Debug "HTTP::OAI::DataProvider::Result::isError";
 
 	if ( ref $result ne 'HTTP::OAI::DataProvider::Engine::Result' ) {
-		die "isError: Wrong class ";
+		carp "isError: Wrong class ";    #unlikely, unperlish, but possible...
 	}
 
 	if ( $result->{errors} ) {
 		return @{ $result->{errors} };
 	}
-	else {
-		return ();    #fail
-	}
+	return;                             #fail, i.e. no error
 }
 
-=method my $ret=result->lastChunk;
+=method my $ret=$result->lastChunk;
 
-	Returns 1 if this is the last chunk, otherwise empty.
+Returns 1 (success) if this is the last chunk, otherwise empty (failure).
 
-	if ($result->lastChunk)
+	print "this is the last or only chunk" if $result->lastChunk;
 
 =cut
 
 sub lastChunk {
 	my $result = shift;
-	if ( $result->{last} ) {
-		return 1;
-	}
-	return ();
+	return 1 if $result->{last};
+	return;
 }
 __PACKAGE__->meta->make_immutable;
 1;

@@ -39,9 +39,11 @@ my $provider = new HTTP::OAI::DataProvider(%config);
 
 my $codeRef = sub {
 	my ( $provider, $verb, $params ) = @_;
-	my $response=$provider->$verb(%{$params});
+	$params->{verb}=$verb;
+	my $response=$provider->verb(%{$params});
 	
 	if ($provider->error) {
+		print $provider->asString($response);
 		die "error";
 	}
 	

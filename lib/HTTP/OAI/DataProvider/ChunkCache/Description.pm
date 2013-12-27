@@ -16,7 +16,7 @@ has 'total'        => ( is => 'ro', isa => 'Str', required => '1' );
 has 'targetPrefix' => ( is => 'ro', isa => 'Str', required => '1' );
 has 'next' => ( is => 'rw', isa => 'Str', required => '0' );
 has 'last' => ( is => 'rw', isa => 'Str', required => '0' );
-has 'requestURL' => ( is => 'rw', isa => 'Str', required => '0' );
+has 'requestURL' => ( is => 'rw', isa => 'Str', required => '0' ); #still necessary?
 
 
 

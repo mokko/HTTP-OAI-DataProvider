@@ -33,31 +33,31 @@ my @sequence = (
 	},
 );
 
-plan tests => @sequence * 2 + 3; #put number of tests as early as possible
+plan tests => @sequence * 2 + 3;    #put number of tests as early as possible
 
 my $newURL = 'http://somethingelse.com';
 my $oldURL = 'http://localhost';
-
 
 #testing if requestURL can be changed
 
 my $codeRef = sub {
 	my ( $provider, $verb, $params ) = @_;
-
 	foreach my $url ( $oldURL, $newURL ) {
 		$provider->requestURL($url);
+		$provider->resetErrorStack;
 		#$provider->_overwriteRequestURL($url);
-		
-		my $response = $provider->$verb( %{$params} );
-
+		$params->{verb}=$verb;
+		print Dumper ($params);
+		my $response = $provider->verb( %{$params});
 		if ( $provider->error ) {
-			die "provider error:" . $provider->OAIerrors;
-			#fail "oaiError where there should be none";
+			print $provider->asString($response);
+			die "provider error";
 		}
 
-		my $xt = xpathTester($provider->asString($response));
+		my $xt = xpathTester( $provider->asString($response) );
+
 		#print "$response\n";
-		$xt->is( $xpath, $url, "$verb" );
+		$xt->is( $xpath, $url, $verb );
 	}
 
 };
@@ -74,9 +74,9 @@ my %config = loadWorkingTestConfig();
 	my $provider = new HTTP::OAI::DataProvider(%config);
 	ok( !$provider->requestURL, 'no requestURL expected at this point' );
 	$provider->requestURL($oldURL);
-	ok ($provider->requestURL eq $oldURL, 'setting requestURL to old');
+	ok( $provider->requestURL eq $oldURL, 'setting requestURL to old' );
 	$provider->requestURL($newURL);
-	ok ($provider->requestURL eq $newURL, 'setting requestURL to new');
+	ok( $provider->requestURL eq $newURL, 'setting requestURL to new' );
 }
 
 testSequence(

@@ -5,6 +5,7 @@ package HTTP::OAI::DataProvider::Engine::SQLite;
 use warnings;
 use strict;
 use Moose::Role;
+with 'HTTP::OAI::DataProvider::Engine::Interface';
 
 #use namespace::autoclean;
 use Carp qw(carp croak confess);
@@ -17,7 +18,7 @@ use HTTP::OAI::DataProvider::Engine::Result;
 use HTTP::OAI::DataProvider::ChunkCache;
 use HTTP::OAI::DataProvider::Common qw/Debug Warning/;
 use HTTP::OAI::DataProvider::Transformer;
-with 'HTTP::OAI::DataProvider::Engine::Interface';
+
 
 =head1 SYNOPSIS
 	use HTTP::OAI::DataProvider::SQLite;
@@ -103,9 +104,9 @@ sub queryChunk {
 		$opts{'last'} = 1;
 	}
 
-	my $result = new HTTP::OAI::DataProvider::Engine::Result(%opts);
+	my $result = HTTP::OAI::DataProvider::Engine::Result->new (%opts);
 
-	#should copy all of the requestURL
+	#should copy all of the requestURL??
 	
 	#SQL
 	my $dbh = $self->{connection}->dbh()       or croak $DBI::errstr;
@@ -177,7 +178,7 @@ sub queryChunk {
 
 	# Check result
 	if ( $result->isError ) {
-		return $self->err2XML( $result->isError );
+		return $self->err2XML( $result->isError ); #todo
 	}
 
 	return $result->getResponse;
@@ -426,14 +427,11 @@ sub planChunking {
 			total        => $total
 		);
 
-		#the last chunk has no resumption token
+		#last chunk has no resumption token
 		my $nextToken = $self->mkToken();
 		if ( $chunkNo < $maxChunkNo ) {
 			$chunk->{'next'} = $nextToken;
 		}
-
-		#Debug "planChunking: chunkNo:$chunkNo, token:$currentToken"
-		#  . ", next:$nextToken, offset: $offset, limit ";
 
 		# LOOP stuff: prepare for next loop
 		$chunkNo++;    #now it's safe to increase
@@ -576,7 +574,7 @@ sub _countTotals {
 	my $params = shift;
 
 	my $sql = $self->_queryCount($params);
-	Debug "_countTotals: $sql";
+	#Debug "_countTotals: $sql";
 	my $dbh = $self->{connection}->dbh() or die $DBI::errstr;
 	my $sth = $dbh->prepare($sql)        or croak $dbh->errstr();
 	$sth->execute() or croak $dbh->errstr();

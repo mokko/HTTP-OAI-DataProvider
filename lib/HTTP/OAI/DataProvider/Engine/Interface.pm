@@ -210,18 +210,15 @@ Returns last error message (a string) if there has been an error yet.
 
 It returns nothing (failure) if no error message.
 
-Possible uses:
-
+	#eg
 	$engine->$method or croak $engine->error;
 
 	if ($engine->error) {
-		croak $engine->error
-	} else {
-		#there has not yet been an error
+		croak $engine->error;
 	}
 
-Note: Calling error with parameters is considered an error!
-
+	$engine->error('param'); # error!
+	
 =cut
 
 sub error {

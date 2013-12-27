@@ -158,10 +158,11 @@ sub query {
 
 =method my $chunk=$self->chunkExists (%params);
 
-returns a chunk description for a specified resumptionToken or nothing.
+returns a chunk (not a chunk description) for a specified resumptionToken or 
+nothing (no chunk exists for this token).
 
-Expects a param hashref with a resumptionToken. On failure (if resumptionToken 
-is not known in chunk cache), returns nothing.
+Expects a hashref with a resumptionToken (resumptionToken=>$token). On failure 
+(if resumptionToken is not known to chunk cache), it returns nothing.
 
 	my $chunk=$self->chunkExists (%params);
 	if (!$chunk) {
@@ -169,7 +170,7 @@ is not known in chunk cache), returns nothing.
 	}
 
 	#or:
- 	my $chunk=$engine->chunkExists(resumptionToken=>$resumptionToken);
+ 	my $chunk=$engine->chunkExists(resumptionToken=>$resumptionToken) or return;
 
 =cut
 
@@ -180,7 +181,7 @@ sub chunkExists {
 
 	my $chunkCache = $self->{ChunkCache};
 
-	Debug "Query chunkCache for " . $resumptionToken;
+	#Debug "->>>>>>>--Query chunkCache for " . $resumptionToken;
 
 	my $chunkDesc = $chunkCache->get($resumptionToken) or return;
 

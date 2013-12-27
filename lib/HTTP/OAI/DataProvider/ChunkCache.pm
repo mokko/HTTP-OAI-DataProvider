@@ -8,7 +8,7 @@ use Moose;
 use namespace::autoclean;
 use Carp qw/carp croak/;
 use HTTP::OAI::DataProvider::ChunkCache::Description;
-
+#use HTTP::OAI::DataProvider::Common qw/Debug Warning/;
 our $chunkCache = {};
 has 'maxSize' => ( is => 'ro', isa => 'Int', required => '1' );
 
@@ -51,7 +51,7 @@ Return 1 on success.
 =cut
 
 sub add {
-	my $self = shift;
+	my $self = shift or croak "Need myself";
 	my $chunkDesc = shift or croak "Need chunkDescription!";    #should be return
 
 	if ( !ref $chunkDesc ) {
@@ -62,7 +62,7 @@ sub add {
 		croak "maxChunkNo greater than chunkCache maxSize";
 	}
 
-	#if necessary remove a description from cache
+	#necessary remove a description from cache
 	my $count   = $self->count();
 	my $overPar = $count + 1 - $self->{maxSize};
 	if ( $overPar > 0 ) {
@@ -70,6 +70,7 @@ sub add {
 	}
 
 	#write into cache
+	#Debug '==============adding chunk '.$chunkDesc->{token};
 	$chunkCache->{ $chunkDesc->{token} } = $chunkDesc;
 }
 
@@ -108,11 +109,15 @@ found.
 =cut
 
 sub get {
-	my $self = shift;
+	my $self = shift or croak "Need myself";
 	my $token = shift or return;
 
 	if ( !$chunkCache->{$token} ) {
-		$self->{error} = "This token does not exist in cache";
+		my $msg="Token $token not found in chunk cache";
+		#use Data::Dumper;
+		#Debug $chunkCache;
+		$self->{error} = $msg;
+		#Debug $msg;
 		return;
 	}
 
@@ -145,6 +150,7 @@ sub _rmFromCache {    #gets called in add
 	my $i = 0;
 	while ( $i < $overPar ) {
 		my $key = shift @array;
+		#Debug "==============rming chunk $key";
 		delete $chunkCache->{$key};
 		$i++;
 	}

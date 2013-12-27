@@ -8,18 +8,14 @@ use HTTP::OAI::DataProvider::Test;
 use XML::LibXML;
 use Test::XPath;
 
-
 # new is taken for granted
-my %config = HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
+my %config   = HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
 my $provider = new HTTP::OAI::DataProvider(%config);
 
-#use Data::Dumper qw(Dumper);
-#use Data::Dumper qw(Dumper);
-#print Dumper (%config);
-
-
-my $response = $provider->Identify();    #response should be a xml string
+my $response =
+  $provider->verb( verb => 'Identify' );    #response should be a xml string
 okIdentify($response);
+
 # 1- check config values from test_config
 my $from_config_test = {
 
@@ -30,7 +26,7 @@ my $from_config_test = {
 	deletedRecord  => '/oai:OAI-PMH/oai:Identify/oai:deletedRecord',
 };
 
-my $xt = xpathTester($response->toDOM->toString);
+my $xt = xpathTester( $response->toDOM->toString );
 
 foreach my $key ( keys %{$from_config_test} ) {
 	$xt->is(
@@ -66,8 +62,8 @@ foreach my $key ( keys %{$expected} ) {
 #
 
 {
-	my $response;
-	$response = $provider->Identify( bla => 'meschugge' );
+	my $response =
+	  $provider->verb( verb => 'Identify', bla => 'meschugge' );
 	ok( $response->toDOM->toString =~ /badArgument/, 'right error' );
 }
 
