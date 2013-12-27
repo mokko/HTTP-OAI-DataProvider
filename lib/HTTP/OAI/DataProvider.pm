@@ -177,13 +177,6 @@ has 'OAIerrors'  => (
 	init_arg => undef,
 	isa      => 'HTTP::OAI::Response',
 	default  => sub { HTTP::OAI::Response->new }
-
-	  #	default  => sub {
-	  #		my $self = shift;
-	  #		my $response =
-	  #		  HTTP::OAI::Response->new( requestURL => $self->requestURL );
-	  #		return $response;
-	  #	}
 );
 
 sub BUILD {
