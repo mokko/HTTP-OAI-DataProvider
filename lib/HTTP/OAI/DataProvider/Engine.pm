@@ -41,6 +41,8 @@ has 'locateXSL'    => ( isa => 'CodeRef',          is => 'ro', required => 1 );
 has 'nativeFormat' => ( isa => 'nativeFormatType', is => 'ro', required => 1 );
 has 'requestURL'   => ( isa => 'Uri',              is => 'rw', required => 0 );
 
+#N.B. $self->ChunkCache is HTTP::OAI::DataProvider::ChunkCache object.
+
 =head1 DESCRIPTION
 
 Engine is the generic part for getting data of out the database (querying). 
@@ -51,9 +53,9 @@ sure that this distinction is necessary in this place).
 Engine is analogous to the DP::Ingester package which provides a similar 
 service for getting data into the database.
 
-This class is generic in the sense that it doesn't know either 
- a) about the metadataFormat nor 
- b) about the concrete database.
+This class is generic in the sense that it doesn't know about   
+ a) the metadataFormat AND
+ b) the concrete database.
 
 =head2 CLASS LAYOUT
 
@@ -75,7 +77,7 @@ DP::Ingester (class) consumes
 		engine=>'DataProvider::SQLite',
 		engineOpts=>$hashRef,
 	);
-	#internally calls $engine->initDB();
+	#internally calls $engine->init();
 
 	#main query
 	$result=$provider->query ($params);
@@ -156,18 +158,18 @@ sub query {
 
 =method my $chunk=$self->chunkExists (%params);
 
-returns a chunk description (if one with this resumptionToken exists) or nothing.
+returns a chunk description for a specified resumptionToken or nothing.
 
-Usage:
+Expects a param hashref with a resumptionToken. On failure (if resumptionToken 
+is not known in chunk cache), returns nothing.
+
 	my $chunk=$self->chunkExists (%params);
 	if (!$chunk) {
 		return new HTTP::OAI::Error (code=>'badResumptionToken');
 	}
 
- TODO: Should this move into the engine? Does the provider need to know about
- chunkcache at all?
- $engine->chunkExists(%params)
- $engine->chunkExists($resumptionToken);
+	#or:
+ 	my $chunk=$engine->chunkExists(resumptionToken=>$resumptionToken);
 
 =cut
 
@@ -175,8 +177,6 @@ sub chunkExists {
 	my $self            = shift or croak "Need myself!";
 	my %params          = @_;
 	my $resumptionToken = $params{resumptionToken} or return;
-
-	#my $request = $self->requestURL;    #should be optional, but isn't, right?
 
 	my $chunkCache = $self->{ChunkCache};
 

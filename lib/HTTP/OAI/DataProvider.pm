@@ -223,8 +223,7 @@ sub GetRecord {
 	}
 
 	$self->checkFormatSupported( $params{metadataPrefix} );
-
-	return $self->OAIerrors if ( $self->OAIerrors->errors );    ####
+	return $self->OAIerrors if ( $self->error );    ####
 
 	# Metadata handling
 	return $engine->query( \%params );
@@ -374,6 +373,7 @@ sub ListIdentifiers {
 		#chunk has always been HTTP::OAI::Response object
 		my $chunk = $engine->chunkExists(%params);
 		return $chunk if $chunk;
+		Debug "badResumptionToken 3";		
 		return $self->addError( code => 'badResumptionToken' );
 	}
 
@@ -450,6 +450,8 @@ sub ListRecords {
 	if ( $params{resumptionToken} ) {
 		my $chunk = $engine->chunkExists(%params);
 		return $chunk if ($chunk);
+		#use Data::Dumper;
+		Debug "badResumptionToken 1: NO CHUNK\n";#. Dumper \%params;
 		return $self->addError( code => 'badResumptionToken' );
 	}
 
@@ -491,6 +493,7 @@ sub ListSets {
 
 	#resumptionTokens not supported/TODO
 	if ( $params{resumptionToken} ) {
+		Debug "badResumptionToken 2";
 		return $self->addError(
 			code    => 'badResumptionToken',
 			message => 'resumption token not yet supported with listsets'
@@ -531,13 +534,19 @@ sub ListSets {
 
 =method checkFormatSupported ($prefixWanted);
 
-Expects a prefix for a metadataPrefix (as scalar). If it can't be disseminated 
-an error is raised in $self->OAIerrors
+Expects a metadata prefix (as scalar). If it can't be disseminated an OAI 
+error is added to OAIerror stack and checkFormatSupported return 0 (fail).
+If format is supported, it returns 1 (success) and sets no error. 
 
-	$self->checkFormatSupported( $params->{metadataPrefix} )
-	if ($self->OAIerror->errors) { 		#errors is kind a like is_error
+	#Either
+	$provider->checkFormatSupported( $prefix );
+	if ($provider->error) {
 		#do something
 	}
+	
+	#Or
+	$provider->checkFormatSupported( $prefix ) or return $self->OAIerror; 
+
 
 =cut
 
@@ -546,7 +555,9 @@ sub checkFormatSupported {
 	my $prefixWanted = shift or carp "Need something to test for";
 	if ( !$self->{globalFormats}{$prefixWanted} ) {
 		$self->addError( code => 'cannotDisseminateFormat' );
+		return;
 	}
+	return 1;
 }
 
 =method my $xml=$self->asString($response);
@@ -622,7 +633,7 @@ sub validateRequest {
 	if ( $self->error ) {
 		return;    # error = request NOT valid
 	}
-	Debug "validateRequest: found NO error";
+	#Debug "validateRequest: found NO error";
 	return 1;      #success = request is valid
 }
 

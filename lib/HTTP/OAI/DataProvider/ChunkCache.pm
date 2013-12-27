@@ -17,8 +17,8 @@ has 'maxSize' => ( is => 'ro', isa => 'Int', required => '1' );
 	use HTTP::OAI::DataProvider::ChunkCache;
 	my $cache=new HTTP::OAI::DataProvider::ChunkCache (maxSize=>$integer);
 
-	#chunkDesc is description of a chunk as hashref
-	#next is optional. Last token doesn't have a next
+	#chunkDesc is a chunk described as hashref
+	#Last description doesn't have a next
 	my $chunkDesc= new HTTP::OAI::DataProvider::ChunkCache::Description(
 		chunkNo=>$chunkNo,
 		maxChunkNo=>$maxChunkNo,

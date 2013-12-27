@@ -129,7 +129,7 @@ First initialize Debug with codeRef:
 	$config{debug}=sub { my $msg=shift; print "$msg\n" if $msg};
 	Debug $config{debug};
 Then use it
-	Debug "debug message";
+	Debug "message";
 
 =cut
 
