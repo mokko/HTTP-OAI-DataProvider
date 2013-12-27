@@ -690,7 +690,10 @@ sub resetErrorStack {
 
 =method $self->validateRequest(%params) or return $self->OAIerrors;
 
-My validateRequest returns 1 on success (i.e. no validation error).
+Expects params in hash. It saves potential errors in $provider->errorOAI and 
+returns 1 on success (i.e. no validation error) or fails when validation showed
+an error.
+
 =cut
 
 sub validateRequest {
