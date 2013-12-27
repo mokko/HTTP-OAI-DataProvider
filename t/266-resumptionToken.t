@@ -39,13 +39,13 @@ my $provider = new HTTP::OAI::DataProvider(%config);
 
 my $codeRef = sub {
 	my ( $provider, $verb, $params ) = @_;
-	my $result=$provider->$verb(%{$params});
+	my $response=$provider->$verb(%{$params});
 	
-	if ($provider->OAIerrors->errors) {
+	if ($provider->error) {
 		die "error";
 	}
 	
-	my $xt=xpathTester($result);
+	my $xt=xpathTester($provider->asString($response));
 	$xt->ok ('/oai:OAI-PMH/*/oai:resumptionToken','resumptionToken exists');
 };
 

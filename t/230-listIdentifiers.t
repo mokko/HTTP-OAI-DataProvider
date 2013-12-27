@@ -1,6 +1,6 @@
 #!perl
 
-use Test::More tests => 11;
+use Test::More tests => 14;
 use HTTP::OAI::DataProvider;
 use HTTP::OAI::DataProvider::Test;
 use HTTP::OAI::Repository qw(validate_request);
@@ -13,7 +13,6 @@ my $provider = new HTTP::OAI::DataProvider(loadWorkingTestConfig);
 ##
 ## OAI responds with verb (no errors)
 ##
-
 
 {
 	my %params = (
@@ -59,7 +58,7 @@ my $provider = new HTTP::OAI::DataProvider(loadWorkingTestConfig);
 	validateRequest(%params);
 
 	my $response = $provider->ListIdentifiers(%params)
-	  or die $provider->OAIerror;
+	  or die $provider->OAIerrors;
 	okListIdentifiers( $response, 'with from' );
 }
 {
@@ -91,11 +90,9 @@ my $provider = new HTTP::OAI::DataProvider(loadWorkingTestConfig);
 	okListIdentifiers( $response, 'with from and until' );
 }
 
-
 ##
 ## test OAI errors
 ##
-
 
 {
 	my %params = (
@@ -103,15 +100,17 @@ my $provider = new HTTP::OAI::DataProvider(loadWorkingTestConfig);
 		metadataPrefix => 'bla',
 		set            => 'MIMO',
 	);
-	validateRequest(%params);
+	$provider->validateRequest(%params) or die "request does not validate";
 	my $response = $provider->ListIdentifiers(%params);
-	isOAIerror( $response, 'cannotDisseminateFormat' );
+	isOAIerror2( $response, 'cannotDisseminateFormat' );
+
 }
 
 {
 	my $response = $provider->OAIerrors;
-	if ($provider->OAIerrors->errors){
-		isOAIerror( $response, 'cannotDisseminateFormat' );
+	if ( $provider->OAIerrors->errors ) {
+		isOAIerror2( $response, 'cannotDisseminateFormat' );
+		$provider->resetErrorStack;
 	}
 }
 
@@ -122,8 +121,9 @@ my $provider = new HTTP::OAI::DataProvider(loadWorkingTestConfig);
 	);
 	validateRequest(%params);
 	my $response = $provider->ListIdentifiers(%params);
-	die "------------no response" if (!$response);
-	isOAIerror( $response, 'badResumptionToken' );
+	die "no response" if ( !$response );
+	isOAIerror2( $response, 'badResumptionToken' );
+	$provider->resetErrorStack;
 }
 
 {
@@ -133,10 +133,11 @@ my $provider = new HTTP::OAI::DataProvider(loadWorkingTestConfig);
 		set            => 'bla',
 	);
 
-	#validateRequest(%params);
+	validateRequest(%params);
 	my $response = $provider->ListIdentifiers(%params);
-	#print "$response\n";
-	isOAIerror( $response, 'noRecordsMatch' );
+
+	isOAIerror2( $response, 'noRecordsMatch' );
+	$provider->resetErrorStack;
 }
 
 ##
@@ -151,10 +152,15 @@ my $provider = new HTTP::OAI::DataProvider(loadWorkingTestConfig);
 
 	my $response = $provider->ListIdentifiers(%params);
 
-	isOAIerror( $response, 'badArgument' );
-	if ($provider->OAIerrors->errors){
+	#test return value
+	isOAIerror2( $response, 'badArgument' );
+
+	#test provider error
+	if ( $provider->error ) {
 		$response = $provider->OAIerrors;
-		isOAIerror( $response, 'badArgument' );
+		#ok ($response->toDOM->toString =~/badArgument/, 'badArgument' );
+		isOAIerror2( $response, 'badArgument' );
+		$provider->resetErrorStack;
 	}
 }
 
@@ -162,18 +168,20 @@ my $provider = new HTTP::OAI::DataProvider(loadWorkingTestConfig);
 	my %params = ( verb => 'ListIdentifiers', );
 
 	my $response = $provider->ListIdentifiers(%params);
-	isOAIerror( $response, 'badArgument' );
-	if ($provider->OAIerrors->errors){
+	isOAIerror2( $response, 'badArgument' );
+	if ( $provider->error ) {
 		$response = $provider->OAIerrors;
-		isOAIerror( $response, 'badArgument' );
+		#ok ($response->toDOM->toString =~/badArgument/, 'badArgument' );
+		isOAIerror2( $response, 'badArgument' );
+		$provider->resetErrorStack;
 	}
 }
 
 #TODO: noSetHierarchy
 
-#
-#
-#
+###
+### SUBS
+###
 
 =func validateRequest(%params);
 
@@ -189,6 +197,7 @@ Fails with intelligble error message
 	  Could also be called failOnRequestError(%params);
   and be placed in DP::Test 
 =cut
+
 sub validateRequest {
 	if ( my @e = HTTP::OAI::Repository::validate_request(@_) ) {
 		fail "Query error: " . $e[0]->code . "\n";

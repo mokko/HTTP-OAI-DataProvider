@@ -20,19 +20,29 @@ use HTTP::OAI::DataProvider::Common qw/Debug Warning say/;
 
 =head1 SYNOPSIS
 
-	#Init
+	#(1) Init
 	use HTTP::OAI::DataProvider;
 	my $provider = HTTP::OAI::DataProvider->new(%options);
 	
-	#Verbs: GetRecord, Identify ...
+	#(2) Verbs: GetRecord, Identify ...
 	my $response=$provider->$verb(%params);
+	my $xml=$provider->asString($response);
 
-	#$response is a string in OAI-PMH XML, either one of the six OAI 
-	#verbs or an error. 
+	my $xml=$provider->asString($response);
+	#$response is a HTTP::OAI::Response object (verbs or error)
 
-	#New Error Checking 
-	if ($provider->OAIerrors->errors) {
-		debug $self->_output($provider->OAIerror);
+	#(3) NEW ERROR HANDLING
+	my $response=$provider->addError(code=>'badArgument');
+
+	if (!$provider->validateRequest (%params));
+		my $response=$provider->OAIerrors;
+	}
+
+	#elsewhere
+	if ($provider->error) { 	
+		my $response=$provider->OAIerrors;
+		my $xml=$provider->asString($response);
+		$provider->resetErrorStack;
 	}
 
 =head1 DESCRIPTION
@@ -45,12 +55,12 @@ example implementations that should work out of the box, including an SQLite
 backend (DP::Engine::SQLite), a metadata format (DP::Mapping::MPX), web 
 interface (bin/webapp.pl) and a command line interface (bin/dp.pl).
 
-I try to avoid too many and obscure dependencies. 
+I try to avoid too obscure dependencies. 
 
 Starting from version 0.07, the user-facing interface of this module should be 
 mostly stable.
 
-Please note: I use 'DP::' as an abbreviation of 'HTTP::OAI::DataProvider::' 
+Note: I use 'DP::' as an abbreviation of 'HTTP::OAI::DataProvider::' 
 thoughout the documentation.
 
 =method my $provider->new ($options);
@@ -165,9 +175,15 @@ has 'OAIerrors'  => (
 	is       => 'rw',
 	required => 0,
 	init_arg => undef,
+	isa      => 'HTTP::OAI::Response',
+	default  => sub { HTTP::OAI::Response->new }
 
-	#OAIerrors has no requestURL & no responseDate
-	default => sub { HTTP::OAI::Response->new() }
+	  #	default  => sub {
+	  #		my $self = shift;
+	  #		my $response =
+	  #		  HTTP::OAI::Response->new( requestURL => $self->requestURL );
+	  #		return $response;
+	  #	}
 );
 
 sub BUILD {
@@ -199,9 +215,10 @@ sub GetRecord {
 	my %params = @_
 	  or ();    #dont croak here, prefer propper OAI error
 
+	$self->resetErrorStack;    #not sure if this should be here
+
 	$params{verb} = 'GetRecord';
-	$self->_validateRequest(%params)
-	  or return $self->_output( $self->OAIerrors );
+	$self->validateRequest(%params) or return $self->OAIerrors;
 
 	my $engine        = $self->{Engine};
 	my $globalFormats = $self->{globalFormats};
@@ -209,18 +226,15 @@ sub GetRecord {
 	# Error handling
 	my $header = $engine->findByIdentifier( $params{identifier} );
 	if ( !$header ) {
-		$self->OAIerrors->errors(
-			new HTTP::OAI::Error( code => 'idDoesNotExist' ) );
+		$self->addError( code => 'idDoesNotExist' );
 	}
 
 	$self->checkFormatSupported( $params{metadataPrefix} );
 
-	if ( $self->OAIerrors->errors ) {
-		return $self->_output( $self->OAIerrors );
-	}
+	return $self->OAIerrors if ( $self->OAIerrors->errors );    ####
 
 	# Metadata handling
-	return $self->_output( $engine->query( \%params ) );
+	return $engine->query( \%params );
 }
 
 =method my $response=$provider->Identify([%params]);
@@ -236,18 +250,14 @@ granularity).
 =cut
 
 sub Identify {
-	my $self     = shift;
-	my %params   = @_ or ();          #dont croak here, prefer propper OAI error
+	my $self = shift or die "Need myself";
+	my %params = $self->_verb( verb => 'ListMetadataFormats', @_ );
+	return $self->OAIerrors if ( $self->error );
 	my $identify = $self->identify;
-	$params{verb} = 'Identify';
-
-	$self->_validateRequest(%params)
-	  or return $self->_output( $self->OAIerrors );
 
 	#Debug "Enter Identify";
-
 	# Metadata munging
-	my $obj = new HTTP::OAI::Identify(
+	my $response = new HTTP::OAI::Identify(
 		adminEmail    => $identify->{adminEmail},
 		baseURL       => $identify->{baseURL},
 		deletedRecord => $identify->{deletedRecord},
@@ -259,7 +269,7 @@ sub Identify {
 		requestURL        => $identify->{requestURL},
 	) or return "Cannot create new HTTP::OAI::Identify";
 
-	return $self->_output($obj);    #success
+	return $response;    #success
 }
 
 =method ListMetadataFormats (%params);
@@ -285,27 +295,37 @@ ERRORS
 
 =cut
 
+=method 
+
+	my %params=$self->_verb(verb=>'ListMetadataFormats', %params);
+	return $self->OAIerrors if ( $self->error );     
+
+=cut
+
+sub _verb {
+	my $self = shift or die "Need myself";
+
+	#dont croak here, prefer propper OAI error
+	my %params = @_ or ();
+
+	$self->resetErrorStack;    #not sure if this should be here
+	$self->validateRequest(%params);
+	return %params;
+
+}
+
 sub ListMetadataFormats {
-	my $self = shift;
+	my $self = shift or die "Need myself";
+	my %params = $self->_verb( verb => 'ListMetadataFormats', @_ );
+	return $self->OAIerrors if ( $self->error );
 
-	#Warning ' Enter ListMetadataFormats ';
-	my %params = @_
-	  or ();    #dont croak here, prefer propper OAI error
-	$params{verb} = 'ListMetadataFormats';
 	my $engine = $self->{Engine};
-
-	#
-	# Error handling
-	#
-	$self->_validateRequest(%params)
-	  or return $self->_output( $self->OAIerrors );
 
 	#only if there is actually an identifier
 	if ( $params{identifier} ) {
 		my $header = $engine->findByIdentifier( $params{identifier} );
 		if ( !$header ) {
-			$self->OAIerrors->errors(
-				new HTTP::OAI::Error( code => 'idDoesNotExist' ) );
+			$self->addError( code => 'idDoesNotExist' );
 		}
 	}
 
@@ -323,14 +343,13 @@ sub ListMetadataFormats {
 
 	#check if noMetadataFormats
 	if ( $list->metadataFormat() == 0 ) {
-		$self->OAIerrors->errors(
-			new HTTP::OAI::Error( code => 'noMetadataFormats' ) );
+		$self->addError( code => 'noMetadataFormats' );
 	}
 
-	if ( $self->OAIerrors->errors ) {
-		return $self->_output( $self->OAIerrors );
+	if ( $self->error ) {
+		return $self->OAIerrors;
 	}
-	return $self->_output($list);    #success
+	return $list;    #success
 }
 
 =method my $response=$provider->ListIdentifiers (%params);
@@ -371,14 +390,11 @@ TODO: Hierarchical sets
 
 sub ListIdentifiers {
 	my $self = shift or croak "Need myself!";
+	my %params = $self->_verb( verb => 'ListIdentifiers', @_ );
+	return $self->OAIerrors if ( $self->error );
+
 	my $engine = $self->{Engine}
 	  or croak "Internal error: Data store missing!";
-	my %params = @_
-	  or ();    #dont croak here, prefer propper OAI error
-	$params{verb} = 'ListIdentifiers';
-
-	$self->_validateRequest(%params)
-	  or return $self->_output( $self->OAIerrors );
 
 	if ( $params{resumptionToken} ) {
 
@@ -386,12 +402,10 @@ sub ListIdentifiers {
 		my $chunk = $engine->chunkExists(%params);
 
 		if ($chunk) {
-			return $self->_output($chunk);    #success
+			return $self->asString($chunk);    #success
 		}
 
-		$self->OAIerrors->errors(
-			new HTTP::OAI::Error( code => 'badResumptionToken' ) );
-		return $self->_output( $self->OAIerrors );
+		return $self->addError( code => 'badResumptionToken' );
 	}
 
 	#reach here if no resumption token
@@ -403,8 +417,7 @@ sub ListIdentifiers {
 
 		#query contains sets, but data has no set defined
 		if ( !@used_sets ) {
-			$self->OAIerrors->errors(
-				new HTTP::OAI::Error( code => 'noRecordsMatch' ) );
+			$self->addError( code => 'noRecordsMatch' );
 		}
 	}
 
@@ -413,17 +426,12 @@ sub ListIdentifiers {
 	my $response = $engine->query( \%params );    #todo!
 
 	if ( !$response ) {
-		$self->OAIerrors->errors(
-			new HTTP::OAI::Error( code => 'noRecordsMatch' ) );
+		$self->addError( code => 'noRecordsMatch' );
 	}
 
-	if ( $self->OAIerrors->errors ) {
-		return $self->_output( $self->OAIerrors );
-	}
-
-	#Debug "RESPONSE:".$response;
-	#todo: check if at least one record. On which level?
-	return $self->_output($response);
+	#todo: check if at least one record. Where?
+	return $self->OAIerrors if ( $self->error );
+	return $response;
 }
 
 =method my $response=$provider->ListRecords(%params);
@@ -455,12 +463,10 @@ ERRORS
 =cut
 
 sub ListRecords {
-	my $self   = shift;
-	my %params = @_
-	  or ();    #dont croak here, prefer propper OAI error
-	$params{verb} = 'ListRecords';
-	$self->_validateRequest(%params)
-	  or return $self->_output( $self->OAIerrors );
+	my $self = shift;
+	my %params = $self->_verb( verb => 'ListRecords', @_ );
+	return $self->OAIerrors if ( $self->error );
+	my $engine = $self->{Engine};
 
 	#Warning 'Enter ListRecords (prefix:' . $params->{metadataPrefix};
 
@@ -470,37 +476,23 @@ sub ListRecords {
 	#Debug 'resumption:' . $params->{resumptionToken}
 	#  if $params->{resumptionToken};
 
-	my $engine = $self->{Engine};
-
 	# Error handling
 
 	if ( $params{resumptionToken} ) {
 		my $chunk = $engine->chunkExists(%params);
-		if ($chunk) {
-			return $self->_output($chunk);
-		}
-		$self->OAIerrors->errors(
-			new HTTP::OAI::Error( code => 'badResumptionToken' ) );
-		return $self->_output( $self->OAIerrors );
+		return $chunk if ($chunk);
+		return $self->addError( code => 'badResumptionToken' );
 	}
 
 	$self->checkFormatSupported( $params{metadataPrefix} );
 
-	if ( $self->OAIerrors->errors ) {
-		return $self->_output( $self->OAIerrors );
-	}
+	return $self->OAIerrors if ( $self->error );
 
 	# Metadata handling
 
-	my $response = $engine->query( \%params );    #todo!
-
-	if ( !$response ) {
-		$self->OAIerrors->errors(
-			new HTTP::OAI::Error( code => 'noRecordsMatch' ) );
-		return $self->_output( $self->OAIerrors );
-	}
-
-	return $self->_output($response);
+	my $response = $engine->query( \%params );
+	return $self->addError( code => 'noRecordsMatch' ) if ( !$response );
+	return $response;
 }
 
 =method my $response=$provider->ListSets(%params);
@@ -520,31 +512,19 @@ ERRORS
 =cut
 
 sub ListSets {
-	my $self   = shift;
-	my %params = @_
-	  or ();    #dont croak here, prefer propper OAI error
+	my $self   = shift           or croak "Provider missing!";
+	my $engine = $self->{Engine} or croak "Engine missing!";
+	my %params = $self->_verb( verb => 'ListSets', @_ );
+	return $self->OAIerrors if ( $self->error );
 
-	my $engine = $self->{Engine};
-
-	$params{verb} = 'ListSets';
-	$self->_validateRequest(%params)
-	  or return $self->_output( $self->OAIerrors );
-
-	#print "Enter ListSets $self\n";
-
-	#errors in using this package...
-	croak "Engine missing!"   if ( !$engine );
-	croak "Provider missing!" if ( !$self );
+	#Debug "Enter ListSets $self\n";
 
 	#resumptionTokens not supported/TODO
 	if ( $params{resumptionToken} ) {
-		$self->OAIerrors->errors(
-			new HTTP::OAI::Error(
-				code    => 'badResumptionToken',
-				message => 'resumption token not yet supported with listsets'
-			)
+		return $self->addError(
+			code    => 'badResumptionToken',
+			message => 'resumption token not yet supported with listsets'
 		);
-		return $self->_output( $self->OAIerrors );
 	}
 
 	# Get the setSpecs from engine/store
@@ -553,33 +533,30 @@ sub ListSets {
 
 	#if none then noSetHierarchy (untested)
 	if ( !@used_sets ) {
-		$self->OAIerrors->errors(
-			new HTTP::OAI::Error( code => 'noSetHierarchy' ) );
-		return $self->_output( $self->OAIerrors );
+		return $self->addError( code => 'noSetHierarchy' );
 	}
 
 	my $listSets = $self->_processSetLibrary();
 
-	my $library = new HTTP::OAI::DataProvider::SetLibrary();
+	my $library = HTTP::OAI::DataProvider::SetLibrary->new;
 	$library->addListSets($listSets)
 	  or die "Error: some error occured in library->addListSet";
 
-	if ( !$library ) {
+	if ($library) {
+		$listSets = $library->expand(@used_sets);
+	}
+	else {
 
 		Warning "setLibrary cannot be loaded, proceed without setNames and "
 		  . "setDescriptions";
 
 		foreach (@used_sets) {
-			my $s = new HTTP::OAI::Set;
+			my $s = HTTP::OAI::Set->new;
 			$s->setSpec($_);
 			$listSets->set($s);
 		}
 	}
-	else {
-		$listSets = $library->expand(@used_sets);
-	}
-
-	return $self->_output($listSets);
+	return $listSets;
 }
 
 =method checkFormatSupported ($prefixWanted);
@@ -598,44 +575,37 @@ sub checkFormatSupported {
 	my $self         = shift or carp "Need self!";
 	my $prefixWanted = shift or carp "Need something to test for";
 	if ( !$self->{globalFormats}{$prefixWanted} ) {
-		$self->OAIerrors->errors(
-			new HTTP::OAI::Error( code => 'cannotDisseminateFormat' ) );
+		$self->addError( code => 'cannotDisseminateFormat' );
 	}
 }
 
-=method my $xml=$self->_output($response);
+=method my $xml=$self->asString($response);
 
 Expects a HTTP::OAI::Response object and returns it as xml string. It applies
-$self->{xslt} if set.
+$self->{xslt} if set and also applies a current requestURL.
 
 =cut
 
-sub _output {
-	my $self     = shift;
+sub asString {
+	my $self = shift or croak "Need myself";
 	my $response = shift
-	  or croak "No response";        #a HTTP::OAI::Response object
-	$self->_init_xslt($response);    #response is a HTTP::OAI::$verb object
+	  or croak "No response";    #a HTTP::OAI::Response object
+	Debug "$response: " . $response;
+	$self->_init_xslt($response);
 	$response = $self->_transferRURL($response);
 
 	my $xml;
 	$response->set_handler( XML::SAX::Writer->new( Output => \$xml ) );
 	$response->generate;
 
-	#reset the OAIerror for next time
-	$self->OAIerrors( HTTP::OAI::Response->new() );
 	return encode_utf8($xml);
 
 #as per https://groups.google.com/forum/?fromgroups#!topic/psgi-plack/J0IiUanfgeU
 }
 
-sub _outputAlt {
-	my $self     = shift;
-	my $response = shift
-	  or croak "No response";        #a HTTP::OAI::Response object
-	$self->_init_xslt($response);    #response is a HTTP::OAI::$verb object
-	$response = $self->_transferRURL($response);
-	return encode_utf8( $response->toDOM->toString );
-}
+#
+#
+#
 
 =method $obj= $self->_transferRURL($response)
 
@@ -677,16 +647,82 @@ sub _init_xslt {
 	}
 }
 
+=method $self->addError(code=>$code, message=>$message);
+
+Expected is an error code and optionally an error message. If not specified, 
+message will use default message for that error code. Returns a 
+HTTP::OAI::Response object with the error stack. Croaks on failure.
+
+TODO: Theoretically, I need a way to add multiple errors at once:
+
+$self->addError([(code=>$code, message=>$message), (code=>$code, message=>$message)]);
+
+=cut
+
+sub addError {
+	my $self = shift or croak "Need myself";
+	my %args = @_;
+	die "Need error code!" if ( !$args{code} );
+
+	$self->OAIerrors->errors( HTTP::OAI::Error->new(%args) );
+	return $self->OAIerrors;
+
+}
+
+=method $self->error
+
+Have errors occured? Returns number of errors that have been added to error 
+stack so far or else false.
+
+=cut
+
+sub error {
+	my $self = shift or croak "Need myself";
+	return $self->OAIerrors->errors;
+}
+
+=method $provider->resetErrorStack;
+
+Creates a new empty HTTP::OAI::Response for OAIerrors. 
+
+I wonder if this should be called before every verb. Then I probably don't
+need to call it from the outside at all.
+
+=cut
+
+sub resetErrorStack {
+	my $self = shift or croak "Need myself!";
+	$self->OAIerrors( HTTP::OAI::Response->new );
+}
+
+=method $self->validateRequest(%params) or return $self->OAIerrors;
+
+My validateRequest returns 1 on success (i.e. no validation error).
+=cut
+
+sub validateRequest {
+	my $self = shift or croak "Need myself!";
+	my %params = @_ or ();    #dont croak here, prefer propper OAI error
+	foreach my $err ( validate_request(%params) ) {
+		$self->OAIerrors->errors($err);    #adds to error stack manually
+		 #$self->addError(code=>$err->code, message=>$err->message);    #adds to error stack manually
+	}
+
+	#avoid HTTP::OAI::Response->is_error since it makes trouble
+	if ( $self->error ) {
+		Debug "validateRequest: found error";
+		return;    # error = request NOT valid
+	}
+	Debug "validateRequest: found NO error";
+	return 1;    #success = request is valid
+}
+
 sub _uriTest {
 	my $format = shift or croak "Need format!";
 	my @keys = qw (ns_uri ns_schema);
 
 	foreach my $key (@keys) {
-		if ( !$format->{$key} ) {
-
-			#print "$key not defined\n";
-			return;
-		}
+		return if ( !$format->{$key} );
 		my $uri = URI->new( $format->{$key} );
 		if ( !$uri->scheme ) {
 
@@ -695,30 +731,6 @@ sub _uriTest {
 		}
 	}
 	return 1;    #exists and is uri
-}
-
-=method $self->_validateRequest(%params) or return $self->error;
-
-You may want to write $self->_validateRequest(verb=>'GetRecord', %params) if 
-params does not include a verb.
-
-=cut
-
-sub _validateRequest {
-	my $self = shift or croak "Need myself!";
-	my %params = @_ or ();    #dont croak here, prefer propper OAI error
-	my $e = 0;
-	foreach my $err ( validate_request(%params) ) {
-		$self->OAIerrors->errors($err);    #adds to OAI error lost
-		$e++;
-		die "Problem with err: $err" if ( ref $err ne 'HTTP::OAI::Error' );
-	}
-
-	#avoid HTTP::OAI::Response::is_error makes trouble
-	if ( $e > 0 ) {
-		return;                            # return empty on error
-	}
-	return 1;    #my validateRequest returns 1 on success (no validation error)
 }
 
 sub _processSetLibrary {

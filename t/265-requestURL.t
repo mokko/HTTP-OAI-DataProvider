@@ -50,12 +50,12 @@ my $codeRef = sub {
 		
 		my $response = $provider->$verb( %{$params} );
 
-		if ( $provider->OAIerrors->errors ) {
+		if ( $provider->error ) {
 			die "provider error:" . $provider->OAIerrors;
 			#fail "oaiError where there should be none";
 		}
 
-		my $xt = xpathTester($response);
+		my $xt = xpathTester($provider->asString($response));
 		#print "$response\n";
 		$xt->is( $xpath, $url, "$verb" );
 	}

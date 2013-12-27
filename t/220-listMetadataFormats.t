@@ -3,7 +3,7 @@ use warnings;
 use Test::More;
 use HTTP::OAI::DataProvider;
 use HTTP::OAI::DataProvider::Test
-  qw/isLMFprefix okListMetadataFormats xpathTester isOAIerror/;
+  qw/isLMFprefix okListMetadataFormats xpathTester isOAIerror isOAIerror2/;
 use Test::XPath;
 use XML::LibXML;
 
@@ -22,9 +22,10 @@ my $baseURL = 'http://localhost:3000/oai';
 {
 	my $response =
 	  $provider->ListMetadataFormats();    #response should be a xml string
-	  	okListMetadataFormats($response);
+	my $xml = $provider->asString($response);
+	okListMetadataFormats($response);
 	foreach my $prefix ( keys %{ $config{globalFormats} } ) {
-		isLMFprefix( $response, $prefix );
+		isLMFprefix( $xml, $prefix );
 	}
 }
 
@@ -32,27 +33,25 @@ my $baseURL = 'http://localhost:3000/oai';
 
 	#diag "ListMetadataFormats __with__ identifier";
 	my $response = $provider->ListMetadataFormats(
-		identifier => 'spk-berlin.de:EM-objId-543' ) or die "Cant get metadata format";
+		identifier => 'spk-berlin.de:EM-objId-543' )
+	  or die "Cant get metadata format";
 	okListMetadataFormats($response);
 
 }
-
 {
-
 	#testing badArgument
 	my $response = $provider->ListMetadataFormats( iddentifiier => 'wrong' );
-	isOAIerror( $response, 'badArgument' );
-	#print 'sdsds'.$response."\n";
-	
+	isOAIerror2( $response, 'badArgument' );
+
 	$response = $provider->Identify( Identifier => 'meschugge' );
-	#print 'sdsds'.$response."\n";
-	isOAIerror( $response, 'badArgument' );
+	isOAIerror2( $response, 'badArgument' );
 }
 
 {
 	my $response = $provider->ListMetadataFormats(
 		identifier => 'spk-berlin.de:EM-objId-01234567890A' );
-	if ( $response ) {
+	if ($response) {
+
 		#ok ($response=~/idDoesNotExist/, 'idDoesNotExist ok');
 		#isOAIerror( $response, 'idDoesNotExist' );
 	}
