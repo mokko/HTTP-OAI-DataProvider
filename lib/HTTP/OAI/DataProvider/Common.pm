@@ -1,6 +1,6 @@
 package HTTP::OAI::DataProvider::Common;
 {
-  $HTTP::OAI::DataProvider::Common::VERSION = '0.007';
+  $HTTP::OAI::DataProvider::Common::VERSION = '0.009';
 }
 use strict;
 use warnings;
@@ -10,8 +10,9 @@ use warnings;
 use Scalar::Util;
 use Carp qw(carp croak);
 use Cwd qw(realpath);
-use File::Spec;
+
 use FindBin;
+use Path::Class;
 
 use base 'Exporter';
 our @EXPORT_OK;
@@ -42,15 +43,20 @@ sub modDir {
 }
 
 #load this once when the module is loaded
-sub _modDir {
-	my $_modDir = __FILE__;
-	$_modDir =~ s,\.pm$,,;
-	$_modDir = realpath( File::Spec->catfile( $_modDir, '..' ) );
+##sub _modDir {
+#	my $_modDir = __FILE__;
+#	$_modDir =~ s,\.pm$,,;
+#	$_modDir = realpath( File::Spec->catfile( $_modDir, '..' ) );
+#
+#	if ( !-d $_modDir ) {
+#		carp "modDir does not exist! ($_modDir)";
+#	}
+#	$modDir = $_modDir;
+#}
 
-	if ( !-d $_modDir ) {
-		carp "modDir does not exist! ($_modDir)";
-	}
-	$modDir = $_modDir;
+
+sub _modDir {
+	return file(__FILE__)->parent;
 }
 
 
@@ -121,26 +127,27 @@ sub say {
 
 
 sub testEnvironment {
-	my $arg    = shift;
-	my $dir    = File::Spec->catfile( $FindBin::Bin, '..', 't', 'environment' );
-	my $return = $dir;
+	my $arg = shift;
+	my $dir = file($FindBin::Bin);
+	$dir = dir( $dir->parent, 't', 'environment' );
 
 	if ( $arg eq 'config' ) {
-		return File::Spec->catfile( $dir, 'config.pl' );
+		return file( $dir, 'config.pl' );
 	}
 
 	if (@_) {
-		foreach my $item (@_) {
-			$return = File::Spec->catfile( $return, $item );
-		}
+		$dir = file( $dir, @_ );
 	}
-	return $return;
+	return $dir;
 }
 
 1;
 
 __END__
+
 =pod
+
+=encoding UTF-8
 
 =head1 NAME
 
@@ -148,7 +155,15 @@ HTTP::OAI::DataProvider::Common - common FUNCTIONs for the dataProvider
 
 =head1 VERSION
 
-version 0.007
+version 0.009
+
+=head1 METHODS
+
+=head2 my $modDir=$self->_modDir || die self->error;  
+
+returns absolute path of module's directory or error. 
+
+Carps on failure.
 
 =head1 FUNCTIONS
 
@@ -184,7 +199,7 @@ First initialize Debug with codeRef:
 	$config{debug}=sub { my $msg=shift; print "$msg\n" if $msg};
 	Debug $config{debug};
 Then use it
-	Debug "debug message";
+	Debug "message";
 
 =head2 Warning "message";
 
@@ -212,4 +227,3 @@ This is free software; you can redistribute it and/or modify it under
 the same terms as the Perl 5 programming language system itself.
 
 =cut
-

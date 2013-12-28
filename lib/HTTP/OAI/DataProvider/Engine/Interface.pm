@@ -1,6 +1,6 @@
 package HTTP::OAI::DataProvider::Engine::Interface;
 {
-  $HTTP::OAI::DataProvider::Engine::Interface::VERSION = '0.007';
+  $HTTP::OAI::DataProvider::Engine::Interface::VERSION = '0.009';
 }
 # ABSTRACT: my first interface
 use strict;
@@ -92,7 +92,10 @@ sub resetError {
 1;
 
 __END__
+
 =pod
+
+=encoding UTF-8
 
 =head1 NAME
 
@@ -100,7 +103,7 @@ HTTP::OAI::DataProvider::Engine::Interface - my first interface
 
 =head1 VERSION
 
-version 0.007
+version 0.009
 
 =head1 SYNOPSIS
 
@@ -194,17 +197,14 @@ Returns last error message (a string) if there has been an error yet.
 
 It returns nothing (failure) if no error message.
 
-Possible uses:
-
+	#eg
 	$engine->$method or croak $engine->error;
 
 	if ($engine->error) {
-		croak $engine->error
-	} else {
-		#there has not yet been an error
+		croak $engine->error;
 	}
 
-Note: Calling error with parameters is considered an error!
+	$engine->error('param'); # error!
 
 =head2 $engine->resetError
 
@@ -271,4 +271,3 @@ This is free software; you can redistribute it and/or modify it under
 the same terms as the Perl 5 programming language system itself.
 
 =cut
-

@@ -4,7 +4,7 @@
       "Maurice Mengel <mauricemengel@gmail.com>"
    ],
    "dynamic_config" : 0,
-   "generated_by" : "Dist::Zilla version 4.300017, CPAN::Meta::Converter version 2.120921",
+   "generated_by" : "Dist::Zilla version 5.006, CPAN::Meta::Converter version 2.132830",
    "license" : [
       "perl_5"
    ],
@@ -19,6 +19,11 @@
             "ExtUtils::MakeMaker" : "6.30"
          }
       },
+      "develop" : {
+         "requires" : {
+            "Test::Pod" : "1.41"
+         }
+      },
       "runtime" : {
          "requires" : {
             "Carp" : "0",
@@ -28,7 +33,6 @@
             "Dancer" : "0",
             "Encode" : "0",
             "Exporter" : "0",
-            "File::Spec" : "0",
             "FindBin" : "0",
             "Getopt::Long" : "0",
             "HTTP::OAI" : "0",
@@ -36,10 +40,11 @@
             "Moose" : "0",
             "Moose::Role" : "0",
             "Moose::Util::TypeConstraints" : "0",
+            "Path::Class" : "0",
             "Pod::Usage" : "0",
             "Scalar::Util" : "0",
             "Test::More" : "0",
-            "Test::Xpath" : "0",
+            "Test::XPath" : "0",
             "Time::HiRes" : "0",
             "URI" : "0",
             "XML::LibXML" : "0",
@@ -65,13 +70,13 @@
       "bugtracker" : {
          "web" : "https://rt.cpan.org/Public/Dist/Display.html?Name=HTTP-OAI-DataProvider"
       },
-      "homepage" : "https://github.com/mokko/HTTP-OAI-DataProvider/wiki",
+      "homepage" : "https://github.com///github.com/mokko/HTTP-OAI-DataProvider/wiki",
       "repository" : {
          "type" : "git",
-         "url" : "git://github.com/mokko/HTTP-OAI-DataProvider.git",
-         "web" : "https://github.com/mokko/HTTP-OAI-DataProvider"
+         "url" : "git://github.com///github.com/mokko/HTTP-OAI-DataProvider.git",
+         "web" : "https://github.com///github.com/mokko/HTTP-OAI-DataProvider"
       }
    },
-   "version" : "0.007"
+   "version" : "0.009"
 }
 

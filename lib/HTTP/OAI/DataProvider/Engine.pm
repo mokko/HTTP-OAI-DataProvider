@@ -1,6 +1,6 @@
 package HTTP::OAI::DataProvider::Engine;
 {
-  $HTTP::OAI::DataProvider::Engine::VERSION = '0.007';
+  $HTTP::OAI::DataProvider::Engine::VERSION = '0.009';
 }
 use strict;
 use warnings;
@@ -43,6 +43,8 @@ has 'engine'       => ( isa => 'Str',              is => 'ro', required => 1 );
 has 'locateXSL'    => ( isa => 'CodeRef',          is => 'ro', required => 1 );
 has 'nativeFormat' => ( isa => 'nativeFormatType', is => 'ro', required => 1 );
 has 'requestURL'   => ( isa => 'Uri',              is => 'rw', required => 0 );
+
+#N.B. $self->ChunkCache is HTTP::OAI::DataProvider::ChunkCache object.
 
 
 sub nativePrefix {
@@ -92,11 +94,9 @@ sub chunkExists {
 	my %params          = @_;
 	my $resumptionToken = $params{resumptionToken} or return;
 
-	#my $request = $self->requestURL;    #should be optional, but isn't, right?
-
 	my $chunkCache = $self->{ChunkCache};
 
-	Debug "Query chunkCache for " . $resumptionToken;
+	#Debug "->>>>>>>--Query chunkCache for " . $resumptionToken;
 
 	my $chunkDesc = $chunkCache->get($resumptionToken) or return;
 
@@ -120,7 +120,10 @@ sub mkToken {
 1;
 
 __END__
+
 =pod
+
+=encoding UTF-8
 
 =head1 NAME
 
@@ -128,7 +131,7 @@ HTTP::OAI::DataProvider::Engine - interface between database and data provider
 
 =head1 VERSION
 
-version 0.007
+version 0.009
 
 =head1 SYNOPSIS
 
@@ -137,7 +140,7 @@ version 0.007
 		engine=>'DataProvider::SQLite',
 		engineOpts=>$hashRef,
 	);
-	#internally calls $engine->initDB();
+	#internally calls $engine->init();
 
 	#main query
 	$result=$provider->query ($params);
@@ -182,9 +185,9 @@ sure that this distinction is necessary in this place).
 Engine is analogous to the DP::Ingester package which provides a similar 
 service for getting data into the database.
 
-This class is generic in the sense that it doesn't know either 
- a) about the metadataFormat nor 
- b) about the concrete database.
+This class is generic in the sense that it doesn't know about   
+ a) the metadataFormat AND
+ b) the concrete database.
 
 =head2 CLASS LAYOUT
 
@@ -203,18 +206,19 @@ DP::Ingester (class) consumes
 
 =head2 my $chunk=$self->chunkExists (%params);
 
-returns a chunk description (if one with this resumptionToken exists) or nothing.
+returns a chunk (not a chunk description) for a specified resumptionToken or 
+nothing (no chunk exists for this token).
 
-Usage:
+Expects a hashref with a resumptionToken (resumptionToken=>$token). On failure 
+(if resumptionToken is not known to chunk cache), it returns nothing.
+
 	my $chunk=$self->chunkExists (%params);
 	if (!$chunk) {
 		return new HTTP::OAI::Error (code=>'badResumptionToken');
 	}
 
- TODO: Should this move into the engine? Does the provider need to know about
- chunkcache at all?
- $engine->chunkExists(%params)
- $engine->chunkExists($resumptionToken);
+	#or:
+ 	my $chunk=$engine->chunkExists(resumptionToken=>$resumptionToken) or return;
 
 =head1 MEMO TO MYSELF
 
@@ -284,4 +288,3 @@ This is free software; you can redistribute it and/or modify it under
 the same terms as the Perl 5 programming language system itself.
 
 =cut
-

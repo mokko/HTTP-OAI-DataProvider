@@ -6,28 +6,17 @@ use Test::More tests => 9;
 use HTTP::OAI::DataProvider;
 use HTTP::OAI::DataProvider::Test;
 use XML::LibXML;
-use Test::Xpath;
-
-#use Data::Dumper qw(Dumper);
+use Test::XPath;
 
 # new is taken for granted
 my %config   = HTTP::OAI::DataProvider::Test::loadWorkingTestConfig();
-
-#use Data::Dumper qw(Dumper);
-#print Dumper (%config);
-
 my $provider = new HTTP::OAI::DataProvider(%config);
 
-#
-# execute verb: test if things work
-#
-my $response = $provider->Identify();    #response should be a xml string
-#print $response;
+my $response =
+  $provider->verb( verb => 'Identify' );    #response should be a xml string
 okIdentify($response);
 
-#
 # 1- check config values from test_config
-#
 my $from_config_test = {
 
 	#i could save the xpaths in H::O::DP::Test
@@ -37,15 +26,17 @@ my $from_config_test = {
 	deletedRecord  => '/oai:OAI-PMH/oai:Identify/oai:deletedRecord',
 };
 
-my $xt = xpathTester($response);
+my $xt = xpathTester( $response->toDOM->toString );
 
 foreach my $key ( keys %{$from_config_test} ) {
-	$xt->is( $from_config_test->{$key}, $config{identify}{$key}, "$key correct" );
+	$xt->is(
+		$from_config_test->{$key},
+		$config{identify}{$key},
+		"$key correct"
+	);
 }
 
-#
 # 2 - test static values
-#
 my $other_config_values = {
 	'request'           => '/oai:OAI-PMH/oai:request',
 	'granuality'        => '/oai:OAI-PMH/oai:Identify/oai:granularity',
@@ -71,12 +62,12 @@ foreach my $key ( keys %{$expected} ) {
 #
 
 {
-	my $response;
-	$response = $provider->Identify( bla => 'meschugge' );
-	isOAIerror($response, 'badArgument');
+	my $response =
+	  $provider->verb( verb => 'Identify', bla => 'meschugge' );
+	ok( $response->toDOM->toString =~ /badArgument/, 'right error' );
 }
 
 #
 # todo: at this point we have just tested if test configuration works as expected
-# next we have to test if various function/change as expected when config is changed
+# next we should test if variables change as expected when config is changed
 

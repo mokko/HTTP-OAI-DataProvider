@@ -24,7 +24,6 @@ lib/HTTP/OAI/DataProvider/SetLibrary.pm
 lib/HTTP/OAI/DataProvider/Test.pm
 lib/HTTP/OAI/DataProvider/Transformer.pm
 lib/HTTP/OAI/DataProvider/Valid.pm
-logs/development.log
 t/000-prepareEnvironment.t
 t/100-common-load.t
 t/101-common.t
@@ -40,10 +39,10 @@ t/150-chunkCache-load.t
 t/155-chunkCache.t
 t/156-chunkCacheDescription.t
 t/170-ingester.t
-t/200-load.t
-t/201-new.t
+t/200-load_data_provider.t
+t/201-new_data_provider.t
 t/202-badVerb.t
-t/204-internals.t
+t/203-data_provider_errors.t
 t/210-identify.t
 t/220-listMetadataFormats.t
 t/230-listIdentifiers.t

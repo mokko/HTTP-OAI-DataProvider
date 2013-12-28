@@ -1,6 +1,6 @@
 package HTTP::OAI::DataProvider::Engine::Result;
 {
-  $HTTP::OAI::DataProvider::Engine::Result::VERSION = '0.007';
+  $HTTP::OAI::DataProvider::Engine::Result::VERSION = '0.009';
 }
 
 #ABSTRACT: Result object for engine
@@ -11,8 +11,7 @@ use Carp qw(croak carp);
 use HTTP::OAI;
 use Encode qw/decode/;    #encoding problem when dealing with data from sqlite
 
-#
-# DOUBTFUL!
+
 #not sure if I should inherit from Engine!
 #use parent qw(HTTP::OAI::DataProvider::Engine);
 use HTTP::OAI::DataProvider::Common qw(Warning Debug);
@@ -20,14 +19,14 @@ use HTTP::OAI::DataProvider::Common qw(Warning Debug);
 has 'transformer' => ( isa => 'Object', is => 'ro', required => 1 );
 has 'verb'        => ( isa => 'Str',    is => 'ro', required => 1 );
 
-has 'chunkSize'  => ( isa => 'Str',    is => 'ro', required => 1 );
-has 'chunkNo'  => ( isa => 'Str',    is => 'ro', required => 1 );
-has 'token'  => ( isa => 'Str',    is => 'ro', required => 1 );
-has 'targetPrefix'  => ( isa => 'Str',    is => 'ro', required => 1 );
-has 'total'  => ( isa => 'Str',    is => 'ro', required => 1 );
+has 'chunkSize'    => ( isa => 'Str', is => 'ro', required => 1 );
+has 'chunkNo'      => ( isa => 'Str', is => 'ro', required => 1 );
+has 'token'        => ( isa => 'Str', is => 'ro', required => 1 );
+has 'targetPrefix' => ( isa => 'Str', is => 'ro', required => 1 );
+has 'total'        => ( isa => 'Str', is => 'ro', required => 1 );
 
-has 'next'  => ( isa => 'Str',    is => 'rw', required => 0 );
-has 'requestURL'  => ( isa => 'Str',    is => 'rw', required => 0 );
+has 'next'       => ( isa => 'Str', is => 'rw', required => 0 );
+has 'requestURL' => ( isa => 'Str', is => 'rw', required => 0 );
 
 
 sub BUILD {
@@ -234,6 +233,7 @@ sub save {
 		my $dom = XML::LibXML->load_xml( string => $args{md} );
 
 		my $prefix = $result->targetPrefix or croak "still no prefix?";
+
 		#Debug "prefix:$prefix-----------------------";
 
 		my $transformer = $result->{transformer};
@@ -350,30 +350,29 @@ sub isError {
 	#Debug "HTTP::OAI::DataProvider::Result::isError";
 
 	if ( ref $result ne 'HTTP::OAI::DataProvider::Engine::Result' ) {
-		die "isError: Wrong class ";
+		carp "isError: Wrong class ";    #unlikely, unperlish, but possible...
 	}
 
 	if ( $result->{errors} ) {
 		return @{ $result->{errors} };
 	}
-	else {
-		return ();    #fail
-	}
+	return;                             #fail, i.e. no error
 }
 
 
 sub lastChunk {
 	my $result = shift;
-	if ( $result->{last} ) {
-		return 1;
-	}
-	return ();
+	return 1 if $result->{last};
+	return;
 }
 __PACKAGE__->meta->make_immutable;
 1;
 
 __END__
+
 =pod
+
+=encoding UTF-8
 
 =head1 NAME
 
@@ -381,7 +380,7 @@ HTTP::OAI::DataProvider::Engine::Result - Result object for engine
 
 =head1 VERSION
 
-version 0.007
+version 0.009
 
 =head1 METHODS
 
@@ -420,7 +419,7 @@ is convenient.
 
 Adds an HTTP::OAI::Error error to a result object. Test with
 	if ($result->isError) {
-		$provider->err2XML ($result->isError);
+		#something
 	}
 
 isError returns 
@@ -516,16 +515,16 @@ it'll be applied to the ListRecord object.
 Returns a list of HTTP::OAI::Error objects if any.
 
 	if ( $result->isError ) {
-		return $self->err2XML($result->isError);
+		return $result->isError;
 	}
 
 Is _actually_ called in DataProvider.
 
-=head2 my $ret=result->lastChunk;
+=head2 my $ret=$result->lastChunk;
 
-	Returns 1 if this is the last chunk, otherwise empty.
+Returns 1 (success) if this is the last chunk, otherwise empty (failure).
 
-	if ($result->lastChunk)
+	print "this is the last or only chunk" if $result->lastChunk;
 
 =head1 DESCRIPTIOPN
 
@@ -597,4 +596,3 @@ This is free software; you can redistribute it and/or modify it under
 the same terms as the Perl 5 programming language system itself.
 
 =cut
-

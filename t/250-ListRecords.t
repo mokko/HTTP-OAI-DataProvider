@@ -13,9 +13,7 @@ my %params   = (
 	metadataPrefix => 'mpx',
 );
 
-failOnRequestError (%params); #I do want to make sure that params are correct
-
-my $response =  $provider->ListRecords( %params );    #response should be a xml string
+my $response =  $provider->verb( %params );    #response should be a xml string
 okListRecords($response);
 #print $response;
 

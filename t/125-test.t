@@ -13,23 +13,17 @@ use XML::LibXML;
 # not testing each and every message, die etc.
 
 {
-	my $id = new HTTP::OAI::Identify(
-		adminEmail     => 'billg@microsoft.com',
+	my $response = new HTTP::OAI::Identify(
+		adminEmail     => 'billig@microsoft.com',
 		baseURL        => 'http://www.myarchives.org/oai',
 		repositoryName => 'www.myarchives.org',
 		granularity    => 'YYYY-MM-DDThh:mm:ssZ',
 	);
-
-	my $response = $id->toDOM->toString;
-
-	#	print "$response\n";
 	okIdentify($response);
 }
 
 {
 	my $response = testGetRecord();
-
-	#print "$response\n";
 	okGetRecord($response);
 }
 
@@ -39,23 +33,19 @@ use XML::LibXML;
 		datestamp  => '2002-04-12T20:31:00Z',
 	);
 
-	my $li = new HTTP::OAI::ListIdentifiers;
-	$li->identifier($header);
-
-	my $response = $li->toDOM->toString;
-
-	#print "$response\n";
+	my $response = new HTTP::OAI::ListIdentifiers;
+	$response->identifier($header);
 	okListIdentifiers($response);
 }
 
 {
-	my $response = testGetRecord();
+	my $xml = testGetRecord()->toDOM->toString(1);
 	ok(
-		HTTP::OAI::DataProvider::Test::_validateOAIresponse( $response, 'lax' ),
-		'validates as expected'
+		HTTP::OAI::DataProvider::Test::validateOAIxml( $xml, 'lax' ),
+		'lax validatation passes as expected'
 	);
-	ok( !HTTP::OAI::DataProvider::Test::_validateOAIresponse($response),
-		'does not validate as expected' );
+	ok( !HTTP::OAI::DataProvider::Test::validateOAIxml($xml),
+		'strict validatation fails as expected' );
 
 }
 
@@ -64,7 +54,8 @@ use XML::LibXML;
 ###
 
 sub testGetRecord {
-	my $xml = '<data1 xmlns="http://www.test.org">eins</data1>';
+	my $xml = '<data xmlns="http://www.test.org">eins</data>';
+	#my $xml = '<data>eins</data>';
 	my $md  = XML::LibXML->load_xml( string => $xml );
 	my $ab  = XML::LibXML->load_xml( string => $xml );
 
@@ -80,6 +71,6 @@ sub testGetRecord {
 	my $gr = new HTTP::OAI::GetRecord();
 	$gr->record($record);
 
-	return $gr->toDOM->toString;
+	return $gr;
 
 }

@@ -1,6 +1,6 @@
 package HTTP::OAI::DataProvider::Mapping::MPX;
 {
-  $HTTP::OAI::DataProvider::Mapping::MPX::VERSION = '0.007';
+  $HTTP::OAI::DataProvider::Mapping::MPX::VERSION = '0.009';
 }
 
 # ABSTRACT: MPX-specific extensions
@@ -199,9 +199,11 @@ sub _setRules {
 
 1;
 
-
 __END__
+
 =pod
+
+=encoding UTF-8
 
 =head1 NAME
 
@@ -209,14 +211,15 @@ HTTP::OAI::DataProvider::Mapping::MPX - MPX-specific extensions
 
 =head1 VERSION
 
-version 0.007
+version 0.009
 
 =head1 DESCRIPTION
 
-This is an example for a metadata mapping. During the ingest process when data
-is important into the database HTTP::OAI::DataProvider needs to figure out how
-to extract or create OAI header information (identifier, datestamp and 
-metadata) from your data. To do so you need to know the data format. All code
+This is an example for a metadata mapping. During the ingest process (when 
+data is being imported into the database) the data provider 
+(HTTP::OAI::DataProvider) creates OAI headers. To do so, it needs to know how 
+to construct (find, extract, puzzle together) identifier, datestamp and metadata
+from your data. One can do this only with knowledge of data format. All code
 that needs knowledge about your data format is in this package.
 
 The only method that gets called from the outside is extractRecords.
@@ -265,4 +268,3 @@ This is free software; you can redistribute it and/or modify it under
 the same terms as the Perl 5 programming language system itself.
 
 =cut
-

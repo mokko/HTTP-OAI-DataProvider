@@ -1,6 +1,6 @@
 package HTTP::OAI::DataProvider::SetLibrary;
 {
-  $HTTP::OAI::DataProvider::SetLibrary::VERSION = '0.007';
+  $HTTP::OAI::DataProvider::SetLibrary::VERSION = '0.009';
 }
 # ABSTRACT: Handle set definitions
 
@@ -112,9 +112,11 @@ sub toListSets {
 __PACKAGE__->meta->make_immutable;
 1;
 
-
 __END__
+
 =pod
+
+=encoding UTF-8
 
 =head1 NAME
 
@@ -122,7 +124,7 @@ HTTP::OAI::DataProvider::SetLibrary - Handle set definitions
 
 =head1 VERSION
 
-version 0.007
+version 0.009
 
 =head1 DESCRIPTION
 
@@ -258,4 +260,3 @@ This is free software; you can redistribute it and/or modify it under
 the same terms as the Perl 5 programming language system itself.
 
 =cut
-

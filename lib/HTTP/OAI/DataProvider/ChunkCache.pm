@@ -1,6 +1,6 @@
 package HTTP::OAI::DataProvider::ChunkCache;
 {
-  $HTTP::OAI::DataProvider::ChunkCache::VERSION = '0.007';
+  $HTTP::OAI::DataProvider::ChunkCache::VERSION = '0.009';
 }
 use strict;
 use warnings;
@@ -11,13 +11,13 @@ use Moose;
 use namespace::autoclean;
 use Carp qw/carp croak/;
 use HTTP::OAI::DataProvider::ChunkCache::Description;
-
+#use HTTP::OAI::DataProvider::Common qw/Debug Warning/;
 our $chunkCache = {};
 has 'maxSize' => ( is => 'ro', isa => 'Int', required => '1' );
 
 
 sub add {
-	my $self = shift;
+	my $self = shift or croak "Need myself";
 	my $chunkDesc = shift or croak "Need chunkDescription!";    #should be return
 
 	if ( !ref $chunkDesc ) {
@@ -28,7 +28,7 @@ sub add {
 		croak "maxChunkNo greater than chunkCache maxSize";
 	}
 
-	#if necessary remove a description from cache
+	#necessary remove a description from cache
 	my $count   = $self->count();
 	my $overPar = $count + 1 - $self->{maxSize};
 	if ( $overPar > 0 ) {
@@ -36,6 +36,7 @@ sub add {
 	}
 
 	#write into cache
+	#Debug '==============adding chunk '.$chunkDesc->{token};
 	$chunkCache->{ $chunkDesc->{token} } = $chunkDesc;
 }
 
@@ -54,11 +55,15 @@ sub error {
 
 
 sub get {
-	my $self = shift;
+	my $self = shift or croak "Need myself";
 	my $token = shift or return;
 
 	if ( !$chunkCache->{$token} ) {
-		$self->{error} = "This token does not exist in cache";
+		my $msg="Token $token not found in chunk cache";
+		#use Data::Dumper;
+		#Debug $chunkCache;
+		$self->{error} = $msg;
+		#Debug $msg;
 		return;
 	}
 
@@ -84,6 +89,7 @@ sub _rmFromCache {    #gets called in add
 	my $i = 0;
 	while ( $i < $overPar ) {
 		my $key = shift @array;
+		#Debug "==============rming chunk $key";
 		delete $chunkCache->{$key};
 		$i++;
 	}
@@ -93,7 +99,10 @@ __PACKAGE__->meta->make_immutable;
 1;
 
 __END__
+
 =pod
+
+=encoding UTF-8
 
 =head1 NAME
 
@@ -101,15 +110,15 @@ HTTP::OAI::DataProvider::ChunkCache - Store request info per resumptionToken
 
 =head1 VERSION
 
-version 0.007
+version 0.009
 
 =head1 SYNOPSIS
 
 	use HTTP::OAI::DataProvider::ChunkCache;
 	my $cache=new HTTP::OAI::DataProvider::ChunkCache (maxSize=>$integer);
 
-	#chunkDesc is description of a chunk as hashref
-	#next is optional. Last token doesn't have a next
+	#chunkDesc is a chunk described as hashref
+	#Last description doesn't have a next
 	my $chunkDesc= new HTTP::OAI::DataProvider::ChunkCache::Description(
 		chunkNo=>$chunkNo,
 		maxChunkNo=>$maxChunkNo,
@@ -174,4 +183,3 @@ This is free software; you can redistribute it and/or modify it under
 the same terms as the Perl 5 programming language system itself.
 
 =cut
-

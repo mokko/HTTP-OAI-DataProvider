@@ -1,17 +1,17 @@
 #!/usr/bin/perl
 #PODNAME: ingest.pl
-# ABSTRACT: demo the data provider's ingest feature
+#ABSTRACT: demo the data provider's ingest feature
 
 use strict;
 use warnings;
 use Getopt::Long;
 use Carp 'confess';
 
-use FindBin;
-use File::Spec;
+#use FindBin;
+#use File::Spec;
 use XML::LibXML;
 use Pod::Usage;
-use lib File::Spec->catfile( $FindBin::Bin, '..', 'lib' );
+#use lib File::Spec->catfile( $FindBin::Bin, '..', 'lib' );
 use HTTP::OAI::DataProvider::Ingester;
 use HTTP::OAI::DataProvider::Mapping::MPX;
 use HTTP::OAI::DataProvider::Common qw(
@@ -107,9 +107,11 @@ sub userInput {
 	return %opts;
 }
 
-
 __END__
+
 =pod
+
+=encoding UTF-8
 
 =head1 NAME
 
@@ -117,7 +119,7 @@ ingest.pl - demo the data provider's ingest feature
 
 =head1 VERSION
 
-version 0.007
+version 0.009
 
 =head1 DESCRIPTION
 
@@ -171,4 +173,3 @@ This is free software; you can redistribute it and/or modify it under
 the same terms as the Perl 5 programming language system itself.
 
 =cut
-

@@ -2,22 +2,32 @@ NAME
     HTTP::OAI::DataProvider - A simple OAI data provider
 
 VERSION
-    version 0.007
+    version 0.009
 
 SYNOPSIS
-            #Init
+            #(1) Init
             use HTTP::OAI::DataProvider;
             my $provider = HTTP::OAI::DataProvider->new(%options);
         
-            #Verbs: GetRecord, Identify ...
+            #(2) Verbs: GetRecord, Identify ...
             my $response=$provider->$verb(%params);
+            my $xml=$provider->asString($response);
 
-            #$response is a string in OAI-PMH XML, either one of the six OAI 
-            #verbs or an error. 
+            my $xml=$provider->asString($response);
+            #$response is a HTTP::OAI::Response object (verbs or error)
 
-            #New Error Checking 
-            if ($provider->OAIerror) {
-                    debug $provider->error;
+            #(3) NEW ERROR HANDLING
+            my $response=$provider->addError(code=>'badArgument');
+
+            if (!$provider->validateRequest (%params));
+                    my $response=$provider->OAIerrors;
+            }
+
+            #elsewhere
+            if ($provider->error) {         
+                    my $response=$provider->OAIerrors;
+                    my $xml=$provider->asString($response);
+                    $provider->resetErrorStack;
             }
 
 DESCRIPTION
@@ -29,14 +39,6 @@ DESCRIPTION
     including an SQLite backend (DP::Engine::SQLite), a metadata format
     (DP::Mapping::MPX), web interface (bin/webapp.pl) and a command line
     interface (bin/dp.pl).
-
-    I try to avoid too many and obscure dependencies.
-
-    Starting from version 0.07, the user-facing interface of this module
-    should be mostly stable.
-
-    Please note: I use 'DP::' as an abbreviation of
-    'HTTP::OAI::DataProvider::' thoughout the documentation.
 
 METHODS
   my $provider->new ($options);
@@ -109,7 +111,7 @@ METHODS
             part (without ? followed by GET params), but that HTTP::OAI treats the
             complete URL as requestURL
 
-  my $result=$provider->GetRecord(%params);
+  my $result=$provider->_GetRecord(%params);
     Arguments =for :list * identifier (required) * metadataPrefix (required)
 
     Errors =for :list * badArgument * cannotDisseminateFormat *
@@ -226,66 +228,52 @@ METHODS
 
     *   noSetHierarchy
 
-  return $provider->error;
-    Returns an internal error message (if any). Error message is a single
-    scalar (string). TODO: at the monent it is not guaranteed to have an
-    error every time an error actually occured. See OAIerror instead.
-
-    Just a getter, no setter! The error is set internally, e.g.
-    $provider->_validateRequest (%params) or return provider->error;
-
-  return $provider->errorOAI;
-    Returns an internal error message (if any). Error message is a single
-    scalar (string). Just a getter, no setter!
-
   checkFormatSupported ($prefixWanted);
-    Expects a prefix for a metadataPrefix (as scalar), returns an OAI error
-    if the format cannot be disseminated. Returns nothing on success, so you
-    can do:
+    Expects a metadata prefix (as scalar). If it can't be disseminated an
+    OAI error is added to OAIerror stack and checkFormatSupported return 0
+    (fail). If format is supported, it returns 1 (success) and sets no
+    error.
 
-            if ( my $e = $self->checkFormatSupported( $params->{metadataPrefix} ) ) {
-                    push @errors, $e;
+            #Either
+            $provider->checkFormatSupported( $prefix );
+            if ($provider->error) {
+                    #do something
             }
+        
+            #Or
+            $provider->checkFormatSupported( $prefix ) or return $self->OAIerror;
 
-  my $xml=$provider->err2XML(@obj);
-    Parameter is an array of HTTP::OAI::Error objects.
-
-    (Now works with multiple OAI errors.)
-
-  $self->raiseOAIerrors (@errors);
-    Expects a list of HTTP::OAI errors. Sets xml string version of the error
-    message which can be retrieved using $self->error.
-
-  $self->raiseOAIerror('noRecordsMatch', 'optional message');
-    Expects an OAI error code as string. The error message is optional. Sets
-    the error message which can be retrieved using $self->error.
-
-  my $xml=$self->_output($response);
+  my $xml=$self->asString($response);
     Expects a HTTP::OAI::Response object and returns it as xml string. It
-    applies $self->{xslt} if set.
+    applies $self->{xslt} if set and also applies a current requestURL.
 
-  $obj= $self->overwriteRequestURL($obj)
-    If $provider->{requestURL} exists take that value and overwrite the
-    requestURL in the responseURL. requestURL specified in this module
-    consists only of http://blablabla.com:8080
+  $self->error
+    Have errors occured? Returns number of errors that have been added to
+    error stack so far or else false.
 
-    All params following the question mark are preserved.
+  $provider->resetErrorStack;
+    Creates a new empty HTTP::OAI::Response for OAIerrors.
 
-    I use this to correct the url of data provider which is hosted on two
-    different server. One hosts the perl webapp and the other one caches the
-    app for the public.
+    I wonder if this should be called before every verb. Then I probably
+    don't need to call it from the outside at all.
 
-  $obj= $self->_init_xslt($obj)
-    For an HTTP::OAI::Response object ($obj), sets the stylesheet to the
-    value specified during init. This assume that there is only one
-    stylesheet.
+  $self->validateRequest(%params) or return $self->OAIerrors;
+    Expects params in hash. It saves potential errors in $provider->errorOAI
+    and returns 1 on success (i.e. no validation error) or fails when
+    validation showed an error.
 
-    This may be a bad name, since not specific enough. This xslt is
-    responsible for a nicer look and added on the top of reponse headers.
+  $self->addError(code=>$code, message=>$message);
+    Expected is an error code and optionally an error message. If not
+    specified, message will use default message for that error code. Returns
+    a HTTP::OAI::Response object with the error stack. Croaks on failure.
 
-  $self->_validateRequest(%params) or return $self->error;
-    You may want to write $self->_validateRequest(verb=>'GetRecord',
-    %params) if params does not include a verb.
+    TODO: Theoretically, I need a way to add multiple errors at once:
+
+    $self->addError([(code=>$code, message=>$message), (code=>$code,
+    message=>$message)]);
+
+  verb
+            my $response=$provider->verb(%params);
 
 SEE ALSO
     <http://www.openarchives.org/OAI/openarchivesprotocol.html>

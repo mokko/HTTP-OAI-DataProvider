@@ -1,6 +1,6 @@
 package HTTP::OAI::DataProvider::ChunkCache::Description;
 {
-  $HTTP::OAI::DataProvider::ChunkCache::Description::VERSION = '0.007';
+  $HTTP::OAI::DataProvider::ChunkCache::Description::VERSION = '0.009';
 }
 
 # ABSTRACT: Store request info per resumptionToken
@@ -19,7 +19,7 @@ has 'total'        => ( is => 'ro', isa => 'Str', required => '1' );
 has 'targetPrefix' => ( is => 'ro', isa => 'Str', required => '1' );
 has 'next' => ( is => 'rw', isa => 'Str', required => '0' );
 has 'last' => ( is => 'rw', isa => 'Str', required => '0' );
-has 'requestURL' => ( is => 'rw', isa => 'Str', required => '0' );
+has 'requestURL' => ( is => 'rw', isa => 'Str', required => '0' ); #still necessary?
 
 
 
@@ -28,7 +28,10 @@ __PACKAGE__->meta->make_immutable;
 1;
 
 __END__
+
 =pod
+
+=encoding UTF-8
 
 =head1 NAME
 
@@ -36,7 +39,7 @@ HTTP::OAI::DataProvider::ChunkCache::Description - Store request info per resump
 
 =head1 VERSION
 
-version 0.007
+version 0.009
 
 =head1 METHODS
 
@@ -77,4 +80,3 @@ This is free software; you can redistribute it and/or modify it under
 the same terms as the Perl 5 programming language system itself.
 
 =cut
-

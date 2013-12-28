@@ -1,12 +1,13 @@
 package HTTP::OAI::DataProvider::Test;
 {
-  $HTTP::OAI::DataProvider::Test::VERSION = '0.007';
+  $HTTP::OAI::DataProvider::Test::VERSION = '0.009';
 }
+
 # ABSTRACT: Testing the data provider
 use strict;
 use warnings;
 use Test::More;
-use Test::Xpath;
+use Test::XPath;
 use FindBin;
 use XML::LibXML;
 use Carp qw(carp croak);
@@ -34,6 +35,7 @@ our @EXPORT;
   isLMFprefix
 
   isOAIerror
+  isOAIerror2
   oaiErrorResponse
 
   failOnRequestError
@@ -61,41 +63,46 @@ our @EXPORT;
 
 
 sub okGetRecord {
-	my $response = shift or croak "Need xml as string!";
+	my $response = shift or croak "Need HTTP::OAI::Response as string!";
 	_okType( $response, 'GetRecord', shift );
 }
 
 sub okIdentify {
-	my $response = shift or croak "Need xml as string!";
+	my $response = shift or croak "Need HTTP::OAI::Response as string!";
 	_okType( $response, 'Identify', shift );
 }
 
 sub okListIdentifiers {
-	my $response = shift or croak "Need xml as string!";
+	my $response = shift or croak "Need HTTP::OAI::Response as string!";
 	_okType( $response, 'ListIdentifiers', shift );
 }
 
 sub okListRecords {
-	my $response = shift or croak "Need xml as string!";
+	my $response = shift or croak "Need HTTP::OAI::Response as string!";
 	_okType( $response, 'ListRecords', shift );
 }
 
 sub okListMetadataFormats {
-	my $response = shift or croak "Need xml as string!";
+	my $response = shift or croak "Need HTTP::OAI::Response as string!";
 	_okType( $response, 'ListMetadataFormats', shift );
 }
 
 sub okListSets {
-	my $response = shift or croak "Need xml as string!";
+	my $response = shift or croak "Need HTTP::OAI::Response as string!";
 	_okType( $response, 'ListSets', shift );
 }
 
 #generic for okIfListIdentifiers,okIfIdentify etc.
 sub _okType {
-	my $response = shift or croak "Need xml as string!";
+	my $response = shift or croak "Need xml as a HTTP::OAI::Response!";
 	my $type     = shift or croak "Need type!";
 	my $msg = shift || "response validates and is of type $type\n";
-	isScalar($response);
+
+	if ( !( ref $response && $response->isa('HTTP::OAI::Response') ) ) {
+		croak 'Response not of the right type: ' . ref $response;
+	}
+
+	#checking user input
 	my @validVerbs = qw(Identify GetRecord ListIdentifiers ListMetadataFormats
 	  ListRecords ListSets);
 
@@ -103,21 +110,7 @@ sub _okType {
 		croak "Error: Unknown type ($type)!";
 	}
 
-	my $xpath = "/oai:OAI-PMH/oai:$type";
-	my $lax = ( $type =~ /^ListRecords$|^GetRecord$/ ) ? 'lax' : '';
-
-	#print "LAX:$lax|type:$type\n";
-	if ( !_validateOAIresponse( $response, $lax ) ) {
-		fail "$type response does not validate $lax";
-	}
-
-	_failIfOAIerror( _response2dom($response) );
-
-	my $xt = xpathTester($response);
-
-	#print $response."\n";
-	$xt->ok( $xpath, $msg );
-
+	ok( $type eq $response->verb, $msg );
 }
 
 
@@ -147,8 +140,9 @@ sub isOAIerror {
 	my $code     = shift or croak "Need error type to look for!";
 	isScalar($response);
 	isScalar($code);
-	
+
 	my @errors = qw (
+	  badVerb
 	  badArgument
 	  badResumptionToken
 	  cannotDisseminateFormat
@@ -161,11 +155,36 @@ sub isOAIerror {
 		print "Unrecognized OAI error code ($code)\n";
 	}
 
-	my $dom = _response2dom($response);
+	my $dom = _response2dom($response) or die "no dom!";
 	_failValidationError($dom);
 	my $oaiError = _failNoOAIerror($dom);
 
 	ok( defined $oaiError->{$code}, "expect OAIerror of type '$code'" );
+}
+
+
+sub isOAIerror2 {
+	my $response = shift or croak "Need response!";
+	my $code     = shift or croak "Need error type to look for!";
+	croak "Wrong response object" if ( ref $response ne 'HTTP::OAI::Response' );
+	isScalar($code);
+	my @errors = qw (
+	  badVerb
+	  badArgument
+	  badResumptionToken
+	  cannotDisseminateFormat
+	  idDoesNotExist
+	  noMetadataFormats
+	  noRecordsMatch
+	  noSetHierarchy);
+
+	if ( !grep ( $_ eq $code, @errors ) ) {
+		croak "Unrecognized OAI error code ($code)\n";
+	}
+
+	#map {print $_} @{$response->{errors}};
+	my $matching=grep ( $_->code eq $code, @{ $response->{errors} } );
+	ok( $matching > 0, "expect OAIerror of type '$code'" );
 }
 
 
@@ -176,7 +195,7 @@ sub _okIfBadArgument {
 
 
 sub loadWorkingTestConfig {
-	my $signal   = shift; #optional
+	my $signal = shift;    #optional
 
 	my $fileName = HTTP::OAI::DataProvider::Common::testEnvironment('config');
 
@@ -191,23 +210,23 @@ sub loadWorkingTestConfig {
 
 	#signal in first level?
 	if ( $signal && $config{$signal} ) {
-		return %{$config{$signal}};
+		return %{ $config{$signal} };
 	}
 
 	#signal in 2nd level?
-	if ( $signal) {
-		foreach my $first (keys %config) {
-			if ($config{$first}{$signal}) {
-				return %{$config{$first}{$signal}};				
+	if ($signal) {
+		foreach my $first ( keys %config ) {
+			if ( $config{$first}{$signal} ) {
+				return %{ $config{$first}{$signal} };
 			}
 		}
-	#return complete hash	
-	return %{$config{$signal}};
+
+		#return complete hash
+		return %{ $config{$signal} };
 	}
-	
+
 	return %config;
 }
-
 
 
 sub oaiErrorResponse {
@@ -230,14 +249,12 @@ sub oaiError {
 		my $code = $xc->findvalue('/oai:OAI-PMH/oai:error/@code');
 		my $desc = '';
 		$desc = $xc->findvalue('/oai:OAI-PMH/oai:error');
-
-		#print "badewanne".$doc->toString."\n";
 		if ($code) {
 			$error->{$code} = $desc;
-			return $error; #success, i.e. error exists
+			return $error;    #success, i.e. error exists
 		}
 	}
-	return; #failure,i.e. no error
+	return;                   #failure,i.e. no error
 }
 
 
@@ -249,9 +266,8 @@ sub failOnRequestError {
 }
 
 
-
 sub testSequence {
-	my %opts = @_;
+	my %opts     = @_;
 	my @sequence = @{ $opts{sequence} };
 	my $provider = new HTTP::OAI::DataProvider( %{ $opts{config} } );
 
@@ -262,8 +278,6 @@ sub testSequence {
 		$opts{codeRef}( $provider, $verb, $params );
 	}
 }
-
-
 
 
 sub xpathTester {
@@ -331,7 +345,7 @@ sub _registerOAI {
 }
 
 
-sub _validateOAIresponse {
+sub validateOAIxml {
 	my $response = shift or croak "Error: Need doc!";
 	my $type = shift || '';
 
@@ -347,11 +361,10 @@ sub _validateOAIresponse {
 		$msg = $v->validate($doc);
 	}
 
-	#print "msg:$msg (type:$type)\n";
 	if ( $msg eq 'ok' ) {
-		return 1;    #success
+		return 1;    #error
 	}
-	carp "$msg\n";
+	warn "$msg (type:$type)\n";
 	return 0;
 }
 
@@ -434,7 +447,10 @@ sub _okOaiResponse {
 1;
 
 __END__
+
 =pod
+
+=encoding UTF-8
 
 =head1 NAME
 
@@ -442,7 +458,7 @@ HTTP::OAI::DataProvider::Test - Testing the data provider
 
 =head1 VERSION
 
-version 0.007
+version 0.009
 
 =head1 FUNCTIONS
 
@@ -457,15 +473,20 @@ version 0.007
 New version of tests. Validates and checks if element named after verb (aka 
 'the type') exists.
 
-=head2 isLMFprefix ($response, 'prefix');
+=head2 isLMFprefix ($response_xml, 'prefix');
 
-test if ListMetadataFormats response contains a specific prefix.
+test if ListMetadataFormats response contains a specific prefix. Response
+here is xml string.
 
 =head3 OAI Error tests
 
 =head2 isOAIerror ($response, $code);
 
 passes if $response is of error type $code
+
+=head2 isOAIerror ($response, $code);
+
+passes if $response is of error type $code. Here $response is a HTTP::OAI::Response
 
 =head2 okIfBadArgument ($response);
 
@@ -487,7 +508,7 @@ Instead use:
 Most of the time you want oaiErrorResponse instead of this one. Still trying to
 figure out if this function should be internal.
 
-Returns nothing if no response is not an error. If the response is erroneous, 
+Returns nothing if response is not an error. If the response is erroneous, 
 returns a hashref with one or more errors.
 
 	$hashref->{code}->{description};
@@ -523,11 +544,11 @@ Will become a private function soon.
 Register the uri 'http://www.openarchives.org/OAI/2.0/' as the prefix 'oai' and
 return a LibXML::xPathContext object
 
-=head2 _validateOAIresponse ($response, 'lax');
+=head2 _validateOAIxml ($response, 'lax');
 
 	new version!
 
- if (!_validateOAIresponse ($response, ['lax'])) {
+ if (!_validateOAIxml ($response, 'lax')) {
 	fail ('validation reason');
  }
 
@@ -613,4 +634,3 @@ This is free software; you can redistribute it and/or modify it under
 the same terms as the Perl 5 programming language system itself.
 
 =cut
-

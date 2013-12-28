@@ -6,12 +6,12 @@ use strict;
 use warnings;
 
 use Getopt::Long;
-use FindBin;
-use File::Spec;
+#use FindBin;
+#use Path::Class;
 
 #should make allow this script to the find the packages before install, like
 #perl -Ilib bin/dp.pl
-use lib File::Spec->catfile( $FindBin::Bin, '..', 'lib' );
+#use lib File::Spec->catfile( $FindBin::Bin, '..', 'lib' );
 use HTTP::OAI;
 use HTTP::OAI::DataProvider;
 use HTTP::OAI::DataProvider::Common;
@@ -121,7 +121,10 @@ sub verbose {
 }
 
 __END__
+
 =pod
+
+=encoding UTF-8
 
 =head1 NAME
 
@@ -129,7 +132,7 @@ dp.pl - command line interface to HTTP::OAI::DataProvider
 
 =head1 VERSION
 
-version 0.007
+version 0.009
 
 =head1 SYNOPSIS
 
@@ -195,4 +198,3 @@ This is free software; you can redistribute it and/or modify it under
 the same terms as the Perl 5 programming language system itself.
 
 =cut
-

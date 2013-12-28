@@ -1,14 +1,14 @@
 package HTTP::OAI::DataProvider::Engine::SQLite;
 {
-  $HTTP::OAI::DataProvider::Engine::SQLite::VERSION = '0.007';
+  $HTTP::OAI::DataProvider::Engine::SQLite::VERSION = '0.009';
 }
 
 # ABSTRACT: A simple and fairly generic SQLite engine for HTTP::OAI::DataProvider
 
 use warnings;
 use strict;
-
 use Moose::Role;
+with 'HTTP::OAI::DataProvider::Engine::Interface';
 
 #use namespace::autoclean;
 use Carp qw(carp croak confess);
@@ -21,7 +21,7 @@ use HTTP::OAI::DataProvider::Engine::Result;
 use HTTP::OAI::DataProvider::ChunkCache;
 use HTTP::OAI::DataProvider::Common qw/Debug Warning/;
 use HTTP::OAI::DataProvider::Transformer;
-with 'HTTP::OAI::DataProvider::Engine::Interface';
+
 
 
 sub queryChunk {
@@ -29,9 +29,9 @@ sub queryChunk {
 	my $chunkDesc = shift or croak "Need chunkDesc!";
 	my $params    = shift or croak "Need params!";
 
-	#print "chunkDesc->chunkNo".$chunkDesc->chunkNo."\n";
-	#print "recordsPerChunk".$self->{chunkCache}{recordsPerChunk}."\n";
 	#Debug "Enter queryChunk";
+	#Debug "chunkDesc->chunkNo".$chunkDesc->chunkNo."\n";
+	#Debug "recordsPerChunk".$self->{chunkCache}{recordsPerChunk}."\n";
 
 	my %opts = (
 		transformer => $self->{transformer},
@@ -46,7 +46,7 @@ sub queryChunk {
 		total        => $chunkDesc->total,
 	);
 
-	#next is optional because last chunk has no next
+	#last chunk has no next
 	if ( $chunkDesc->next ) {
 		$opts{'next'} = $chunkDesc->next;
 	}
@@ -55,11 +55,10 @@ sub queryChunk {
 		$opts{'last'} = 1;
 	}
 
-	my $result = new HTTP::OAI::DataProvider::Engine::Result(%opts);
-	if ( $self->requestURL ) {
-		$result->requestURL = $self->requestURL;
-	}
+	my $result = HTTP::OAI::DataProvider::Engine::Result->new (%opts);
 
+	#should copy all of the requestURL??
+	
 	#SQL
 	my $dbh = $self->{connection}->dbh()       or croak $DBI::errstr;
 	my $sth = $dbh->prepare( $chunkDesc->sql ) or croak $dbh->errstr();
@@ -130,7 +129,7 @@ sub queryChunk {
 
 	# Check result
 	if ( $result->isError ) {
-		return $self->err2XML( $result->isError );
+		return $self->err2XML( $result->isError ); #todo
 	}
 
 	return $result->getResponse;
@@ -223,7 +222,7 @@ sub findByIdentifier {
 	if ( $aref->[0] ) {
 		my $h = new HTTP::OAI::Header(
 			identifier => $identifier,
-			datestamp  => $aref->[0]
+			datestamp  => $aref->[0],
 		);
 
 		#TODO $h->status=$aref->[1];
@@ -309,14 +308,11 @@ sub planChunking {
 			total        => $total
 		);
 
-		#the last chunk has no resumption token
+		#last chunk has no resumption token
 		my $nextToken = $self->mkToken();
 		if ( $chunkNo < $maxChunkNo ) {
 			$chunk->{'next'} = $nextToken;
 		}
-
-		#Debug "planChunking: chunkNo:$chunkNo, token:$currentToken"
-		#  . ", next:$nextToken, offset: $offset, limit ";
 
 		# LOOP stuff: prepare for next loop
 		$chunkNo++;    #now it's safe to increase
@@ -428,7 +424,7 @@ sub _countTotals {
 	my $params = shift;
 
 	my $sql = $self->_queryCount($params);
-	Debug "_countTotals: $sql";
+	#Debug "_countTotals: $sql";
 	my $dbh = $self->{connection}->dbh() or die $DBI::errstr;
 	my $sth = $dbh->prepare($sql)        or croak $dbh->errstr();
 	$sth->execute() or croak $dbh->errstr();
@@ -456,7 +452,8 @@ sub _initDB {
 		return;
 	}
 
-	$dbh->do("PRAGMA foreign_keys");
+	#not sure about foreign keys
+	$dbh->do("PRAGMA foreign_keys = OFF");
 
 	#doesn't seem to make a big difference; default is 2000
 	$dbh->do("PRAGMA cache_size = 8000");
@@ -653,8 +650,12 @@ sub _updateSets {
 }
 
 1;
+
 __END__
+
 =pod
+
+=encoding UTF-8
 
 =head1 NAME
 
@@ -662,7 +663,7 @@ HTTP::OAI::DataProvider::Engine::SQLite - A simple and fairly generic SQLite eng
 
 =head1 VERSION
 
-version 0.007
+version 0.009
 
 =head1 DESCRIPTION
 
@@ -676,7 +677,7 @@ HTTP::OAI::DataProvider::Engine consumes
 
 =head1 METHODS
 
-=head2 my $cache=HTTP::OAI::DataRepository::SQLite::new (@args);
+=head2 my $cache=HTTP::OAI::DataProvider::Engine::SQLite->new (@args);
 
 TODO: params
 
@@ -796,7 +797,7 @@ TODO: Check whether all datestamps comply with format
 =head2 $header=$engine->findByIdentifier($identifier)
 	Finds and return a specific header (HTTP::OAI::Header) by identifier.
 
-	If no header with this identifier found, this method returns nothing. 
+	If no header with this identifier found, nothing is returned. 
 
 =head2 my $i=$self->parseHeaders ($result, $sth);
 
@@ -861,4 +862,3 @@ This is free software; you can redistribute it and/or modify it under
 the same terms as the Perl 5 programming language system itself.
 
 =cut
-

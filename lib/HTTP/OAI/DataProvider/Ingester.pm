@@ -1,6 +1,6 @@
 package HTTP::OAI::DataProvider::Ingester;
 {
-  $HTTP::OAI::DataProvider::Ingester::VERSION = '0.007';
+  $HTTP::OAI::DataProvider::Ingester::VERSION = '0.009';
 }
 #ABSTRACT: Get data from XML file into the DB 
 use strict;
@@ -93,7 +93,10 @@ sub loadXML {
 1;
 
 __END__
+
 =pod
+
+=encoding UTF-8
 
 =head1 NAME
 
@@ -101,14 +104,16 @@ HTTP::OAI::DataProvider::Ingester - Get data from XML file into the DB
 
 =head1 VERSION
 
-version 0.007
+version 0.009
 
 =head1 SYNOPSIS
 
 	use HTTP::OAI::DataProvider::Ingester;
 	my $mouth=new HTTP::OAI::DataProvider::Ingester (
-		engine=>'OAI::DP::SQLite', 
-		engineOpts=$hashRef,
+		engine     => 'OAI::DP::SQLite', 
+		nativePrefix => $natPrefix,
+		nativeURI=>$natURI,
+		dbfile=>$dbfile,
 	);
 	#ingester internally calls new OAI::DP::SQlite (%dbOpts);
 	$ingester->digest($file,$mapping);
@@ -144,4 +149,3 @@ This is free software; you can redistribute it and/or modify it under
 the same terms as the Perl 5 programming language system itself.
 
 =cut
-

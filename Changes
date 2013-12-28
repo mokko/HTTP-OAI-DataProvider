@@ -1,5 +1,12 @@
 RELEASE HISTORY
-$next (0.07) Major Refactoring
+0.9 Major Refactoring (end of 2013)
+-new method "verb" for all verbs
+-request is completely validated in data provider now
+-verb returns HTTP::OAI::Response values now
+-all responses can now be translated to strings using the asString method
+-these changes reduce a lot of clutter 
+
+0.07 Major Refactoring
  -all OO packages now have antlers (Moose).
  Major Interface changes
  -HTTP::OAI::DataProvider now wants arguments as HASH (instead of HashRef).

@@ -1,6 +1,6 @@
 #!perl
 
-use Test::More tests => 8;
+use Test::More tests => 7;
 use HTTP::OAI::DataProvider;
 use HTTP::OAI::DataProvider::Test;
 use XML::LibXML;
@@ -19,73 +19,76 @@ my $baseURL = 'http://localhost:3000/oai';
 
 #
 # the actual tests
-# 1-see if it works
+# 1-see if simple GetRecord works
 {
 	my %params = (
+		verb           => 'GetRecord',
 		metadataPrefix => 'mpx',
 		identifier     => 'spk-berlin.de:EM-objId-524',
 	);
-	my $response = $provider->GetRecord(%params);
+	my $response = $provider->verb(%params);
 	okGetRecord($response);
+	$provider->resetErrorStack;
 }
 
 #
-# 2-OAI errors
+# 2-OAI errors: see if it fails as expected
 #
 
 {
-	my %params = ( identifier => 'spk-berlin.de:EM-objId-40008', );
-	my $response = $provider->GetRecord(%params);
-	if ( !$response ) {
-		$response = $provider->error;
-	}
-	isOAIerror( $response, 'badArgument' );
-}
-
-{
-	my %params = ( metadataPrefix => 'mpx', );
-	my $response = $provider->GetRecord(%params);
-	if ( !$response ) {
-		$response = $provider->error;
-	}
-	isOAIerror( $response, 'badArgument' );
+	my %params = (
+		identifier => 'spk-berlin.de:EM-objId-40008',
+		verb       => 'GetRecord',
+	);
+	my $response = $provider->verb(%params);
+	isOAIerror( $provider->asString($response), 'badArgument' );
+	$provider->resetErrorStack;
 }
 
 {
 	my %params = (
+		metadataPrefix => 'mpx',
+		verb           => 'GetRecord',
+	);
+	my $response = $provider->verb(%params);
+	isOAIerror2( $response, 'badArgument' );
+	$provider->resetErrorStack;
+
+}
+
+{
+	my %params = (
+		verb           => 'GetRecord',
 		metadataPrefix => 'mpx',
 		identifier     => 'spk-berlin.de:EM-objId-40008',
 		meschugge      => 'schixe',
 	);
-	my $response = $provider->GetRecord(%params);
-	if ( !$response ) {
-		$response = $provider->error;
-	}
-	isOAIerror( $response, 'badArgument' );
+	my $response = $provider->verb(%params);
+	isOAIerror2( $response, 'badArgument' );
+	$provider->resetErrorStack;
 }
 
 {
 	my %params = (
+	verb=>'GetRecord',
 		metadataPrefix => 'mpx',
 		identifier     => 'spk-berlin.de:EM-objId-meschugge',
 	);
-	my $response = $provider->GetRecord(%params);
-	isOAIerror( $response, 'idDoesNotExist' );
-	$response = $provider->OAIerror;
-	isOAIerror( $response, 'idDoesNotExist' );
+	my $response = $provider->verb(%params);
+	isOAIerror2( $response, 'idDoesNotExist' );
+
 }
 
 {
 	#make sure that this id exists!
 	my %params = (
+		verb=> 'GetRecord',
 		metadataPrefix => 'meschugge',
 		identifier     => 'spk-berlin.de:EM-objId-524',
 	);
-	my $response = $provider->GetRecord(%params);
-	#print Dumper ($response);
-	isOAIerror( $response, 'cannotDisseminateFormat' );
-	#check if OAIerror message is persistent
-	$response = $provider->OAIerror;
-	isOAIerror( $response, 'cannotDisseminateFormat' );
+	my $response = $provider->verb(%params);
+	isOAIerror2( $response, 'cannotDisseminateFormat' );
+	isOAIerror2( $response, 'cannotDisseminateFormat' );
+
 }
 
