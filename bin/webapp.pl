@@ -7,9 +7,6 @@ use FindBin;
 use Dancer;
 use Path::Class;
 
-#so you don't have to type 'perl -Ilib bin/webapp.pl'
-#use lib dir(())->parent),'lib');
-#use lib dir(dir($FindBin::Bin)->parent,'lib');
 use HTTP::OAI::DataProvider;
 use HTTP::OAI::DataProvider::Test;
 
@@ -28,9 +25,8 @@ my $provider = new HTTP::OAI::DataProvider(%config)
 
 any [ 'get', 'post' ] => '/' => sub {
 	  content_type 'text/xml';                  #to make browser use oai2.xsl
-	  my $params = params();
-	  my $verb   = delete $params->{verb};
-	  return $provider->$verb( %{$params} );
+	  my $response=$provider->verb( %{params()} );
+	  return $provider->asString($response);
   };
 
 dance;
@@ -38,11 +34,10 @@ dance;
 =head1 INTRODCUTION
 
 A working demo of HTTP::OAI::DataProvider inside a webapp. I use the web 
-framework Dancer because I like it. You could use anything else (catalyst, 
-mojolicious) if you like.  
+framework Dancer because I like it. Use whatever you like.
 
-1) start this app from the shell: bin/webapp.pl
-   (it expects config file at '../t/environment/config.pl')
+1) start this app from the shell: perl -Ilib bin/webapp.pl
+   (app expects config file at '../t/environment/config.pl')
 
 2) In your webbrowser point to http:://localhost:3000/?verb=Identify
 

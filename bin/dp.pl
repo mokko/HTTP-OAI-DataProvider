@@ -6,12 +6,6 @@ use strict;
 use warnings;
 
 use Getopt::Long;
-#use FindBin;
-#use Path::Class;
-
-#should make allow this script to the find the packages before install, like
-#perl -Ilib bin/dp.pl
-#use lib File::Spec->catfile( $FindBin::Bin, '..', 'lib' );
 use HTTP::OAI;
 use HTTP::OAI::DataProvider;
 use HTTP::OAI::DataProvider::Common;
@@ -26,12 +20,14 @@ A simple command line interface to HTTP::OAI::DataProvider to execute verbs
 for testing and debugging. 
 
 Note: Neither HTTP::OAI::DataProvider nor this script provide a web front
-end. See bin/eg-app.pl for an example implementation of a webapp.
+end. See bin/eg-app.pl for an example implementation of a webapp. Also, this
+is not a harvester. dp.pl communicates with local installation of 
+HTTP::OAI::DataProvider with direct access to its database (not via HTTP).
 
 =head1 SYNOPSIS
 
 	#OAI verbs and paramters
-	dp --verb Identify
+	dp --host http://127.0.0.1 --verb Identify
 	dp --verb GetRecord --identifier 12342 --metadataPrefix oai_dc
 
 	#other arguments
@@ -56,9 +52,9 @@ Normally, you should never need any of the following functions.
 
 my %params   = getOpt();               #from command line
 my %config   = loadConfig();           #from disk
-my $response = executeVerb(%params);
+my $str = executeVerb(%params);
 verbose "OAI response";
-print "$response\n";
+print "$str\n";
 exit;
 
 #
@@ -152,15 +148,13 @@ sub validateRequest {
 
 sub executeVerb {
     my %params = @_ or die "Need params!";
-    my $verb = $params{verb};
-    delete $params{verb};
-    verbose "About to execute $verb";
+    verbose "About to execute".$params{verb};
 
     #new might die on error
     my $provider = new HTTP::OAI::DataProvider(%config)
       or die "Cant create new object";
-
-    return $provider->$verb(%params) or die "Cant execute verb!";
+    my $response=$provider->verb(%params) or die "Cant execute verb!";
+	return $provider->asString ($response);
 }
 
 =func verbose "bla";

@@ -14,36 +14,28 @@ use namespace::autoclean;
 
 use HTTP::OAI;
 use HTTP::OAI::Repository 'validate_request';
-use HTTP::OAI::DataProvider::Engine;
+use HTTP::OAI::DataProvider::Engine;   #subtype 'Uri' already declared in Engine
 use HTTP::OAI::DataProvider::SetLibrary;
 use HTTP::OAI::DataProvider::Common qw/Debug Warning say/;
 
 =head1 SYNOPSIS
 
-	#(1) Init
 	use HTTP::OAI::DataProvider;
-	my $provider = HTTP::OAI::DataProvider->new(%options);
-	
-	#(2) Verbs: GetRecord, Identify ...
-	my $response=$provider->$verb(%params);
-	my $xml=$provider->asString($response);
+	my $provider = HTTP::OAI::DataProvider->new(%options) or die "Can't init";
+	my $response=$provider->verb(%params); 	#a HTTP::OAI::Response object (verbs or error)
 
-	my $xml=$provider->asString($response);
-	#$response is a HTTP::OAI::Response object (verbs or error)
-
-	#(3) NEW ERROR HANDLING
-	my $response=$provider->addError(code=>'badArgument');
-
-	if (!$provider->validateRequest (%params));
-		my $response=$provider->OAIerrors;
-	}
-
-	#elsewhere
 	if ($provider->error) { 	
 		my $response=$provider->OAIerrors;
 		my $xml=$provider->asString($response);
 		$provider->resetErrorStack;
 	}
+	my $xml=$provider->asString($response);
+
+	#param validation is done internally now, but you could still do it on your end
+	if (!$provider->validateRequest (%params));
+		my $response=$provider->OAIerrors;
+	}
+
 
 =head1 DESCRIPTION
 
@@ -55,7 +47,7 @@ example implementations that should work out of the box, including an SQLite
 backend (DP::Engine::SQLite), a metadata format (DP::Mapping::MPX), web 
 interface (bin/webapp.pl) and a command line interface (bin/dp.pl).
 
-=method my $provider->new ($options);
+=method my $provider->new ($options) or die "Can't init";
 
 Initialize the HTTP::OAI::DataProvider object with the options of your choice.
 
@@ -74,6 +66,18 @@ expects a hashref with key value pairs inside all of which are required:
 
 See OAI specification (Identify) for available options and other details.
 
+=cut
+
+subtype 'identifyType', as 'HashRef', where {
+	     defined $_->{adminEmail}
+	  && defined $_->{baseURL}
+	  && defined $_->{deletedRecord}
+	  && defined $_->{repositoryName}
+	  && URI->new( $_->{baseURL} )->scheme;
+};
+
+has 'identify' => ( isa => 'identifyType', is => 'ro', required => 1 );
+
 =head3 Engine Parameters
 
 engine->{engine} specifies the engine you use. Other parameters depend on the
@@ -83,11 +87,19 @@ engine you use. All engine parameters are handed down to the engine you use.
 		engine    => 'HTTP::OAI::DataProvider::Engine::SQLite',
 		moreParameters => 'see your engine for more info on those params', 
 	},
+=cut
+
+has 'engine' => ( isa => 'HashRef', is => 'ro', required => 1 );
 
 =head3 Message Parameters 
 
 	debug   => sub { my $msg = shift; print "<<$msg\n" if $msg; },
 	warning => sub { my $msg = shift; warn ">>$msg"    if $msg; },
+
+=cut 
+
+has 'debug'   => ( isa => 'CodeRef', is => 'ro', required => 0 );
+has 'warning' => ( isa => 'CodeRef', is => 'ro', required => 0 );
 
 =head3 Metadata Format Parameters 
 
@@ -103,6 +115,21 @@ engine you use. All engine parameters are handed down to the engine you use.
 		},
 	},
 
+=cut
+
+subtype 'globalFormatsType', as 'HashRef', where {
+	foreach my $prefix ( keys %{$_} ) {
+		return if ( !_uriTest( $_->{$prefix} ) );
+	}
+	return 1;    #success
+};
+
+has 'globalFormats' => (
+	isa      => 'globalFormatsType',
+	is       => 'ro',
+	required => 1
+);
+
 =head3 Set Parameters 
 
 	setLibrary => {
@@ -115,6 +142,10 @@ engine you use. All engine parameters are handed down to the engine you use.
 			'setName' => 'testing setSpecs - might not work without this one',
 		},
 	},
+
+=cut
+
+has 'setLibrary' => ( isa => 'HashRef', is => 'ro', required => 1 );
 
 =head3 Other Parameters (Optional)
 
@@ -131,45 +162,23 @@ engine you use. All engine parameters are handed down to the engine you use.
 
 =cut
 
-subtype 'identifyType', as 'HashRef', where {
-	     defined $_->{adminEmail}
-	  && defined $_->{baseURL}
-	  && defined $_->{deletedRecord}
-	  && defined $_->{repositoryName}
-	  && URI->new( $_->{baseURL} )->scheme;
-};
+has 'xslt'       => ( isa => 'Str', is => 'ro', required => 0 );
+has 'requestURL' => ( isa => 'Uri', is => 'rw', required => 0 );
 
-subtype 'globalFormatsType', as 'HashRef', where {
-	foreach my $prefix ( keys %{$_} ) {
-		return if ( !_uriTest( $_->{$prefix} ) );
-	}
-	return 1;    #success
-};
 
-#subtype 'Uri' already declared in Engine
+#INTERNAL (no initarg)
 
-#required
-has 'engine' => ( isa => 'HashRef', is => 'ro', required => 1 );
-has 'globalFormats' => (
-	isa      => 'globalFormatsType',
-	is       => 'ro',
-	required => 1
-);
-has 'identify'   => ( isa => 'identifyType', is => 'ro', required => 1 );
-has 'setLibrary' => ( isa => 'HashRef',      is => 'ro', required => 1 );
-
-#optional
-has 'debug'      => ( isa => 'CodeRef', is => 'ro', required => 0 );
-has 'requestURL' => ( isa => 'Uri',     is => 'rw', required => 0 );
-has 'warning'    => ( isa => 'CodeRef', is => 'ro', required => 0 );
-has 'xslt'       => ( isa => 'Str',     is => 'ro', required => 0 );
-has 'OAIerrors'  => (
+has 'OAIerrors' => (
 	is       => 'rw',
-	required => 0,
+	required => 0,                                 #really?
 	init_arg => undef,
 	isa      => 'HTTP::OAI::Response',
 	default  => sub { HTTP::OAI::Response->new }
 );
+
+#
+#
+#
 
 sub BUILD {
 	my $self = shift or die "Need myself!";
@@ -179,6 +188,47 @@ sub BUILD {
 
 	$self->{Engine} = new HTTP::OAI::DataProvider::Engine( %{ $self->engine } );
 }
+
+
+#
+# VERBs 
+# 
+
+=method verb
+
+	my $response=$provider->verb(%params);
+
+=cut
+
+sub verb {
+	my $self = shift or die "Need myself";
+
+	#dont croak here, prefer propper OAI error
+	my %params = @_ or ();
+
+	$self->resetErrorStack;    #not sure if this should be here
+	$self->validateRequest(%params) or return $self->OAIerrors;
+
+	if ( $params{verb} eq 'GetRecord' ) {
+		return $self->_GetRecord(%params);
+	}
+	elsif ( $params{verb} eq 'Identify' ) {
+		return $self->_Identify(%params);
+	}
+	elsif ( $params{verb} eq 'ListRecords' ) {
+		return $self->_ListRecords(%params);
+	}
+	elsif ( $params{verb} eq 'ListSets' ) {
+		return $self->_ListSets(%params);
+	}
+	elsif ( $params{verb} eq 'ListIdentifiers' ) {
+		return $self->_ListIdentifiers(%params);
+	}
+	elsif ( $params{verb} eq 'ListMetadataFormats' ) {
+		return $self->_ListMetadataFormats(%params);
+	}
+}
+
 
 =method my $result=$provider->_GetRecord(%params);
 
@@ -216,7 +266,7 @@ sub _GetRecord {
 	return $engine->query( \%params );
 }
 
-=method my $response=$provider->Identify([%params]);
+=method my $response=$provider->verb(verb->Identify);
 
 Arguments: none
 
@@ -230,22 +280,24 @@ granularity).
 
 sub _Identify {
 	my $self = shift or die "Need myself";
-	my %params = @_;
-	return $self->OAIerrors if ( $self->error );
-	my $identify = $self->identify;
 
+	#my %params   = @_;
 	#Debug "Enter Identify";
+
+	my $identify = $self->identify;
+	return $self->OAIerrors if $self->error;
+
 	# Metadata munging
-	my $response = new HTTP::OAI::Identify(
-		adminEmail    => $identify->{adminEmail},
-		baseURL       => $identify->{baseURL},
-		deletedRecord => $identify->{deletedRecord},
+	my $response = HTTP::OAI::Identify->new(
+		adminEmail     => $identify->{adminEmail},
+		baseURL        => $identify->{baseURL},
+		deletedRecord  => $identify->{deletedRecord},
+		repositoryName => $identify->{repositoryName},
+		requestURL     => $identify->{requestURL},
 
 		#probably a demeter problem
 		earliestDatestamp => $self->{Engine}->earliestDate(),
 		granularity       => $self->{Engine}->granularity(),
-		repositoryName    => $identify->{repositoryName},
-		requestURL        => $identify->{requestURL},
 	) or return "Cannot create new HTTP::OAI::Identify";
 
 	return $response;    #success
@@ -281,7 +333,6 @@ sub _ListMetadataFormats {
 
 	my $engine = $self->{Engine};
 
-	#only if there is actually an identifier
 	if ( $params{identifier} ) {
 		my $header = $engine->findByIdentifier( $params{identifier} );
 		if ( !$header ) {
@@ -386,8 +437,8 @@ sub _ListIdentifiers {
 	}
 
 	#todo: check if at least one record. Where?
-	return $self->OAIerrors if ( $self->error );
-	return $response;
+	$self->error ? return $self->OAIerrors : return $response;
+
 }
 
 =method my $response=$provider->ListRecords(%params);
@@ -419,7 +470,7 @@ ERRORS
 =cut
 
 sub _ListRecords {
-	my $self = shift;
+	my $self   = shift;
 	my %params = @_;
 	my $engine = $self->{Engine};
 
@@ -449,9 +500,9 @@ sub _ListRecords {
 
 	# Metadata handling
 
-	my $response = $engine->query( \%params );
-	return $self->addError( code => 'noRecordsMatch' ) if ( !$response );
-	return $response;
+	my $response = $engine->query( \%params )
+	  or $self->addError( code => 'noRecordsMatch' );
+	$self->error ? return $self->OAIerrors : return $response;
 }
 
 =method my $response=$provider->ListSets(%params);
@@ -489,12 +540,7 @@ sub _ListSets {
 
 	# Get the setSpecs from engine/store
 	# TODO:test for noSetHierarchy has to be in SetLibrary
-	my @used_sets = $engine->listSets;
-
-	#if none then noSetHierarchy (untested)
-	if ( !@used_sets ) {
-		return $self->addError( code => 'noSetHierarchy' );
-	}
+	my @used_sets = $engine->listSets or $self->addError( code => 'noSetHierarchy' );
 
 	my $listSets = $self->_processSetLibrary();
 
@@ -516,8 +562,73 @@ sub _ListSets {
 			$listSets->set($s);
 		}
 	}
-	return $listSets;
+	$self->error ? return $self->OAIerrors : return $listSets;
 }
+
+#
+# SUPPORT STUFF (PUBLIC)
+#
+
+
+=method my $xml=$self->asString($response);
+
+Expects a HTTP::OAI::Response object and returns it as xml string. It applies
+$self->{xslt} if set and also applies a current requestURL.
+
+=cut
+
+sub asString {
+	my $self = shift or croak "Need myself";
+	my $response = shift
+	  or croak "No response";    #a HTTP::OAI::Response object
+	                             #Debug "$response: " . $response;
+	if ( $self->xslt ) {
+		$response->xslt( $self->xslt ) or carp "problems with xslt!";
+	}
+	$response->requestURL( $self->requestURL );
+
+	my $xml;
+	$response->set_handler( XML::SAX::Writer->new( Output => \$xml ) );
+	$response->generate;
+
+	return encode_utf8($xml);
+
+#as per https://groups.google.com/forum/?fromgroups#!topic/psgi-plack/J0IiUanfgeU
+}
+
+
+=method $self->error
+
+Have errors occured? Returns number of errors that have been added to error 
+stack so far or else false.
+
+=cut
+
+sub error {
+	my $self = shift or croak "Need myself";
+	return $self->OAIerrors->errors;
+}
+
+=method $provider->resetErrorStack;
+
+Creates a new empty HTTP::OAI::Response for OAIerrors. 
+
+I wonder if this should be called before every verb. Then I probably don't
+need to call it from the outside at all.
+
+=cut
+
+sub resetErrorStack {
+	my $self = shift or croak "Need myself!";
+	$self->OAIerrors( HTTP::OAI::Response->new );
+}
+
+
+
+#
+# SUPPORT STUFF, private?
+#
+
 
 =method checkFormatSupported ($prefixWanted);
 
@@ -547,63 +658,13 @@ sub checkFormatSupported {
 	return 1;
 }
 
-=method my $xml=$self->asString($response);
-
-Expects a HTTP::OAI::Response object and returns it as xml string. It applies
-$self->{xslt} if set and also applies a current requestURL.
-
-=cut
-
-sub asString {
-	my $self = shift or croak "Need myself";
-	my $response = shift
-	  or croak "No response";    #a HTTP::OAI::Response object
-	                             #Debug "$response: " . $response;
-	if ( $self->xslt ) {
-		$response->xslt( $self->xslt ) or carp "problems with xslt!";
-	}
-	$response->requestURL( $self->requestURL );
-
-	my $xml;
-	$response->set_handler( XML::SAX::Writer->new( Output => \$xml ) );
-	$response->generate;
-
-	return encode_utf8($xml);
-
-#as per https://groups.google.com/forum/?fromgroups#!topic/psgi-plack/J0IiUanfgeU
-}
-
-=method $self->error
-
-Have errors occured? Returns number of errors that have been added to error 
-stack so far or else false.
-
-=cut
-
-sub error {
-	my $self = shift or croak "Need myself";
-	return $self->OAIerrors->errors;
-}
-
-=method $provider->resetErrorStack;
-
-Creates a new empty HTTP::OAI::Response for OAIerrors. 
-
-I wonder if this should be called before every verb. Then I probably don't
-need to call it from the outside at all.
-
-=cut
-
-sub resetErrorStack {
-	my $self = shift or croak "Need myself!";
-	$self->OAIerrors( HTTP::OAI::Response->new );
-}
-
 =method $self->validateRequest(%params) or return $self->OAIerrors;
 
 Expects params in hash. It saves potential errors in $provider->errorOAI and 
 returns 1 on success (i.e. no validation error) or fails when validation showed
 an error.
+
+Should not be necessary anymore publicly...
 
 =cut
 
@@ -625,9 +686,6 @@ sub validateRequest {
 	return 1;      #success = request is valid
 }
 
-##
-## SUBS that are or should be private
-##
 
 =method $self->addError(code=>$code, message=>$message);
 
@@ -667,40 +725,6 @@ sub _uriTest {
 	return 1;    #exists and is uri
 }
 
-=method verb
-
-	my $response=$provider->verb(%params);
-
-=cut
-
-sub verb {
-	my $self = shift or die "Need myself";
-
-	#dont croak here, prefer propper OAI error
-	my %params = @_ or ();
-
-	$self->resetErrorStack;    #not sure if this should be here
-	$self->validateRequest(%params) or return $self->OAIerrors;
-
-	if ( $params{verb} eq 'GetRecord' ) {
-		return $self->_GetRecord(%params);
-	}
-	elsif ( $params{verb} eq 'Identify' ) {
-		return $self->_Identify(%params);
-	}
-	elsif ( $params{verb} eq 'ListRecords' ) {
-		return $self->_ListRecords(%params);
-	}
-	elsif ( $params{verb} eq 'ListSets' ) {
-		return $self->_ListSets(%params);
-	}
-	elsif ( $params{verb} eq 'ListIdentifiers' ) {
-		return $self->_ListIdentifiers(%params);
-	}
-	elsif ( $params{verb} eq 'ListMetadataFormats' ) {
-		return $self->_ListMetadataFormats(%params);
-	}
-}
 
 sub _processSetLibrary {
 	my $self = shift or croak "Need myself!";
