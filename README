@@ -2,3 +2,13 @@ This is only a dummy for the README. For the real readme see the "Master" branch
 	https://github.com/mokko/HTTP-OAI-DataProvider/tree/master
 
 It seems that dzil's readmeFromPod plugin requires a file that it can overwrite. 
+
+
+HTTP::OAI::DataProvider (object)
+ : expects elaborate configuration during init
+ HTTP::OAI::DataProvider::Engine;   
+ HTTP::OAI::DataProvider::SetLibrary;
+ HTTP::OAI::DataProvider::Common
+ 
+HTTP::OAI::DataProvider::Engine 
+ 

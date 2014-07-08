@@ -165,7 +165,6 @@ has 'setLibrary' => ( isa => 'HashRef', is => 'ro', required => 1 );
 has 'xslt'       => ( isa => 'Str', is => 'ro', required => 0 );
 has 'requestURL' => ( isa => 'Uri', is => 'rw', required => 0 );
 
-
 #INTERNAL (no initarg)
 
 has 'OAIerrors' => (
@@ -189,10 +188,9 @@ sub BUILD {
 	$self->{Engine} = new HTTP::OAI::DataProvider::Engine( %{ $self->engine } );
 }
 
-
 #
-# VERBs 
-# 
+# VERBs
+#
 
 =method verb
 
@@ -228,7 +226,6 @@ sub verb {
 		return $self->_ListMetadataFormats(%params);
 	}
 }
-
 
 =method my $result=$provider->_GetRecord(%params);
 
@@ -357,10 +354,7 @@ sub _ListMetadataFormats {
 		$self->addError( code => 'noMetadataFormats' );
 	}
 
-	if ( $self->error ) {
-		return $self->OAIerrors;
-	}
-	return $list;    #success
+	$self->error ? return $self->OAIerrors : return $list;
 }
 
 =method my $response=$provider->ListIdentifiers (%params);
@@ -430,12 +424,8 @@ sub _ListIdentifiers {
 
 	#Metadata handling: query returns response
 	#always only the first chunk
-	my $response = $engine->query( \%params );    #todo!
-
-	if ( !$response ) {
-		$self->addError( code => 'noRecordsMatch' );
-	}
-
+	my $response = $engine->query( \%params )
+	  or $self->addError( code => 'noRecordsMatch' );    
 	#todo: check if at least one record. Where?
 	$self->error ? return $self->OAIerrors : return $response;
 
@@ -540,7 +530,8 @@ sub _ListSets {
 
 	# Get the setSpecs from engine/store
 	# TODO:test for noSetHierarchy has to be in SetLibrary
-	my @used_sets = $engine->listSets or $self->addError( code => 'noSetHierarchy' );
+	my @used_sets = $engine->listSets
+	  or $self->addError( code => 'noSetHierarchy' );
 
 	my $listSets = $self->_processSetLibrary();
 
@@ -569,7 +560,6 @@ sub _ListSets {
 # SUPPORT STUFF (PUBLIC)
 #
 
-
 =method my $xml=$self->asString($response);
 
 Expects a HTTP::OAI::Response object and returns it as xml string. It applies
@@ -595,7 +585,6 @@ sub asString {
 
 #as per https://groups.google.com/forum/?fromgroups#!topic/psgi-plack/J0IiUanfgeU
 }
-
 
 =method $self->error
 
@@ -623,12 +612,9 @@ sub resetErrorStack {
 	$self->OAIerrors( HTTP::OAI::Response->new );
 }
 
-
-
 #
 # SUPPORT STUFF, private?
 #
-
 
 =method checkFormatSupported ($prefixWanted);
 
@@ -686,7 +672,6 @@ sub validateRequest {
 	return 1;      #success = request is valid
 }
 
-
 =method $self->addError(code=>$code, message=>$message);
 
 Expected is an error code and optionally an error message. If not specified, 
@@ -696,6 +681,8 @@ HTTP::OAI::Response object with the error stack. Croaks on failure.
 TODO: Theoretically, I need a way to add multiple errors at once:
 
 $self->addError([(code=>$code, message=>$message), (code=>$code, message=>$message)]);
+
+Currently, on failire addError may die...
 
 =cut
 
@@ -724,7 +711,6 @@ sub _uriTest {
 	}
 	return 1;    #exists and is uri
 }
-
 
 sub _processSetLibrary {
 	my $self = shift or croak "Need myself!";

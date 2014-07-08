@@ -26,7 +26,7 @@ subtype 'nativeFormatType', as 'HashRef', where {
 subtype 'chunkCacheType', as 'HashRef', where {
 	my @list = qw (maxChunks recordsPerChunk);
 	foreach my $item (@list) {
-		my $it=$_->{$item};
+		my $it = $_->{$item};
 		return unless ( $it && looks_like_number($it) && $it > 0 );
 	}
 	return 1;                                    #success
@@ -34,21 +34,37 @@ subtype 'chunkCacheType', as 'HashRef', where {
 
 subtype 'Uri', as 'Str', where { URI->new($_)->scheme; };
 
-has 'chunkCache'   => ( isa => 'chunkCacheType',   is => 'ro', required => 1 );
-has 'dbfile'       => ( isa => 'Str',              is => 'ro', required => 1 );
-has 'engine'       => ( isa => 'Str',              is => 'ro', required => 1 );
-has 'locateXSL'    => ( isa => 'CodeRef',          is => 'ro', required => 1 );
-has 'nativeFormat' => ( isa => 'nativeFormatType', is => 'ro', required => 1 );
-has 'requestURL'   => ( isa => 'Uri',              is => 'rw', required => 0 );
+#
+# many of the following attributes should not be required, since they are
+# engine specific. Perhaps it would be cleaner to pass the engine's opts
+# directly to engine?
+# HTTP::OAI::DataProvider::Engine->new (
+#    Engine=>'HTTP::OAI::DataProvider::Engine::SQLite,
+#    Opts=>(a=>'a', b=>'b');
+# );
+#
 
-#N.B. $self->ChunkCache is HTTP::OAI::DataProvider::ChunkCache object.
+#chunkCache could have been called the resumptionToken cache
+has 'chunkCache' => ( isa => 'chunkCacheType', is => 'ro', required => 1 );     #needed for chunkExists
+has 'engine'       => ( isa => 'Str',              is => 'ro', required => 1 ); #needed to consume role
+has 'locateXSL'    => ( isa => 'CodeRef',          is => 'ro', required => 1 ); #needed for transformer
+has 'nativeFormat' => ( isa => 'nativeFormatType', is => 'ro', required => 1 ); #needed for transformer
+has 'requestURL'   => ( isa => 'Uri',              is => 'rw', required => 0 ); #not sure if needed
+
+#should be required in SQLite not here...
+has 'dbfile'       => ( isa => 'Str',              is => 'ro', required => 1 ); 
+
+
+
+#N.B. 
+#$self->ChunkCache is HTTP::OAI::DataProvider::ChunkCache object.
+#$self->transformer is a HTTP::OAI::DataProvider::Transformer object
 
 =head1 DESCRIPTION
 
 Engine is the generic part for getting data of out the database (querying). 
-Engine loads the specific database engine, e.g. DP::Engine::SQLite. (Actually,
-consumes the engine as a role and hence inherits methods from it, but I am not
-sure that this distinction is necessary in this place). 
+Engine dynamically consumes a specific database engine, e.g. 
+   DP::Engine::SQLite. 
 
 Engine is analogous to the DP::Ingester package which provides a similar 
 service for getting data into the database.
@@ -73,7 +89,7 @@ DP::Ingester (class) consumes
 =head1 SYNOPSIS
 
 	use HTTP::OAI::DataProvider::Engine;
-	my $engine=new HTTP::OAI::DataProvider::Engine (
+	my $engine=HTTP::OAI::DataProvider::Engine->new (
 		engine=>'DataProvider::SQLite',
 		engineOpts=>$hashRef,
 	);
@@ -98,6 +114,32 @@ DP::Ingester (class) consumes
 	
 =cut
 
+sub BUILD {
+	my $self = shift or croak "Need myself";
+
+	#init transformer object
+	$self->{transformer} = HTTP::OAI::DataProvider::Transformer->new(
+		nativePrefix => $self->nativePrefix,
+		locateXSL    => $self->locateXSL,
+	);
+
+	with $self->engine;    # dynamically consume a role 
+	$self->init();         # an engine object which consumed a role
+}
+
+#
+# METHODS every engine obj knows ...
+#
+
+=method my $pref=$engine->nativePrefix();
+
+Returns native prefix as set during init (nativeFormat), i.e. the prefix for 
+the data format used for internally in the db.
+
+Why is this here? Should this be in HTTP::OAI::DataProvider instead? Should this be in role instead?
+
+=cut
+
 sub nativePrefix {
 	my $self = shift or confess "Need myself!";
 	my $nativePrefix = ( keys %{ $self->nativeFormat } )[0];
@@ -106,27 +148,12 @@ sub nativePrefix {
 	return $nativePrefix;
 }
 
-sub BUILD {
-	my $self = shift or croak "Need myself";
-
-	#dynamically consume a role and inherit from it
-
-	$self->{transformer} = new HTTP::OAI::DataProvider::Transformer(
-		nativePrefix => $self->nativePrefix,
-		locateXSL    => $self->locateXSL,
-	);
-	with $self->engine;
-
-	$self->init();
-}
-
-=head2 $result=$provider->query ($params);
+=method $result=$provider->query ($params);
 
 Expects OAI parameters as hashref (TODO: hash). query 
 a) plans the chunking, 
 b) saves the chunks in chunk cache and 
-c) returns the first chunk as
-	HTTP::OAI::DataProvider::Result 
+c) returns the first chunk as HTTP::OAI::DataProvider::Result 
    reflecting data from database
 
 Gets called from GetRecord, ListRecords, ListIdentifiers. Possible parameters
@@ -135,6 +162,9 @@ should not get here.)
 
 TODO: What to do on failure? Should return nothing and set $self->error 
 internally
+
+Why is this here? Should this be in HTTP::OAI::DataProvider instead?
+
 
 =cut
 
@@ -146,7 +176,8 @@ sub query {
 
 	#if there are no results there is no first chunk
 	if ( !$first ) {
-		$self->{error} = 'query: no results (no chunk)!';
+		$self->{error} =
+		  'query: no results (no chunk)!';    #is this a proper error message?
 		return;
 	}
 
@@ -159,18 +190,12 @@ sub query {
 =method my $chunk=$self->chunkExists (%params);
 
 returns a chunk (not a chunk description) for a specified resumptionToken or 
-nothing (no chunk exists for this token).
+nothing if no chunk exists for this token.
 
 Expects a hashref with a resumptionToken (resumptionToken=>$token). On failure 
 (if resumptionToken is not known to chunk cache), it returns nothing.
 
-	my $chunk=$self->chunkExists (%params);
-	if (!$chunk) {
-		return new HTTP::OAI::Error (code=>'badResumptionToken');
-	}
-
-	#or:
- 	my $chunk=$engine->chunkExists(resumptionToken=>$resumptionToken) or return;
+	my $chunk=$self->chunkExists (%params) or return HTTP::OAI::Error->new (code=>'badResumptionToken');
 
 =cut
 
@@ -189,29 +214,38 @@ sub chunkExists {
 	return $self->queryChunk( $chunkDesc, \%params );
 }
 
-=head1 MEMO TO MYSELF
+=method my $token=$engine->mkToken; #check if still needed!
 
--A child class inherits methods from the parent.
--Conversely, a parent class gives its methods to a child class. 
--The child declares its parent class (who their parent is).
+Returns a fairly arbitrary unique token (miliseconds since epoch). 
 
--A role (definition) gives its methods to the consumer. 
--Conversely, the consumer inherits methods from the role. 
--The consumer declares its role using the 'with' keyword.
+=cut
 
-Engine could be role. SQLite could consumer or vice versa.
+sub mkToken {
+	my ( $sec, $msec ) = gettimeofday;
+	return time . $msec;
+}
 
-What I really want to do is to dynamically load a module, either as 
-role or as a module to do this:
-	package Engine {
-		use Moose;
-		with $someModule;
-		my $engine= new $someModule (%opts);
-		$engine->method();
-	}
+# MEMO TO SELF
+#A child class inherits methods from the parent.
+#Conversely, a parent class gives its methods to a child class.
+#The child declares its parent class (who their parent is).
 
-	Engine inherits methods from SQLite.
-	Database defines interface for SQLite.
+#A role (definition) gives its methods to the consumer.
+#Conversely, the consumer inherits methods from the role.
+#The consumer declares its role using the 'with' keyword.
+
+#Engine could be role. SQLite could consumer or vice versa.
+
+#What I really want to do is to dynamically load a module, either as
+#role or as a module to do this:
+#	package Engine {
+#		use Moose;
+#		with $someModule;
+#		my $engine= new $someModule (%opts);
+#		$engine->method();
+#	}
+#	Engine inherits methods from SQLite.
+#	Database defines interface for SQLite.
 
 =head1 TODO
 
@@ -243,21 +277,6 @@ What does the engine need?
 
 =cut
 
-###
-### OLD STUFF - Todo: check if still needed!
-###
-
-=head2 my $token=$engine->mkToken;
-
-Returns a fairly arbitrary unique token (miliseconds since epoch). 
-
-=cut
-
-sub mkToken {
-	my ( $sec, $msec ) = gettimeofday;
-	return time . $msec;
-}
-
-#doesn't work if it is immutable
+#doesn't work if it is immutable because of dynamic role loading
 #__PACKAGE__->meta->make_immutable;
 1;

@@ -84,7 +84,7 @@ sub queryChunk {
 
 	my %opts = (
 		transformer => $self->{transformer},
-		verb        => $params->{verb},
+		verb        => $params->{verb}, #should I delete the verb?
 		params      => $params,
 
 		#for resumptionToken
@@ -354,7 +354,6 @@ will re-enter this loop at a later point in time.
 
 =method init
 
-was initChunkCache()
 
 Would this method better be in DP::Engine::SQLite. Does it make much of a 
 difference? DP::Engine inherits from the engine, DP:Engine 
@@ -371,7 +370,7 @@ sub init {
 	my $self = shift or croak "Need myself!";
 
 	$self->{ChunkCache} =
-	     new HTTP::OAI::DataProvider::ChunkCache( maxSize => $self->{chunkCache}{maxChunks} )
+	     HTTP::OAI::DataProvider::ChunkCache->new ( maxSize => $self->{chunkCache}{maxChunks} )
 	  or croak "Cannot init chunkCache";
 
 	$self->_initDB();
