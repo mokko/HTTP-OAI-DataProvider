@@ -1,5 +1,8 @@
 RELEASE HISTORY
 0.10 Cleaning up pod
+ some minor refactoring
+ HTTP::OAI::DataProvider::ChunkCache and ChunkCache::Description switched to Moo
+ changes of this version currently not well tested
 
 0.9 Major Refactoring (end of 2013)
 -new method "verb" for all verbs

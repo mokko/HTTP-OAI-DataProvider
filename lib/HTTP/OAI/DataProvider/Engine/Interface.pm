@@ -1,5 +1,6 @@
+# ABSTRACT: Requirements for all engines
 package HTTP::OAI::DataProvider::Engine::Interface;
-# ABSTRACT: my first interface
+
 use strict;
 use warnings;
 use Moose::Role;

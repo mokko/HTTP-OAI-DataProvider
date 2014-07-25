@@ -1,28 +1,27 @@
+# ABSTRACT: Store request info per resumptionToken
 package HTTP::OAI::DataProvider::ChunkCache;
+
 use strict;
 use warnings;
-
-# ABSTRACT: Store request info per resumptionToken
-
-use Moose;
-use namespace::autoclean;
+use Moo;
+use MooX::Types::MooseLike::Base qw/Int/;
 use Carp qw/carp croak/;
 use HTTP::OAI::DataProvider::ChunkCache::Description;
 #use HTTP::OAI::DataProvider::Common qw/Debug Warning/;
 our $chunkCache = {};
-has 'maxSize' => ( is => 'ro', isa => 'Int', required => '1' );
+has 'maxSize' => ( is => 'ro', isa => Int, required => '1' );
 
 =head1 SYNOPSIS
 
 	use HTTP::OAI::DataProvider::ChunkCache;
-	my $cache=new HTTP::OAI::DataProvider::ChunkCache (maxSize=>$integer);
+	my $cache=HTTP::OAI::DataProvider::ChunkCache->new (maxSize=>$integer);
 
 	#chunkDesc is a chunk described as hashref
 	#Last description doesn't have a next
-	my $chunkDesc= new HTTP::OAI::DataProvider::ChunkCache::Description(
+	my $chunkDesc= HTTP::OAI::DataProvider::ChunkCache::Description->new (
 		chunkNo=>$chunkNo,
 		maxChunkNo=>$maxChunkNo,
-		[next=>$token,]
+		#next=>$token,
 		sql=>$sql,
 		token=>$token,
 		total=>$total,
@@ -40,9 +39,7 @@ has 'maxSize' => ( is => 'ro', isa => 'Int', required => '1' );
 
 	my @tokens=$cache->list;	#list tokens
 
-=head2 my $chunkCache=HTTP::OAI::DataProvider::ChunkCache::new (maxSize=>1000);
-
-=head2 $chunkCache->add(%chunk);
+=method $chunkCache->add(%chunk);
 
 Add chunk information to the cache. Add will delete old chunks if no of cached
 chunks would exceed maxSize after adding it. On error: carps and returns 0.
@@ -156,5 +153,4 @@ sub _rmFromCache {    #gets called in add
 	}
 }
 
-__PACKAGE__->meta->make_immutable;
 1;

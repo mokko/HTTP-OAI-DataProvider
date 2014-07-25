@@ -1,5 +1,6 @@
-package HTTP::OAI::DataProvider::Ingester;
 #ABSTRACT: Get data from XML file into the DB 
+package HTTP::OAI::DataProvider::Ingester;
+
 use strict;
 use warnings;
 use Moose;

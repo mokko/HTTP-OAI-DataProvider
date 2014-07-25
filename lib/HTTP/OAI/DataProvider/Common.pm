@@ -1,9 +1,8 @@
+# ABSTRACT: common FUNCTIONs for the dataProvider
 package HTTP::OAI::DataProvider::Common;
+
 use strict;
 use warnings;
-
-# ABSTRACT: common FUNCTIONs for the dataProvider
-
 use Scalar::Util;
 use Carp qw(carp croak);
 use Cwd qw(realpath);

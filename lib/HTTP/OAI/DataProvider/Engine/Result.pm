@@ -10,43 +10,29 @@ use Encode qw/decode/;    #encoding problem when dealing with data from sqlite
 
 =head1 DESCRIPTIOPN
 
-A result is an object that can carry 
-[a) info to carry out a DB query and (should ChunkCache, right?)]
-b) the db response before it is transformed to a HTTP::OAI::Response object.
-c) it can also carry OAI errors
+The result object mainly stores the db response. It can also carry OAI 
+errors. It also provides convenience methods that provide information on the 
+response.
 
 =head1 OLD SYNOPSIS 
 
 	#INIT
-	my $result=new HTTP::OAI::DataProvider::Engine (%opts);
+	my $result=HTTP::OAI::DataProvider::Engine::Result->new (%opts);
 
 	#setter and getter for requestURL, will be applied in wrapper, see below
 	my $request=$result->requestURL ([$request]);
 
-	#RECORDS
+	#save RECORDS to result object
 	#write records to result
-	$result->saveRecord ($params, $header,$md);
+	$result->save ($params, $header,$md);
 
-	# makes a record from parts, also transforms md
-	$result->_addRecord ($record); #prefer saveRecord if possible
-
-	#simple count
+	#Utilities
 	print $result->countRecords. ' results';
+	print $result->countHeaders. 'headers';
 
 	#access to record data
 	my @records=$result->returnRecords;
-
-	#HEADERS
-	print $result->countHeaders. 'headers';
-
-	#depending on $result will return listIdentifiers or listRecords
-	my $response=$result->getResponse
-
-	#WRAPPERS
-	#return records/headers as a HTTP::OAI::Response
-	my $getRecord=$result->toGetRecord;
-	my $listIdentifiers=$result->toListIdentifiers;
-	my $listRecords=$result->toListRecords;
+	my $response=$result->getResponse; # response is HTTP::OAI::Response
 
 	#CHUNKING
 	$result->chunk; #figures out maxChunkNo and sets
@@ -61,7 +47,7 @@ c) it can also carry OAI errors
 	$result->mkToken; #make a token using current micro second
 =cut
 
-#not sure if I should inherit from Engine!
+#not sure if I should inherit Engine here!
 #use parent qw(HTTP::OAI::DataProvider::Engine);
 use HTTP::OAI::DataProvider::Common qw(Warning Debug);
 
@@ -77,20 +63,20 @@ has 'total'        => ( isa => 'Str', is => 'ro', required => 1 );
 has 'next'       => ( isa => 'Str', is => 'rw', required => 0 );
 has 'requestURL' => ( isa => 'Str', is => 'rw', required => 0 );
 
-=method my $result=HTTP::OAI::DataProvider::Engine->new (%opts);
+=method my $result=HTTP::OAI::DataProvider::Engine::Result->new (%opts);
 
 	my %opts = (
-		requestURL  => $requestURL, #optional
-		transformer => $transformer, #required
-		verb        => $verb, #required
-		params      => $params,		#this params should not have a verb
+		requestURL  => $requestURL,    #optional
+		transformer => $transformer,   #required
+		verb        => $verb,          #required
+		params      => $params,		   #this params should not have a verb
 
 		#for resumptionToken
-		chunkSize    => $chunkSize,
-		chunkNo      => $chunkNo,
-		targetPrefix => $targetPrefix,
-		token        => $token,
-		total        => $total,
+		chunkSize    => $chunkSize,    #max. chunks in cache
+		chunkNo      => $chunkNo,      #no of current chunk
+		targetPrefix => $targetPrefix, #metadataFormat
+		token        => $token,        #resumptionToken
+		total        => $total,        #total no of items
 	);
 
 #$opts{last}
@@ -104,7 +90,7 @@ sub BUILD {
 	#init values
 	$self->{records}   = [];    #use $result->countRecords
 	$self->{headCount} = 0;     #use $result->countHeaders
-	$self->{headers} = new HTTP::OAI::ListIdentifiers;
+	$self->{headers} = HTTP::OAI::ListIdentifiers->new;
 	$self->{errors}  = [];
 
 }
@@ -193,14 +179,11 @@ Adds a header to the result object.
 
 sub _addHeader {
 	my $result = shift;
-	my $header = shift;
+	my $header = shift or croak "Internal Error: Cannot add header, because \$header missing!";
 
 	#Debug "Enter _addHeader";
 
 	$result->{headCount}++;
-	if ( !$header ) {
-		croak "Internal Error: Cannot add header, because \$header missing!";
-	}
 
 	if ( ref $header ne 'HTTP::OAI::Header' ) {
 		croak 'Internal Error: object is not HTTP::OAI::Header';
@@ -213,19 +196,15 @@ sub _addHeader {
 
 =method $result->_addRecord ($record);
 
-Adds a record to the result object. Gets called by saveRecord.
+Adds a record to the result object. Gets called by save.
 
 =cut
 
 sub _addRecord {
 	my $result = shift;
-	my $record = shift;
+	my $record = shift or croak "Internal Error: Nothing to add";
 	$result->{recCount}++;      #number of records (cursor)
 	$result->{posInChunk}++;    #position in chunk, not cursor
-
-	if ( !$record ) {
-		croak "Internal Error: Nothing add";
-	}
 
 	if ( ref $record ne 'HTTP::OAI::Record' ) {
 		croak 'Internal Error: record is not HTTP::OAI::Record';
@@ -406,24 +385,21 @@ sub save {
 
 		#Debug "prefix:$prefix-----------------------";
 
-		my $transformer = $result->{transformer};
+		my $transformer = $result->{transformer} or Warning "Transformer not available";
+
 		if ($transformer) {
 			$dom = $transformer->toTargetPrefix( $prefix, $dom );
-
 			#Debug "transformed dom" . $dom;
-		}
-		else {
-			Warning "Transformer not available";
 		}
 
 		#Debug $dom->toString;
-		$args{metadata} = new HTTP::OAI::Metadata( dom => $dom );
+		$args{metadata} = HTTP::OAI::Metadata->new ( dom => $dom );
 	}
 	else {
 		Warning "metadata not available, but that might well be the case";
 	}
 
-	my $record = new HTTP::OAI::Record(%args);
+	my $record = HTTP::OAI::Record->new (%args);
 	$result->_addRecord($record);
 	return 0;    #success
 }

@@ -1,8 +1,8 @@
+# ABSTRACT: Interface between database and data provider
 package HTTP::OAI::DataProvider::Engine;
+
 use strict;
 use warnings;
-
-# ABSTRACT: interface between database and data provider
 use Moose;
 use Moose::Util::TypeConstraints;
 use namespace::autoclean;
@@ -55,11 +55,6 @@ has 'requestURL'   => ( isa => 'Uri',              is => 'rw', required => 0 ); 
 has 'dbfile'       => ( isa => 'Str',              is => 'ro', required => 1 ); 
 
 
-
-#N.B. 
-#$self->ChunkCache is HTTP::OAI::DataProvider::ChunkCache object.
-#$self->transformer is a HTTP::OAI::DataProvider::Transformer object
-
 =head1 DESCRIPTION
 
 Engine is the generic part for getting data of out the database (querying). 
@@ -76,7 +71,7 @@ This class is generic in the sense that it doesn't know about
 =head2 CLASS LAYOUT
 
 HTTP::OAI::DataProvider (object) creates
-  DP::Engine (class) consumes
+  DP::Engine (object) consumes
     DP::Engine::SQLite (role) consumes
       DP::Engine::Interface (role)
       	is more than just interface, also includes some general methods

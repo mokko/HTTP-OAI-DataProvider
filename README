@@ -4,11 +4,42 @@ This is only a dummy for the README. For the real readme see the "Master" branch
 It seems that dzil's readmeFromPod plugin requires a file that it can overwrite. 
 
 
-HTTP::OAI::DataProvider (object)
- : expects elaborate configuration during init
- HTTP::OAI::DataProvider::Engine;   
- HTTP::OAI::DataProvider::SetLibrary;
+HTTP::OAI::DataProvider (object) 
+ : this is the data provider that end use should interact with
+ : INPUT expects elaborate configuration during init
  HTTP::OAI::DataProvider::Common
+ HTTP::OAI::DataProvider::Engine  
+ HTTP::OAI::DataProvider::SetLibrary
+
+HTTP::OAI::DataProvider::Common
+ : common helper FUNCTIONS like Debug and Warnings
+
+HTTP::OAI::DataProvider::SetLibrary
+ : ???
  
-HTTP::OAI::DataProvider::Engine 
+HTTP::OAI::DataProvider::Engine (object)
+ : generic database layer, i.e. should be agnostic of database engine and data format 
+ HTTP::OAI::DataProvider::Common
+ HTTP::OAI::DataProvider::ChunkCache
+ HTTP::OAI::DataProvider::Transformer
+ consumes HTTP::OAI::DataProvider::Engine::SQLite
  
+HTTP::OAI::DataProvider::Engine::SQLite (role)
+ : obviously SQLite specific, e.g. has SQL
+ HTTP::OAI::DataProvider::Common
+ HTTP::OAI::DataProvider::Engine::Result
+ HTTP::OAI::DataProvider::ChunkCache
+ HTTP::OAI::DataProvider::Transformer
+ why are the chunkCache and Transformer loaded from both SQLite and Engine?
+
+HTTP::OAI::DataProvider::ChunkCache (object)
+ stores a limited number of SQL queries and other stuff necessary for pagination
+ 
+HTTP::OAI::DataProvider::Transformer (object)
+ an object that allows for XSLT transformations
+ 
+HTTP::OAI::DataProvider::Engine::Result (object)
+ parses results from DP::Engine into HTTP::OAI objects
+ and provides utilities e.g. 
+ 	$result->lastChunk 
+ returns success for if currently working on last chunk  
